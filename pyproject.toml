@@ -53,6 +53,14 @@ guardrails-nemo = ["nemoguardrails>=0.9"]
 ragas = ["ragas>=0.1"]
 trulens = ["trulens>=0.32"]
 
+# ── API Server ────────────────────────────────────────────────────────
+api = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+    "python-multipart>=0.0.9",
+    "sse-starlette>=2.0.0",
+]
+
 # ── Convenience bundles ──────────────────────────────────────────────
 all = [
     "advanced-rag[telemetry,openai,anthropic,cohere,qdrant,unstructured,ragas]",
