@@ -184,12 +184,12 @@ export function ChatPanel({
             placeholder="Ask a question about the uploaded document corpus..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            className="flex-1 bg-white dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-full px-5 py-3 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all placeholder-slate-400"
+            className="flex-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-full px-5 py-3 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all placeholder-slate-400"
             disabled={isGenerating}
           />
 
           {/* Mode switcher (Stream vs Evaluate) */}
-          <div className="flex items-center gap-1.5 bg-white dark:bg-slate-955 border border-slate-200 dark:border-slate-850 px-3 py-1.5 rounded-full shadow-sm text-xs font-medium shrink-0">
+          <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-full shadow-sm text-xs font-medium shrink-0">
             <span className="text-slate-500">Stream</span>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -198,7 +198,7 @@ export function ChatPanel({
                 onChange={(e) => setStreamResponse(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-7 h-4 bg-slate-205 dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+              <div className="w-7 h-4 bg-slate-200 dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
             </label>
             <span className="text-slate-500">Evaluate</span>
           </div>

@@ -37,6 +37,7 @@ export default function App() {
   useEffect(() => {
     fetchStatus();
     fetchConfig();
+    document.documentElement.classList.add("dark");
     document.documentElement.setAttribute("data-theme", "dark");
   }, []);
 
@@ -319,12 +320,17 @@ export default function App() {
   const toggleTheme = () => {
     const nextDark = !isDarkMode;
     setIsDarkMode(nextDark);
+    if (nextDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
     document.documentElement.style.setProperty("color-scheme", nextDark ? "dark" : "light");
     document.documentElement.setAttribute("data-theme", nextDark ? "dark" : "light");
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-955 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
       {/* Toast popup */}
       <Toast toast={toast} />
 
@@ -339,7 +345,7 @@ export default function App() {
       />
 
       {/* Main Panel Content Window */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50 dark:bg-slate-950">
         {/* Page Header bar */}
         <Header activePage={activePage} status={status} />
 

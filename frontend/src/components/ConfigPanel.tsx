@@ -126,7 +126,7 @@ export function ConfigPanel({
                     <select
                       value={configData.ingestion?.chunker?.provider || "semantic"}
                       onChange={(e) => handleUpdateConfigValue(["ingestion", "chunker", "provider"], e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:border-primary"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
                     >
                       <option value="semantic">Semantic Chunker</option>
                       <option value="recursive">Recursive Character</option>
@@ -207,7 +207,7 @@ export function ConfigPanel({
                     <select
                       value={configData.retrieval?.strategy || "simple"}
                       onChange={(e) => handleUpdateConfigValue(["retrieval", "strategy"], e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:border-primary"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
                     >
                       <option value="simple">Simple Dense Search</option>
                       <option value="multi_query">Multi-Query Expansion</option>
@@ -278,7 +278,7 @@ export function ConfigPanel({
                     <select
                       value={configData.llm?.provider || "openai"}
                       onChange={(e) => handleUpdateConfigValue(["llm", "provider"], e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-955 border border-slate-200 dark:border-slate-800 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:border-primary"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
                     >
                       <option value="openai">OpenAI GPT</option>
                       <option value="anthropic">Anthropic Claude</option>
