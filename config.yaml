@@ -1,120 +1,38 @@
-# ==============================================================================
-# Advanced RAG Framework — Pipeline Configuration
-# ==============================================================================
-# This configuration acts as the single source of truth for the RAG engine.
-# Pydantic validates this file at startup to construct the pipeline components.
-
-project:
-  name: "enterprise-rag-pipeline"
-  version: "1.0.0"
-  environment: "development" # "development", "staging", "production"
-
-observability:
-  logging:
-    level: "INFO" # "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
-    format: "json" # "json", "text"
-    output: "stdout" # "stdout", "file"
-    file_path: null
-  tracing:
-    enabled: true
-    provider: "opentelemetry" # "opentelemetry", "langsmith"
-    endpoint: "http://localhost:4317"
-    service_name: "enterprise-rag"
-    api_key: "${LANGCHAIN_API_KEY:-}" # Interpolated from environment
-    sample_rate: 1.0
-  metrics:
-    enabled: true
-    provider: "prometheus"
-    port: 9090
-
-ingestion:
-  parser:
-    provider: "unstructured" # "unstructured", "llamaparse"
-    config:
-      strategy: "hi_res" # "hi_res", "fast", "ocr_only"
-      languages: ["en"]
-  chunker:
-    provider: "semantic" # "semantic", "recursive", "hierarchical", "fixed_size"
-    config:
-      target_chunk_size: 500
-      buffer_size: 1
-      similarity_threshold: 0.85
-  batch_size: 50
-
 embeddings:
-  provider: "openai" # "openai", "cohere", "local"
-  config:
-    model: "text-embedding-3-small"
-    dimensions: 1536
-    max_retries: 3
-    api_key: "${OPENAI_API_KEY:-}"
-
-llm:
-  provider: "openai" # "openai", "anthropic", "cohere", "local"
-  config:
-    model: "gpt-4o-mini"
-    temperature: 0.1
-    max_tokens: 2048
-    api_key: "${OPENAI_API_KEY:-}"
-
-vector_store:
-  provider: "qdrant" # "qdrant", "pinecone", "milvus", "pgvector"
-  config:
-    url: "http://localhost:6333"
-    api_key: "${QDRANT_API_KEY:-}"
-    collection_name: "documents"
-    distance: "cosine"
-
-retrieval:
-  strategy: "simple" # "simple", "multi_query", "contextual_compression", "auto_merging"
-  top_k: 10
-  similarity_threshold: 0.7
   config: {}
-  reranker:
-    provider: "cohere" # "cohere", "cross_encoder"
-    config:
-      model: "rerank-english-v3.0"
-      top_n: 5
-      api_key: "${COHERE_API_KEY:-}"
-
+  provider: openai
 generation:
-  system_prompt: >
-    You are an expert enterprise research assistant. Answer the user's question
-    accurately and concisely using ONLY the provided document contexts.
-    If the context does not contain enough information to answer, state:
-    "I cannot find the answer based on the provided context."
-  prompt_template: >
-    Context:
+  include_sources: true
+  max_context_chunks: 5
+  prompt_template: 'Context:
+
     {context}
 
-    ---
 
-    Question: {query}
-
-    Answer:
-  max_context_chunks: 5
-  include_sources: true
-
-guardrails:
-  enabled: true
-  input:
-    provider: "llama_guard" # "llama_guard", "nemo"
+    Question: {query}'
+  system_prompt: You are a helpful assistant.
+ingestion:
+  batch_size: 10
+  chunker:
     config:
-      model: "meta-llama/Llama-Guard-3-8B"
-      base_url: "https://api.together.xyz/v1"
-      api_key: "${TOGETHER_API_KEY:-}"
-  output:
-    provider: "llama_guard"
-    config:
-      model: "meta-llama/Llama-Guard-3-8B"
-      base_url: "https://api.together.xyz/v1"
-      api_key: "${TOGETHER_API_KEY:-}"
-
-evaluation:
-  enabled: true
-  provider: "ragas" # "ragas", "trulens"
-  config:
-    metrics: ["faithfulness", "answer_relevancy"]
-    llm_model: "gpt-4o-mini"
-    embeddings_model: "text-embedding-3-small"
-    api_key: "${OPENAI_API_KEY:-}"
+      target_chunk_size: 600
+    provider: semantic
+  parser:
+    config: {}
+    provider: unstructured
+llm:
+  config: {}
+  provider: openai
+project:
+  environment: development
+  name: verified-sandbox-pipeline
+  version: 1.0.0
+retrieval:
+  config: {}
+  reranker: null
+  similarity_threshold: 0.0
+  strategy: simple
+  top_k: 3
+vector_store:
+  config: {}
+  provider: qdrant

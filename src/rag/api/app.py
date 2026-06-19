@@ -29,6 +29,9 @@ use_mock_mode: bool = False
 # ── Mock Sandbox Implementations for Fallback/Demo ───────────────────
 
 class SandboxParser(BaseParser):
+    def __init__(self, **kwargs):
+        pass
+
     async def parse(self, source, metadata=None):
         from rag.core.types import Document, DocumentMetadata
         name = getattr(source, "filename", str(source))
@@ -39,6 +42,9 @@ class SandboxParser(BaseParser):
         return []
 
 class SandboxChunker(BaseChunker):
+    def __init__(self, **kwargs):
+        pass
+
     async def chunk(self, document):
         from rag.core.types import Chunk
         # Split mock document into 3 sentences
@@ -54,6 +60,9 @@ class SandboxChunker(BaseChunker):
         return chunks
 
 class SandboxEmbedder(BaseEmbeddingModel):
+    def __init__(self, **kwargs):
+        pass
+
     async def embed(self, texts):
         return [[0.1] * self.dimensions for _ in texts]
     async def embed_query(self, query):
@@ -89,6 +98,9 @@ class SandboxRetriever(BaseRetriever):
         return await self.db.search(q_emb, top_k=context.top_k)
 
 class SandboxLLM(BaseLLM):
+    def __init__(self, **kwargs):
+        pass
+
     async def generate(self, prompt, **kwargs):
         # Simulate answering queries
         query_text = prompt.split("Question:")[-1].split("Answer:")[0].strip() if "Question:" in prompt else "Query"
