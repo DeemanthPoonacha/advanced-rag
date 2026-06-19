@@ -133,8 +133,23 @@ def init_orchestrator(force_mock: bool = False):
     global orchestrator, init_error, use_mock_mode
     use_mock_mode = force_mock
     
+    # Check if config.yaml specifies fully local setup (which doesn't require OpenAI keys)
+    is_local_only = False
+    try:
+        config_path = Path("config.yaml")
+        if config_path.exists():
+            with open(config_path, "r", encoding="utf-8") as f:
+                raw_data = yaml.safe_load(f)
+            if isinstance(raw_data, dict):
+                emb_prov = raw_data.get("embeddings", {}).get("provider")
+                llm_prov = raw_data.get("llm", {}).get("provider")
+                if emb_prov == "local" and llm_prov == "local":
+                    is_local_only = True
+    except Exception:
+        pass
+
     # If no OpenAI Key is available and we haven't forced mock, check if we should default to mock
-    if not force_mock and not os.environ.get("OPENAI_API_KEY"):
+    if not force_mock and not os.environ.get("OPENAI_API_KEY") and not is_local_only:
         print("OPENAI_API_KEY environment variable not found. Defaulting to Mock Sandbox Mode.")
         use_mock_mode = True
 

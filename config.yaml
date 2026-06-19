@@ -1,13 +1,13 @@
 embeddings:
-  config: {}
-  provider: openai
+  provider: local
+  config:
+    model_name: "sentence-transformers/all-MiniLM-L6-v2"
+    device: "cpu"
 generation:
   include_sources: true
   max_context_chunks: 5
   prompt_template: 'Context:
-
     {context}
-
 
     Question: {query}'
   system_prompt: You are a helpful assistant.
@@ -21,11 +21,14 @@ ingestion:
     config: {}
     provider: unstructured
 llm:
-  config: {}
-  provider: openai
+  provider: local
+  config:
+    base_url: "http://localhost:11434/v1"
+    model: "llama3.2:1b"
+    temperature: 0.1
 project:
   environment: development
-  name: verified-sandbox-pipeline
+  name: local-rag-pipeline
   version: 1.0.0
 retrieval:
   config: {}
@@ -34,5 +37,9 @@ retrieval:
   strategy: simple
   top_k: 3
 vector_store:
-  config: {}
   provider: qdrant
+  config:
+    url: "http://localhost:6333"
+    collection_name: "documents"
+    vector_size: 384
+    prefer_grpc: false

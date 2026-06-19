@@ -84,7 +84,9 @@ async def test_qdrant_store(sample_chunks):
         "source": "doc.txt",
         "file_name": "doc.txt"
     })
-    mock_client.search = AsyncMock(return_value=[mock_hit])
+    mock_query_res = MagicMock()
+    mock_query_res.points = [mock_hit]
+    mock_client.query_points = AsyncMock(return_value=mock_query_res)
     search_res = await store.search([0.1, 0.2, 0.3], top_k=1)
     assert len(search_res) == 1
     assert search_res[0].chunk.content == "Hello world"

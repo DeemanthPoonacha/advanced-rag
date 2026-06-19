@@ -222,15 +222,15 @@ class QdrantVectorStore(BaseVectorStore):
         client = self._get_client()
         query_filter = self._build_filter(filters) if filters else None
 
-        results = await client.search(
+        results = await client.query_points(
             collection_name=self._collection_name,
-            query_vector=query_embedding,
+            query=query_embedding,
             limit=top_k,
             query_filter=query_filter,
             with_payload=True,
         )
 
-        return [self._point_to_result(hit, "dense") for hit in results]
+        return [self._point_to_result(hit, "dense") for hit in results.points]
 
     @trace_operation(LifecycleStage.RETRIEVE, "qdrant_hybrid_search")
     async def hybrid_search(

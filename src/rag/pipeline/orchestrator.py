@@ -56,6 +56,10 @@ class RAGPipelineOrchestrator:
         self.parser = self.factory.create_parser()
         self.chunker = self.factory.create_chunker()
         self.embedding_model = self.factory.create_embedding_model()
+        
+        if hasattr(self.chunker, "set_embedding_model"):
+            self.chunker.set_embedding_model(self.embedding_model)
+
         self.vector_store = self.factory.create_vector_store()
 
         # Inference components
