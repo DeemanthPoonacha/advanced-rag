@@ -1,0 +1,173 @@
+"""Component Factory — builds concrete instances from ``PipelineConfig``.
+
+The factory reads each section of the configuration, looks up the provider in
+the ``ComponentRegistry``, and instantiates the appropriate implementation
+class with its ``config`` dict unpacked as keyword arguments.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from ..config.schema import PipelineConfig
+from .interfaces import (
+    BaseChunker,
+    BaseEmbeddingModel,
+    BaseEvaluator,
+    BaseGuardrail,
+    BaseLLM,
+    BaseParser,
+    BaseReranker,
+    BaseRetriever,
+    BaseVectorStore,
+)
+from .registry import ComponentRegistry
+
+logger = logging.getLogger(__name__)
+
+
+class ComponentFactory:
+    """Instantiates pipeline components via the registry + config.
+
+    Usage::
+
+        config = load_config("config.yaml")
+        factory = ComponentFactory(config)
+        parser = factory.create_parser()
+        embedder = factory.create_embedding_model()
+    """
+
+    def __init__(self, config: PipelineConfig) -> None:
+        self._config = config
+        ComponentRegistry.discover()
+
+    # ── Generic builder ──────────────────────────────────────────────
+
+    def _build(
+        self,
+        component_type: str,
+        provider: str,
+        config: dict[str, Any],
+    ) -> Any:
+        """Look up and instantiate a component from the registry.
+
+        Args:
+            component_type: Registry category (e.g. ``"parser"``).
+            provider: Provider key (e.g. ``"unstructured"``).
+            config: Keyword arguments forwarded to the constructor.
+
+        Returns:
+            An instance of the registered implementation class.
+        """
+        klass = ComponentRegistry.get(component_type, provider)
+        logger.info(
+            "Building %s with provider '%s' -> %s",
+            component_type,
+            provider,
+            klass.__name__,
+        )
+        return klass(**config)
+
+    # ── Typed Builders ───────────────────────────────────────────────
+
+    def create_parser(self) -> BaseParser:
+        """Build the document parser specified in ``ingestion.parser``."""
+        cfg = self._config.ingestion.parser
+        return self._build("parser", cfg.provider, cfg.config)
+
+    def create_chunker(self) -> BaseChunker:
+        """Build the chunker specified in ``ingestion.chunker``."""
+        cfg = self._config.ingestion.chunker
+        return self._build("chunker", cfg.provider, cfg.config)
+
+    def create_embedding_model(self) -> BaseEmbeddingModel:
+        """Build the embedding model specified in ``embeddings``."""
+        cfg = self._config.embeddings
+        return self._build("embedding_model", cfg.provider, cfg.config)
+
+    def create_llm(self) -> BaseLLM:
+        """Build the LLM specified in ``llm``."""
+        cfg = self._config.llm
+        return self._build("llm", cfg.provider, cfg.config)
+
+    def create_vector_store(self) -> BaseVectorStore:
+        """Build the vector store specified in ``vector_store``."""
+        cfg = self._config.vector_store
+        return self._build("vector_store", cfg.provider, cfg.config)
+
+    def create_retriever(
+        self,
+        vector_store: BaseVectorStore,
+        embedding_model: BaseEmbeddingModel,
+        llm: BaseLLM | None = None,
+    ) -> BaseRetriever:
+        """Build the retriever strategy specified in ``retrieval``.
+
+        Retriever constructors receive the vector store, embedding model,
+        and optionally an LLM (required by multi-query / compression
+        strategies) alongside the strategy-specific config.
+
+        Args:
+            vector_store: The initialised vector store instance.
+            embedding_model: The initialised embedding model instance.
+            llm: Optional LLM for query expansion / compression.
+
+        Returns:
+            A concrete ``BaseRetriever`` implementation.
+        """
+        cfg = self._config.retrieval
+        params: dict[str, Any] = {
+            "vector_store": vector_store,
+            "embedding_model": embedding_model,
+            "top_k": cfg.top_k,
+            "similarity_threshold": cfg.similarity_threshold,
+            **cfg.config,
+        }
+        if llm is not None:
+            params["llm"] = llm
+        return self._build("retriever", cfg.strategy, params)
+
+    def create_reranker(self) -> BaseReranker | None:
+        """Build the reranker if one is configured.
+
+        Returns:
+            A ``BaseReranker`` instance, or ``None`` if no reranker is configured.
+        """
+        cfg = self._config.retrieval.reranker
+        if cfg is None:
+            return None
+        return self._build("reranker", cfg.provider, cfg.config)
+
+    def create_input_guardrail(self) -> BaseGuardrail | None:
+        """Build the input guardrail if enabled and configured.
+
+        Returns:
+            A ``BaseGuardrail`` instance, or ``None``.
+        """
+        cfg = self._config.guardrails
+        if not cfg.enabled or cfg.input is None:
+            return None
+        return self._build("guardrail", cfg.input.provider, cfg.input.config)
+
+    def create_output_guardrail(self) -> BaseGuardrail | None:
+        """Build the output guardrail if enabled and configured.
+
+        Returns:
+            A ``BaseGuardrail`` instance, or ``None``.
+        """
+        cfg = self._config.guardrails
+        if not cfg.enabled or cfg.output is None:
+            return None
+        return self._build("guardrail", cfg.output.provider, cfg.output.config)
+
+    def create_evaluator(self) -> BaseEvaluator | None:
+        """Build the evaluator if enabled and configured.
+
+        Returns:
+            A ``BaseEvaluator`` instance, or ``None``.
+        """
+        cfg = self._config.evaluation
+        if cfg is None or not cfg.enabled:
+            return None
+        return self._build("evaluator", cfg.provider, cfg.config)
