@@ -1,0 +1,48 @@
+"""Configuration sub-package — schema definitions and config loading."""
+
+from .loader import load_config, load_config_from_dict
+from .schema import (
+    ChunkerConfig,
+    EmbeddingsConfig,
+    EvaluationConfig,
+    GenerationConfig,
+    GuardrailProviderConfig,
+    GuardrailsConfig,
+    IngestionConfig,
+    LLMConfig,
+    LoggingConfig,
+    MetricsConfig,
+    ObservabilityConfig,
+    ParserConfig,
+    PipelineConfig,
+    ProjectConfig,
+    ProviderConfig,
+    RerankerConfig,
+    RetrievalConfig,
+    TracingConfig,
+    VectorStoreConfig,
+)
+
+__all__ = [
+    "load_config",
+    "load_config_from_dict",
+    "ChunkerConfig",
+    "EmbeddingsConfig",
+    "EvaluationConfig",
+    "GenerationConfig",
+    "GuardrailProviderConfig",
+    "GuardrailsConfig",
+    "IngestionConfig",
+    "LLMConfig",
+    "LoggingConfig",
+    "MetricsConfig",
+    "ObservabilityConfig",
+    "ParserConfig",
+    "PipelineConfig",
+    "ProjectConfig",
+    "ProviderConfig",
+    "RerankerConfig",
+    "RetrievalConfig",
+    "TracingConfig",
+    "VectorStoreConfig",
+]
