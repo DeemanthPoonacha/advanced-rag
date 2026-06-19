@@ -69,6 +69,8 @@ export default function App() {
   const [input, setInput] = useState("");
   const [status, setStatus] = useState(null);
   const [rawYaml, setRawYaml] = useState("");
+  const [configData, setConfigData] = useState(null);
+  const [editMode, setEditMode] = useState("visual"); // "visual" | "yaml"
   const [activeTab, setActiveTab] = useState("upload"); // "upload" | "config"
   const [isUploading, setIsUploading] = useState(false);
   const [uploadLogs, setUploadLogs] = useState([]);
@@ -124,10 +126,27 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setRawYaml(data.raw_yaml);
+        setConfigData(data.resolved_config);
       }
     } catch (e) {
       console.error("Failed to fetch pipeline config", e);
     }
+  };
+
+  const handleUpdateConfigValue = (path, value) => {
+    setConfigData(prev => {
+      if (!prev) return prev;
+      const copy = JSON.parse(JSON.stringify(prev));
+      let current = copy;
+      for (let i = 0; i < path.length - 1; i++) {
+        if (current[path[i]] === undefined || current[path[i]] === null) {
+          current[path[i]] = {};
+        }
+        current = current[path[i]];
+      }
+      current[path[path.length - 1]] = value;
+      return copy;
+    });
   };
 
   const handleToggleMock = async (checked) => {
@@ -151,15 +170,26 @@ export default function App() {
 
   const handleSaveConfig = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/config`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ yaml_content: rawYaml })
-      });
+      let res;
+      if (editMode === "yaml") {
+        res = await fetch(`${API_BASE}/api/config`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ yaml_content: rawYaml })
+        });
+      } else {
+        res = await fetch(`${API_BASE}/api/config/json`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(configData)
+        });
+      }
+
       const data = await res.json();
       if (res.ok) {
         showToast("Configuration saved and orchestrator reloaded!", "success");
         fetchStatus();
+        fetchConfig(); // Sync both states
       } else {
         const detail = data.detail;
         let errMsg = typeof detail === "string" ? detail : detail.message || "Validation failed";
@@ -438,27 +468,230 @@ export default function App() {
             </div>
           )}
 
-          {/* Tab 2: Config YAML editor */}
+          {/* Tab 2: Config Settings */}
           {activeTab === "config" && (
-            <div style={{ display: "flex", flex: "1", flexDirection: "column", gap: "1rem" }}>
-              <div className="form-group" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <h4 className="section-title" style={{ marginBottom: 0 }}>config.yaml Editor</h4>
-                  <button 
-                    onClick={fetchConfig} 
-                    style={{ fontSize: "0.75rem", background: "none", border: "none", color: "var(--color-primary)", cursor: "pointer", textDecoration: "underline" }}
-                  >
-                    Reset Changes
-                  </button>
-                </div>
-                <textarea
-                  className="form-control yaml-editor-textarea"
-                  value={rawYaml}
-                  onChange={(e) => setRawYaml(e.target.value)}
-                  style={{ flex: 1 }}
-                />
+            <div style={{ display: "flex", flex: "1", flexDirection: "column", gap: "0.8rem", overflow: "hidden" }}>
+              {/* Sub-tab Toggle (Visual Form vs Raw YAML) */}
+              <div style={{ display: "flex", gap: "0.2rem", background: "var(--color-surface-card)", padding: "0.2rem", borderRadius: "8px", border: "1px solid var(--color-border)" }}>
+                <button
+                  onClick={() => setEditMode("visual")}
+                  className="btn"
+                  style={{ flex: 1, padding: "0.4rem", fontSize: "0.75rem", borderRadius: "6px", border: "none", background: editMode === "visual" ? "var(--color-surface)" : "transparent", color: "var(--color-text)", boxShadow: editMode === "visual" ? "var(--shadow-sm)" : "none" }}
+                >
+                  Visual Form
+                </button>
+                <button
+                  onClick={() => setEditMode("yaml")}
+                  className="btn"
+                  style={{ flex: 1, padding: "0.4rem", fontSize: "0.75rem", borderRadius: "6px", border: "none", background: editMode === "yaml" ? "var(--color-surface)" : "transparent", color: "var(--color-text)", boxShadow: editMode === "yaml" ? "var(--shadow-sm)" : "none" }}
+                >
+                  Raw YAML
+                </button>
               </div>
-              <button onClick={handleSaveConfig} className="btn btn-primary" style={{ width: "100%" }}>
+
+              {editMode === "visual" ? (
+                configData ? (
+                  <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "1.2rem", paddingRight: "0.2rem" }}>
+                    
+                    {/* General Section */}
+                    <div style={{ borderBottom: "1px solid var(--color-border)", paddingBottom: "1rem" }}>
+                      <h4 className="section-title">General Project</h4>
+                      
+                      <div className="form-group">
+                        <label>Project Name</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={configData.project?.name || ""}
+                          onChange={(e) => handleUpdateConfigValue(["project", "name"], e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Environment</label>
+                        <select
+                          className="form-control"
+                          value={configData.project?.environment || "development"}
+                          onChange={(e) => handleUpdateConfigValue(["project", "environment"], e.target.value)}
+                        >
+                          <option value="development">Development</option>
+                          <option value="staging">Staging</option>
+                          <option value="production">Production</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Ingestion & Chunking */}
+                    <div style={{ borderBottom: "1px solid var(--color-border)", paddingBottom: "1rem" }}>
+                      <h4 className="section-title">Ingestion & Chunking</h4>
+                      
+                      <div className="form-group">
+                        <label>Chunker Provider</label>
+                        <select
+                          className="form-control"
+                          value={configData.ingestion?.chunker?.provider || "semantic"}
+                          onChange={(e) => handleUpdateConfigValue(["ingestion", "chunker", "provider"], e.target.value)}
+                        >
+                          <option value="semantic">Semantic Chunker</option>
+                          <option value="recursive">Recursive Character</option>
+                          <option value="hierarchical">Hierarchical Parent-Child</option>
+                          <option value="fixed_size">Fixed Size Splitter</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Target Chunk Size (Chars)</label>
+                        <div className="slider-container">
+                          <input
+                            type="range"
+                            min="100"
+                            max="1500"
+                            step="50"
+                            value={configData.ingestion?.chunker?.config?.target_chunk_size || 500}
+                            onChange={(e) => handleUpdateConfigValue(["ingestion", "chunker", "config", "target_chunk_size"], parseInt(e.target.value))}
+                          />
+                          <span className="slider-val">{configData.ingestion?.chunker?.config?.target_chunk_size || 500}</span>
+                        </div>
+                      </div>
+
+                      {configData.ingestion?.chunker?.provider === "semantic" && (
+                        <div className="form-group">
+                          <label>Semantic Buffer Size</label>
+                          <div className="slider-container">
+                            <input
+                              type="range"
+                              min="0"
+                              max="5"
+                              step="1"
+                              value={configData.ingestion?.chunker?.config?.buffer_size ?? 1}
+                              onChange={(e) => handleUpdateConfigValue(["ingestion", "chunker", "config", "buffer_size"], parseInt(e.target.value))}
+                            />
+                            <span className="slider-val">{configData.ingestion?.chunker?.config?.buffer_size ?? 1}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Retrieval Section */}
+                    <div style={{ borderBottom: "1px solid var(--color-border)", paddingBottom: "1rem" }}>
+                      <h4 className="section-title">Retrieval strategy</h4>
+                      
+                      <div className="form-group">
+                        <label>Search Strategy</label>
+                        <select
+                          className="form-control"
+                          value={configData.retrieval?.strategy || "simple"}
+                          onChange={(e) => handleUpdateConfigValue(["retrieval", "strategy"], e.target.value)}
+                        >
+                          <option value="simple">Simple Dense Search</option>
+                          <option value="multi_query">Multi-Query Expansion</option>
+                          <option value="contextual_compression">Contextual Compression</option>
+                          <option value="auto_merging">Auto-Merging Retrieval</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Top K Chunks</label>
+                        <div className="slider-container">
+                          <input
+                            type="range"
+                            min="1"
+                            max="20"
+                            step="1"
+                            value={configData.retrieval?.top_k || 5}
+                            onChange={(e) => handleUpdateConfigValue(["retrieval", "top_k"], parseInt(e.target.value))}
+                          />
+                          <span className="slider-val">{configData.retrieval?.top_k || 5}</span>
+                        </div>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Similarity Threshold</label>
+                        <div className="slider-container">
+                          <input
+                            type="range"
+                            min="0.0"
+                            max="1.0"
+                            step="0.05"
+                            value={configData.retrieval?.similarity_threshold || 0.7}
+                            onChange={(e) => handleUpdateConfigValue(["retrieval", "similarity_threshold"], parseFloat(e.target.value))}
+                          />
+                          <span className="slider-val">{(configData.retrieval?.similarity_threshold || 0.7).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* LLM settings */}
+                    <div>
+                      <h4 className="section-title">LLM generation</h4>
+                      
+                      <div className="form-group">
+                        <label>LLM Provider</label>
+                        <select
+                          className="form-control"
+                          value={configData.llm?.provider || "openai"}
+                          onChange={(e) => handleUpdateConfigValue(["llm", "provider"], e.target.value)}
+                        >
+                          <option value="openai">OpenAI GPT</option>
+                          <option value="anthropic">Anthropic Claude</option>
+                          <option value="cohere">Cohere Command</option>
+                          <option value="local">Local Transformer</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Model Identifier</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={configData.llm?.config?.model || ""}
+                          onChange={(e) => handleUpdateConfigValue(["llm", "config", "model"], e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label>Temperature</label>
+                        <div className="slider-container">
+                          <input
+                            type="range"
+                            min="0.0"
+                            max="1.0"
+                            step="0.05"
+                            value={configData.llm?.config?.temperature ?? 0.1}
+                            onChange={(e) => handleUpdateConfigValue(["llm", "config", "temperature"], parseFloat(e.target.value))}
+                          />
+                          <span className="slider-val">{(configData.llm?.config?.temperature ?? 0.1).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center", color: "var(--color-muted)", padding: "2rem 0" }}>
+                    Loading configuration data...
+                  </div>
+                )
+              ) : (
+                <div className="form-group" style={{ flex: 1, display: "flex", flexDirection: "column", margin: 0 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                    <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>Raw config.yaml</span>
+                    <button 
+                      onClick={fetchConfig} 
+                      style={{ fontSize: "0.75rem", background: "none", border: "none", color: "var(--color-primary)", cursor: "pointer", textDecoration: "underline" }}
+                    >
+                      Reset Changes
+                    </button>
+                  </div>
+                  <textarea
+                    className="form-control yaml-editor-textarea"
+                    value={rawYaml}
+                    onChange={(e) => setRawYaml(e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                </div>
+              )}
+
+              <button onClick={handleSaveConfig} className="btn btn-primary" style={{ width: "100%", marginTop: "0.5rem" }}>
                 Apply & Reload Pipeline
               </button>
             </div>

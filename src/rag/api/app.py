@@ -294,6 +294,39 @@ async def update_config(req: ConfigUpdateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to reload pipeline: {str(e)}")
 
+@app.post("/api/config/json")
+async def update_config_json(req: Dict[str, Any]):
+    """Validate and write new JSON configuration as YAML, then rebuild orchestrator."""
+    global orchestrator, init_error
+    
+    try:
+        # Validate using Pydantic Loader
+        validated_config = load_config_from_dict(req)
+        
+        # Write to config.yaml file as YAML
+        config_path = Path("config.yaml")
+        yaml_content = yaml.dump(req, default_flow_style=False)
+        config_path.write_text(yaml_content, encoding="utf-8")
+        
+        # Reload orchestrator
+        if orchestrator:
+            await orchestrator.close()
+            
+        orchestrator = RAGPipelineOrchestrator(validated_config)
+        init_error = None
+        
+        return {
+            "status": "success",
+            "message": "Configuration updated and pipeline reloaded successfully."
+        }
+    except ValidationError as ve:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "Pydantic validation failed for configuration", "errors": ve.errors()}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reload pipeline: {str(e)}")
+
 @app.post("/api/query")
 async def query_pipeline(req: QueryRequest):
     global orchestrator
