@@ -1,7 +1,7 @@
 import { RAGStatus } from "../types";
 
 interface HeaderProps {
-  activePage: "chat" | "ingest" | "config" | "chunks";
+  activePage: "chat" | "ingest" | "config";
   status: RAGStatus | null;
 }
 
@@ -11,9 +11,8 @@ export function Header({ activePage, status }: HeaderProps) {
       <div>
         <h1 className="text-lg font-bold font-display">
           {activePage === "chat" && "Assistant Chat Dashboard"}
-          {activePage === "ingest" && "Knowledge Base Ingest"}
+          {activePage === "ingest" && "Knowledge Base & Ingestion"}
           {activePage === "config" && "Pipeline Configuration Settings"}
-          {activePage === "chunks" && "Vector Chunk Visualizer"}
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400">
           {status?.mock_mode

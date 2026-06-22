@@ -4,7 +4,6 @@ import { Header } from "./components/Header";
 import { ChatPanel } from "./components/ChatPanel";
 import { IngestPanel } from "./components/IngestPanel";
 import { ConfigPanel } from "./components/ConfigPanel";
-import { ChunksPanel } from "./components/ChunksPanel";
 import { Toast } from "./components/ui/Toast";
 import { Message, RAGStatus, PipelineConfig, ToastState, UploadLog } from "./types";
 
@@ -57,7 +56,7 @@ function jsonToYaml(obj: any, indent = 0): string {
 }
 
 export default function App() {
-  const [activePage, setActivePage] = useState<"chat" | "ingest" | "config" | "chunks">("chat");
+  const [activePage, setActivePage] = useState<"chat" | "ingest" | "config">("chat");
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: "assistant",
@@ -221,7 +220,13 @@ export default function App() {
         const parsedFiles: UploadLog[] = data.files.map((f: any) => ({
           filename: f.filename,
           chunks_count: f.chunks_count,
-          date: new Date().toLocaleDateString(),
+          date: new Date().toLocaleString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
         }));
         setUploadLogs((prev) => [...parsedFiles, ...prev]);
         fetchStatus();
@@ -473,10 +478,6 @@ export default function App() {
             />
           )}
 
-          {/* PAGE 4: CHUNK VISUALIZER */}
-          {activePage === "chunks" && (
-            <ChunksPanel />
-          )}
         </main>
       </div>
     </div>

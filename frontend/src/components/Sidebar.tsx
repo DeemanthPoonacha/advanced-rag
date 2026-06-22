@@ -13,8 +13,8 @@ import {
 import { RAGStatus } from "../types";
 
 interface SidebarProps {
-  activePage: "chat" | "ingest" | "config" | "chunks";
-  setActivePage: (page: "chat" | "ingest" | "config" | "chunks") => void;
+  activePage: "chat" | "ingest" | "config";
+  setActivePage: (page: "chat" | "ingest" | "config") => void;
   status: RAGStatus | null;
   handleToggleMock: (checked: boolean) => void;
   isDarkMode: boolean;
@@ -146,27 +146,10 @@ export function Sidebar({
               ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 shadow-sm"
               : "text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"
           )}
-          title={sidebarCollapsed ? "Document Ingest" : undefined}
+          title={sidebarCollapsed ? "Knowledge Base" : undefined}
         >
           <FileText className="w-4 h-4 shrink-0 text-primary" />
-          {!sidebarCollapsed && <span>Document Ingest</span>}
-        </button>
-
-        <button
-          onClick={() => setActivePage("chunks")}
-          className={cn(
-            "flex items-center rounded-xl transition-all duration-200 cursor-pointer border border-transparent w-full text-left",
-            sidebarCollapsed
-              ? "p-2.5 justify-center w-10 h-10"
-              : "w-full gap-3 px-3.5 py-2.5 text-sm font-semibold",
-            activePage === "chunks"
-              ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 shadow-sm"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"
-          )}
-          title={sidebarCollapsed ? "Chunk Visualizer" : undefined}
-        >
-          <Database className="w-4 h-4 shrink-0 text-primary" />
-          {!sidebarCollapsed && <span>Chunk Visualizer</span>}
+          {!sidebarCollapsed && <span>Knowledge Base</span>}
         </button>
 
         <button

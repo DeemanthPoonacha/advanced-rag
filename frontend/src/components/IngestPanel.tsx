@@ -62,15 +62,6 @@ export function IngestPanel({
   const [selectedChunk, setSelectedChunk] = useState<ChunkData | null>(null);
   const [inspectorTab, setInspectorTab] = useState<"original" | "summary" | "metadata">("original");
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // Track open state of collapsible accordions (mapping fileId -> boolean)
-  const [openPartitionFiles, setOpenPartitionFiles] = useState<Record<string, boolean>>({});
-  const [openChunkFiles, setOpenChunkFiles] = useState<Record<string, boolean>>({});
-  const [openRegistryFiles, setOpenRegistryFiles] = useState<Record<string, boolean>>({});
-
-  const closeWizard = () => {
-    setWizardActive(false);
-  };
 
   // Sample files that are processed during ingestion simulation
   const [files] = useState<ProcessingFile[]>([
@@ -206,7 +197,7 @@ export function IngestPanel({
       otherCount: 0,
       totalElements: 12,
       totalChunks: 2,
-      summarizedChunks: 0, // Plain text is treated raw, no AI summarization
+      summarizedChunks: 0,
       chunks: [
         {
           id: "f3-c1",
@@ -228,6 +219,110 @@ export function IngestPanel({
       ]
     }
   ]);
+  
+  // Track open state of collapsible accordions (mapping fileId -> boolean)
+  const [openPartitionFiles, setOpenPartitionFiles] = useState<Record<string, boolean>>({});
+  const [openChunkFiles, setOpenChunkFiles] = useState<Record<string, boolean>>({});
+  const [openRegistryFiles, setOpenRegistryFiles] = useState<Record<string, boolean>>({});
+
+  const [apiChunks, setApiChunks] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchChunks = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/chunks?limit=250");
+        if (res.ok) {
+          const data = await res.json();
+          setApiChunks(data.chunks || []);
+        }
+      } catch (e) {
+        console.error("Failed to fetch API chunks", e);
+      }
+    };
+    fetchChunks();
+  }, [uploadLogs, status]);
+
+  // Unified files mapping and sorting/grouping
+  const mockFilesList = files?.map((file) => ({
+    id: file.id,
+    name: file.name,
+    size: file.size,
+    status: file.status,
+    uploadTime: file.name === "read_me.txt" ? "Jun 21, 2026, 04:20 PM" : "Jun 22, 2026, 10:30 AM",
+    chunksCount: file.totalChunks,
+    chunks: file.chunks,
+    isMock: true,
+  }));
+
+  const uploadedFilesList = uploadLogs.map((log, idx) => {
+    const matchedChunks = apiChunks.filter((c) => {
+      const docName = c.metadata?.file_name || c.metadata?.source || "";
+      return docName.endsWith(log.filename) || log.filename.endsWith(docName);
+    });
+
+    const formattedChunks = matchedChunks.map((c, cIdx) => ({
+      id: c.id || `${log.filename}-chunk-${cIdx}`,
+      page: c.metadata?.page_number || 1,
+      type: (c.metadata?.file_type === "image" || c.metadata?.image_extracted)
+        ? ("image" as const)
+        : c.metadata?.table_extracted
+        ? ("table" as const)
+        : ("text" as const),
+      snippet: c.content ? (c.content.length > 120 ? c.content.substring(0, 120) + "..." : c.content) : "",
+      originalText: c.content || "",
+      summaryText: c.metadata?.summary_text || "",
+      isRaw: !c.metadata?.summary_text,
+      metadata: c.metadata || {},
+    }));
+
+    return {
+      id: `uploaded-${idx}-${log.filename}`,
+      name: log.filename,
+      size: "N/A",
+      status: "completed" as const,
+      uploadTime: log.date,
+      chunksCount: log.chunks_count,
+      chunks: formattedChunks,
+      isMock: false,
+    };
+  });
+
+  const allFiles = [...uploadedFilesList, ...mockFilesList];
+
+  const getGroupKey = (uploadTime: string) => {
+    const parts = uploadTime.split(",");
+    if (parts.length >= 2) {
+      if (/\d{4}/.test(parts[1])) {
+        return `${parts[0].trim()}, ${parts[1].trim()}`;
+      }
+      return parts[0].trim();
+    }
+    return uploadTime;
+  };
+
+  const groupedFiles: Record<string, typeof allFiles> = {};
+  allFiles.forEach((file) => {
+    const groupKey = getGroupKey(file.uploadTime);
+    if (!groupedFiles[groupKey]) {
+      groupedFiles[groupKey] = [];
+    }
+    groupedFiles[groupKey].push(file);
+  });
+
+  const parseDate = (dStr: string) => {
+    const parsed = Date.parse(dStr);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const sortedGroupKeys = Object.keys(groupedFiles).sort((a, b) => {
+    return parseDate(b) - parseDate(a);
+  });
+
+  const closeWizard = () => {
+    setWizardActive(false);
+  };
+
+
 
   // Handle accordion toggles
   const togglePartitionAccordion = (fileId: string) => {
@@ -258,8 +353,8 @@ export function IngestPanel({
 
   // Auto-progress simulation logic
   useEffect(() => {
-    if (wizardActive && activeStep < 4) {
-      const stepDurations = [3500, 4500, 4500]; // Upload, Partition, Chunking durations
+    if (wizardActive && activeStep < 3) {
+      const stepDurations = [3500, 4500]; // Upload, Partition durations
       const timer = setTimeout(() => {
         setActiveStep(prev => prev + 1);
       }, stepDurations[activeStep - 1]);
@@ -269,7 +364,7 @@ export function IngestPanel({
 
   useEffect(() => {
     if (wizardActive && !isUploading && activeStep > 1) {
-      setActiveStep(4);
+      setActiveStep(3);
     }
   }, [isUploading]);
 
@@ -315,7 +410,287 @@ export function IngestPanel({
         // --- VIEW A: Drag-and-Drop Ingestion Home Screen ---
         <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
           <div className="flex-1 flex flex-col gap-6 max-h-full overflow-y-auto">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+           
+
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex-1 flex flex-col min-h-[300px] overflow-hidden">
+              <h3 className="text-md font-bold mb-4 font-display">Ingested Files Registry</h3>
+              {allFiles.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8">
+                  <Database className="w-12 h-12 text-slate-300 dark:text-slate-800 mb-2" />
+                  <p className="text-sm">No files ingested yet</p>
+                  <p className="text-xs text-slate-400 mt-1">Upload files above to compile the RAG registry.</p>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto space-y-6 pr-1">
+                  {sortedGroupKeys.map((groupKey) => {
+                    const groupFiles = groupedFiles[groupKey];
+                    return (
+                      <div key={groupKey} className="space-y-3">
+                        {/* Group Header */}
+                        <div className="flex items-center gap-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-2">
+                          <Database className="w-3.5 h-3.5 text-slate-300 dark:text-slate-700" />
+                          <span>{groupKey}</span>
+                          <span className="h-[1px] flex-1 bg-slate-200 dark:bg-slate-800/80 ml-2" />
+                        </div>
+
+                        {/* Files list under group */}
+                        <div className="space-y-3">
+                          {groupFiles.map((file) => {
+                            const isExpanded = !!openRegistryFiles[file.id];
+                            return (
+                              <div
+                                key={file.id}
+                                className="bg-slate-50/50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-700/80 shadow-sm"
+                              >
+                                {/* File Card Header */}
+                                <div
+                                  onClick={() => toggleRegistryAccordion(file.id)}
+                                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-800/30 transition select-none"
+                                >
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    {isExpanded ? (
+                                      <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                                    ) : (
+                                      <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                                    )}
+                                    <FileText className="w-4 h-4 text-primary shrink-0" />
+                                    <div className="min-w-0">
+                                      <div className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                                        {file.name}
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
+                                        Uploaded: {file.uploadTime}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="px-2 py-0.5 text-[9px] font-bold text-primary bg-primary/10 border border-primary/20 rounded-md">
+                                      {file.chunksCount} chunks
+                                    </span>
+                                    {file.size && file.size !== "N/A" && (
+                                      <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                                        {file.size}
+                                      </span>
+                                    )}
+                                    <span className="px-2 py-0.5 text-[9px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-md capitalize">
+                                      compiled
+                                    </span>
+                                    
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        startIngestionWizard();
+                                        setActiveStep(3);
+                                      }}
+                                      className="ml-2 px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 hover:border-primary/30 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                                      title="Open Multi-Step Processing Pipeline Visualizer"
+                                    >
+                                      Details
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Expanded Chunks list */}
+                                {isExpanded && (
+                                  <div className="border-t border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-950/20 p-4 space-y-3">
+                                    {file.chunks && file.chunks.length > 0 ? (
+                                      <div className="space-y-3">
+                                        {file.chunks.map((chunk) => {
+                                          const isSelected = selectedChunk?.id === chunk.id;
+                                          return (
+                                            <div
+                                              key={chunk.id}
+                                              onClick={() => setSelectedChunk(chunk)}
+                                              className={`p-3 rounded-lg border text-left cursor-pointer transition-all duration-200 ${
+                                                isSelected
+                                                  ? "bg-primary/5 border-primary/45 shadow-sm"
+                                                  : "bg-slate-50/40 dark:bg-slate-900/20 border-slate-200/60 dark:border-slate-800/40 hover:bg-slate-100/50 dark:hover:bg-slate-800/20"
+                                              }`}
+                                            >
+                                              <div className="flex justify-between items-center mb-1.5">
+                                                <div className="flex gap-1.5 items-center">
+                                                  <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[8px] font-extrabold text-slate-500 dark:text-slate-400 uppercase">
+                                                    Page {chunk.page}
+                                                  </span>
+                                                  <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800/60 text-[8px] font-bold text-slate-500 dark:text-slate-400 capitalize">
+                                                    {chunk.type}
+                                                  </span>
+                                                  {chunk.isRaw ? (
+                                                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-bold text-emerald-500">
+                                                      raw
+                                                    </span>
+                                                  ) : (
+                                                    <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-[8px] font-bold text-yellow-600 dark:text-yellow-500">
+                                                      summarized
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">
+                                                  ID: {chunk.id}
+                                                </span>
+                                              </div>
+                                              <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+                                                {chunk.originalText || chunk.snippet}
+                                              </p>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : (
+                                      <div className="text-center py-4 text-xs text-slate-400 dark:text-slate-500">
+                                        No chunks generated or indexed for this document.
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Dynamic Settings / Detail Inspector */}
+          <div className="w-full md:w-96 shrink-0 flex flex-col max-h-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm">
+            {selectedChunk ? (
+              // --- DETAIL INSPECTOR ---
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0 flex justify-between items-center bg-slate-50 dark:bg-slate-950/20">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-bold text-slate-850 dark:text-slate-100 tracking-wide uppercase">Detail Inspector</span>
+                  </div>
+                  <button
+                    onClick={() => setSelectedChunk(null)}
+                    className="p-1 hover:bg-slate-200 dark:hover:bg-slate-850 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-250 transition cursor-pointer"
+                    title="Close Inspector"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Selector tabs */}
+                <div className="flex border-b border-slate-200 dark:border-slate-800 px-4 py-2 shrink-0 gap-1.5 bg-slate-50/50 dark:bg-slate-950/10">
+                  {[
+                    { key: "original", label: "Original Text" },
+                    { key: "summary", label: "AI Summary" },
+                    { key: "metadata", label: "Metadata" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setInspectorTab(tab.key as any)}
+                      className={`flex-1 py-1.5 px-2 text-center rounded-lg text-[10px] font-bold border transition-all duration-305 cursor-pointer ${
+                        inspectorTab === tab.key
+                          ? "bg-primary/10 text-primary border-primary/20 dark:bg-primary/20 shadow-sm"
+                          : "bg-white dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-850 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Inspector view content */}
+                <div className="flex-1 overflow-y-auto p-5 text-xs space-y-4">
+                  {/* ORIGINAL TEXT VIEW */}
+                  {inspectorTab === "original" && (
+                    <div className="space-y-4">
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-2 tracking-wide">
+                          Original Content
+                        </div>
+                        <div className="bg-slate-50 dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-800/80 rounded-xl leading-relaxed text-slate-700 dark:text-slate-300 font-mono text-[11px] whitespace-pre-wrap select-text">
+                          {selectedChunk.originalText}
+                        </div>
+                      </div>
+
+                      {selectedChunk.type === "image" && (
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-2 tracking-wide">
+                            Images (1)
+                          </div>
+                          <div className="bg-slate-50 dark:bg-slate-950 p-3 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col gap-2 items-center justify-center">
+                            {/* Transformer Architecture Diagram representation */}
+                            <div className="w-full aspect-[4/3] bg-white dark:bg-[#0c111e] rounded-lg border border-slate-200 dark:border-slate-800 flex flex-col p-2 text-[9px] font-semibold text-slate-500 dark:text-slate-400 shadow-inner">
+                              <div className="text-center font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Transformer Encoder-Decoder</div>
+                              <div className="flex-1 flex gap-2 justify-center py-2">
+                                <div className="w-16 bg-[#16223f]/10 border border-primary/20 rounded-md p-1 flex flex-col justify-between">
+                                  <div className="text-center font-bold text-primary">Encoder</div>
+                                  <div className="bg-white dark:bg-[#10192e] border border-slate-200 dark:border-slate-800 text-center p-0.5 rounded shadow-sm text-[8px]">Feed Forward</div>
+                                  <div className="bg-white dark:bg-[#10192e] border border-slate-200 dark:border-slate-800 text-center p-0.5 rounded shadow-sm text-[8px]">Multi-Head Attn</div>
+                                </div>
+                                <div className="w-16 bg-[#1f1a30]/10 border border-accent/20 rounded-md p-1 flex flex-col justify-between">
+                                  <div className="text-center font-bold text-accent">Decoder</div>
+                                  <div className="bg-white dark:bg-[#141020] border border-slate-200 dark:border-slate-850 text-center p-0.5 rounded shadow-sm text-[8px]">Feed Forward</div>
+                                  <div className="bg-white dark:bg-[#141020] border border-slate-200 dark:border-slate-855 text-center p-0.5 rounded shadow-sm text-[8px]">Masked Attn</div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* AI SUMMARY VIEW */}
+                  {inspectorTab === "summary" && (
+                    <div className="space-y-3">
+                      <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                        Searchable Summary (GPT-4o)
+                      </div>
+                      {selectedChunk.isRaw ? (
+                        <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl text-emerald-600 dark:text-emerald-400 text-[11px] leading-relaxed flex gap-2">
+                          <Info className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-semibold block mb-1">No AI Summary needed</span>
+                            This chunk contains plain text, which is parsed and indexed directly in raw form to optimize latency, save token costs, and maintain high-fidelity accuracy.
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-slate-50 dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-800/80 rounded-xl leading-relaxed text-slate-700 dark:text-slate-300 font-mono text-[11px] whitespace-pre-wrap select-text">
+                          {selectedChunk.summaryText}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* METADATA VIEW */}
+                  {inspectorTab === "metadata" && (
+                    <div className="space-y-3">
+                      <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                        Chunk Metadata Parameters
+                      </div>
+                      <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 rounded-xl overflow-hidden shadow-inner">
+                        <table className="w-full text-left text-[11px] border-collapse">
+                          <tbody>
+                            {Object.entries(selectedChunk.metadata).map(([key, value]) => (
+                              <tr key={key} className="border-b border-slate-200 dark:border-slate-800/40">
+                                <td className="p-2.5 font-bold text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-850 bg-slate-100/50 dark:bg-[#0d1220] select-none capitalize">
+                                  {key.replace("_", " ")}
+                                </td>
+                                <td className="p-2.5 text-slate-700 dark:text-slate-200 break-all select-text font-mono">
+                                  {typeof value === "object" ? JSON.stringify(value) : String(value)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // --- SETTINGS AND OVERVIEW (Default State) ---
+              <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto">
+
+                 <div className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
               <h3 className="text-md font-bold mb-1 font-display">Ingest Documents</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
                 Upload multiple documents. Layouts will be partitioned (extracting text, tables, and images), and summarized dynamically using Vision models. Plain text is treated raw and skipped from summaries.
@@ -340,83 +715,39 @@ export function IngestPanel({
                 />
               </div>
             </div>
+                <div className="border-b border-slate-200 dark:border-slate-800 pb-3 mb-1">
+                  <h3 className="text-xs font-bold text-slate-850 dark:text-slate-100 uppercase tracking-wider">Ingestion Engine Settings</h3>
+                </div>
+                <div className="space-y-4 text-xs">
+                  <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                    <span className="text-slate-500">Parser Model</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{status?.parser_provider || "unstructured"}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                    <span className="text-slate-500">Chunking Strategy</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{status?.chunker_provider || "semantic"}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                    <span className="text-slate-500">DB Schema Collection</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{status?.collection_name || "documents"}</span>
+                  </div>
+                  <div className="flex justify-between pb-1">
+                    <span className="text-slate-500">Indexing Engine</span>
+                    <span className="font-semibold text-accent">{status?.vector_store_provider || "qdrant"}</span>
+                  </div>
+                </div>
 
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex-1 flex flex-col min-h-[300px]">
-              <h3 className="text-md font-bold mb-4 font-display">Ingested Files Registry</h3>
-              {uploadLogs.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8">
-                  <Database className="w-12 h-12 text-slate-300 dark:text-slate-800 mb-2" />
-                  <p className="text-sm">No files uploaded yet in this session</p>
-                  <p className="text-xs text-slate-400 mt-1">Upload files above to compile the RAG registry.</p>
-                </div>
-              ) : (
-                <div className="flex-1 overflow-y-auto">
-                  <table className="w-full text-left text-sm border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 font-medium">
-                        <th className="py-2.5">Document Filename</th>
-                        <th className="py-2.5">Generated Chunks</th>
-                        <th className="py-2.5">Uploaded Date</th>
-                        <th className="py-2.5 text-right">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {uploadLogs.map((log, idx) => (
-                        <tr
-                          key={idx}
-                          onClick={() => {
-                            startIngestionWizard();
-                            setActiveStep(4);
-                          }}
-                          className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 cursor-pointer"
-                        >
-                          <td className="py-3 font-medium max-w-[280px] truncate pr-4">{log.filename}</td>
-                          <td className="py-3 font-semibold text-primary">{log.chunks_count} chunks</td>
-                          <td className="py-3 text-slate-500">{log.date}</td>
-                          <td className="py-3 text-right">
-                            <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500">
-                              compiled
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column: Status Summary */}
-          <div className="w-full md:w-80 flex flex-col gap-6 shrink-0 max-h-full overflow-y-auto">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-              <h3 className="text-md font-bold mb-4 font-display">Ingestion Engine Settings</h3>
-              <div className="space-y-4 text-sm">
-                <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <span className="text-slate-500">Parser Model</span>
-                  <span className="font-semibold">{status?.parser_provider || "unstructured"}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <span className="text-slate-500">Chunking Strategy</span>
-                  <span className="font-semibold">{status?.chunker_provider || "semantic"}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-                  <span className="text-slate-500">DB Schema Collection</span>
-                  <span className="font-semibold">{status?.collection_name || "documents"}</span>
-                </div>
-                <div className="flex justify-between pb-1">
-                  <span className="text-slate-500">Indexing Engine</span>
-                  <span className="font-semibold text-accent">{status?.vector_store_provider || "qdrant"}</span>
+                <div className="bg-gradient-to-br from-primary/5 to-accent/5 dark:from-primary/10 dark:to-accent/5 border border-primary/10 dark:border-primary/20 rounded-xl p-5 shadow-sm mt-2">
+                  <h3 className="text-xs font-bold mb-2 font-display text-primary flex items-center gap-1.5">
+                    <Sparkle className="w-3.5 h-3.5 text-primary" />
+                    Multi-Modal RAG
+                  </h3>
+                  <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
+                    Hi-res partitioning processes document layouts to extract text blocks, tables, and images. Chunks with complex visuals are summarized using Vision LLMs, while text-only chunks remain raw. During answer synthesis, original high-fidelity layout data is loaded directly into the LLM context.
+                  </p>
                 </div>
               </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-primary/10 to-accent/5 dark:from-primary/20 dark:to-accent/10 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-              <h3 className="text-md font-bold mb-2 font-display text-primary">Multi-Modal RAG</h3>
-              <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-                Hi-res partitioning processes document layouts to extract text blocks, tables, and images. Chunks with complex visuals are summarized using Vision LLMs, while text-only chunks remain raw. During answer synthesis, original high-fidelity layout data is loaded directly into the LLM context.
-              </p>
-            </div>
+            )}
           </div>
         </div>
       ) : (
@@ -441,13 +772,12 @@ export function IngestPanel({
             </button>
           </div>
 
-          {/* Simplified 4-Step Progress Navigation Header Bar */}
+          {/* Simplified 3-Step Progress Navigation Header Bar */}
           <div className="flex items-center px-6 py-2 border-b border-slate-900 bg-[#0c111e] overflow-x-auto gap-4">
             {[
               { id: 1, label: "1. Upload Status" },
               { id: 2, label: "2. Layout Partitioning" },
               { id: 3, label: "3. Chunking & Summarization" },
-              { id: 4, label: "4. Chunks Registry" },
             ].map((step) => {
               const isStepCompleted = step.id < activeStep;
               const isStepActive = step.id === activeStep;
@@ -471,7 +801,7 @@ export function IngestPanel({
                   <div className="flex items-center gap-1.5">
                     {isStepCompleted ? (
                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    ) : isStepActive && step.id < 4 ? (
+                    ) : isStepActive && step.id < 3 ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
                     ) : null}
                     {step.label}
@@ -481,10 +811,9 @@ export function IngestPanel({
             })}
           </div>
 
-          {/* Main Visualizer Window split panel */}
+          {/* Main Visualizer Window */}
           <div className="flex-1 flex overflow-hidden">
-            {/* Left Content Window */}
-            <div className="flex-1 flex flex-col p-8 overflow-y-auto bg-[#0a0d16]">
+            <div className="flex-1 flex flex-col p-8 overflow-y-auto bg-[#0a0d16] items-center justify-start">
               
               {/* STEP 1: UPLOAD STATUS */}
               {activeStep === 1 && (
@@ -550,13 +879,13 @@ export function IngestPanel({
                     <p className="text-xs text-slate-400 mt-1">Collapsible partitioning layout report for each uploaded file</p>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-4 w-full">
                     {files.map((file) => {
                       const isOpen = !!openPartitionFiles[file.id];
                       return (
                         <div 
                           key={file.id} 
-                          className="bg-[#111728] border border-slate-800 rounded-xl overflow-hidden shadow-md"
+                          className="bg-[#111728] border border-slate-800 rounded-xl overflow-hidden shadow-md w-full"
                         >
                           {/* Collapsible Accordion Header */}
                           <div 
@@ -645,6 +974,32 @@ export function IngestPanel({
                     </div>
                   </div>
 
+                  {/* Enhanced Detailed Uploaded & Ingested Document Compilation Summary */}
+                  <div className="bg-[#111728] border border-slate-800/80 rounded-2xl p-5 shadow-xl space-y-3">
+                    <div className="text-xs font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-1.5 border-b border-slate-800/40 pb-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      Ingestion Summary & Pipeline Logs
+                    </div>
+                    
+                    <div className="divide-y divide-slate-800/60 max-h-[160px] overflow-y-auto pr-1">
+                      {files.map((file) => (
+                        <div key={file.id} className="py-2.5 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            <span className="font-semibold text-slate-200 truncate max-w-[200px]">{file.name}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 flex gap-2 shrink-0">
+                            <span>{file.totalElements} elements</span>
+                            <span>•</span>
+                            <span className="text-primary font-bold">{file.totalChunks} chunks</span>
+                            <span>•</span>
+                            <span className="text-yellow-500 font-bold">{file.summarizedChunks} summarized</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Collapsible details list */}
                   <div className="space-y-3">
                     {files.map((file) => {
@@ -691,237 +1046,16 @@ export function IngestPanel({
                       );
                     })}
                   </div>
-                </div>
-              )}
 
-              {/* STEP 4: CHUNKS REGISTRY */}
-              {activeStep === 4 && (
-                <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-                  <div className="flex justify-between items-center mb-4 shrink-0">
-                    <h4 className="text-sm font-bold text-slate-100">Files Chunks Registry</h4>
-                    <span className="text-xs text-slate-500">Interactive search & inspector</span>
-                  </div>
-
-                  {/* Search box */}
-                  <div className="relative mb-4 shrink-0">
-                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
-                    <input
-                      type="text"
-                      placeholder="Search chunks in all files..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-[#111728] border border-slate-800/80 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-primary/50"
-                    />
-                  </div>
-
-                  {/* List of files with collapsible accordion of chunks */}
-                  <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-                    {files.map((file) => {
-                      const isOpen = !!openRegistryFiles[file.id];
-                      const matchedChunks = file.chunks.filter(c => searchQuery === "" || c.originalText.toLowerCase().includes(searchQuery.toLowerCase()) || c.summaryText.toLowerCase().includes(searchQuery.toLowerCase()));
-                      
-                      // Skip rendering file if search yields no results
-                      if (matchedChunks.length === 0 && searchQuery !== "") return null;
-
-                      return (
-                        <div 
-                          key={file.id} 
-                          className="bg-[#111728] border border-slate-800 rounded-xl overflow-hidden shadow-sm"
-                        >
-                          {/* Accordion File Header */}
-                          <div 
-                            onClick={() => toggleRegistryAccordion(file.id)}
-                            className="flex justify-between items-center px-4 py-3 cursor-pointer hover:bg-slate-800/30 border-b border-slate-800/40 select-none"
-                          >
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-primary" />
-                              <span className="text-xs font-semibold text-slate-200">{file.name}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-[10px] text-slate-500 font-mono">
-                                ({matchedChunks.length} chunks)
-                              </span>
-                              {isOpen ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-                            </div>
-                          </div>
-
-                          {/* Expanded list of chunks under file */}
-                          {isOpen && (
-                            <div className="p-3 bg-[#0d1220] space-y-2">
-                              {matchedChunks.map((chunk) => {
-                                const isSelected = selectedChunk?.id === chunk.id;
-                                return (
-                                  <div
-                                    key={chunk.id}
-                                    onClick={() => setSelectedChunk(chunk)}
-                                    className={`p-3 rounded-lg border cursor-pointer text-left transition-all duration-300 ${
-                                      isSelected
-                                        ? "bg-[#151f32] border-primary/40 shadow-md"
-                                        : "bg-[#111728] border-slate-800/80 hover:bg-[#12192b]"
-                                    }`}
-                                  >
-                                    <div className="flex justify-between items-center mb-1.5">
-                                      <div className="flex gap-1.5 items-center">
-                                        <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[8px] font-bold text-slate-400 capitalize">
-                                          {chunk.type}
-                                        </span>
-                                        {chunk.isRaw ? (
-                                          <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-bold text-emerald-400">
-                                            raw
-                                          </span>
-                                        ) : (
-                                          <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-[8px] font-bold text-yellow-400">
-                                            summarized
-                                          </span>
-                                        )}
-                                      </div>
-                                      <span className="text-[9px] text-slate-500">Page {chunk.page}</span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
-                                      {chunk.snippet}
-                                    </p>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right Panel: Detail Inspector */}
-            <div className="w-80 border-l border-slate-800/80 bg-[#0c111e] flex flex-col overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-850 shrink-0 flex justify-between items-center">
-                <span className="text-xs font-bold text-slate-100 tracking-wide">Detail Inspector</span>
-              </div>
-
-              {activeStep !== 4 || !selectedChunk ? (
-                // Empty state when processing or no chunk selected
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8 text-center gap-2">
-                  <div className="p-3 bg-[#111728] border border-slate-800/80 rounded-full mb-2">
-                    <Eye className="w-6 h-6 text-slate-600" />
-                  </div>
-                  <span className="text-xs font-semibold text-slate-400">Preview Inspector</span>
-                  <p className="text-[10px] text-slate-500 leading-relaxed">
-                    Select a chunk in Step 4 to inspect original content, summaries, and metadata.
-                  </p>
-                </div>
-              ) : (
-                // Full Inspector Tab Interface
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  {/* Selector tabs */}
-                  <div className="flex border-b border-slate-800 px-4 py-2 shrink-0 gap-1.5">
-                    {[
-                      { key: "original", label: "Original Text" },
-                      { key: "summary", label: "AI Summary" },
-                      { key: "metadata", label: "Metadata" },
-                    ].map((tab) => (
-                      <button
-                        key={tab.key}
-                        onClick={() => setInspectorTab(tab.key as any)}
-                        className={`flex-1 py-1 px-1.5 text-center rounded-md text-[9px] font-bold border transition-all duration-300 ${
-                          inspectorTab === tab.key
-                            ? "bg-[#151f32] text-primary border-primary/20"
-                            : "bg-[#111728] text-slate-400 border-slate-800/60 hover:text-slate-200"
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Inspector view content */}
-                  <div className="flex-1 overflow-y-auto p-4 text-xs">
-                    {/* ORIGINAL TEXT VIEW */}
-                    {inspectorTab === "original" && (
-                      <div className="space-y-4">
-                        <div>
-                          <div className="text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-wide">
-                            Original Content
-                          </div>
-                          <div className="bg-[#111728] p-3 border border-slate-800/80 rounded-xl leading-relaxed text-slate-300 font-mono text-[11px] whitespace-pre-wrap">
-                            {selectedChunk.originalText}
-                          </div>
-                        </div>
-
-                        {selectedChunk.type === "image" && (
-                          <div>
-                            <div className="text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-wide">
-                              Images (1)
-                            </div>
-                            <div className="bg-[#111728] p-3 border border-slate-800/80 rounded-xl flex flex-col gap-2 items-center justify-center">
-                              {/* Transformer Architecture Diagram representation */}
-                              <div className="w-full aspect-[4/3] bg-[#0c111e] rounded-lg border border-slate-800 flex flex-col p-2 text-[9px] font-semibold text-slate-400">
-                                <div className="text-center font-bold text-slate-300 uppercase mb-1">Transformer Encoder-Decoder</div>
-                                <div className="flex-1 flex gap-2 justify-center py-2">
-                                  <div className="w-16 bg-[#16223f] border border-primary/20 rounded-md p-1 flex flex-col justify-between">
-                                    <div className="text-center font-bold text-primary">Encoder</div>
-                                    <div className="bg-[#10192e] border border-slate-800 text-center p-0.5 rounded">Feed Forward</div>
-                                    <div className="bg-[#10192e] border border-slate-800 text-center p-0.5 rounded">Multi-Head Attn</div>
-                                  </div>
-                                  <div className="w-16 bg-[#1f1a30] border border-accent/20 rounded-md p-1 flex flex-col justify-between">
-                                    <div className="text-center font-bold text-accent">Decoder</div>
-                                    <div className="bg-[#141020] border border-slate-850 text-center p-0.5 rounded">Feed Forward</div>
-                                    <div className="bg-[#141020] border border-slate-850 text-center p-0.5 rounded">Masked Attn</div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* AI SUMMARY VIEW */}
-                    {inspectorTab === "summary" && (
-                      <div className="space-y-3">
-                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                          Searchable Summary (GPT-4o)
-                        </div>
-                        {selectedChunk.isRaw ? (
-                          <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl text-emerald-400 text-[11px] leading-relaxed flex gap-2">
-                            <Info className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-semibold block mb-1">No AI Summary needed</span>
-                              This chunk contains plain text, which is parsed and indexed directly in raw form to optimize latency, save token costs, and maintain high-fidelity accuracy.
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="bg-[#111728] p-3 border border-slate-800/80 rounded-xl leading-relaxed text-slate-300 font-mono text-[11px] whitespace-pre-wrap">
-                            {selectedChunk.summaryText}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* METADATA VIEW */}
-                    {inspectorTab === "metadata" && (
-                      <div className="space-y-3">
-                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
-                          Chunk Metadata Parameters
-                        </div>
-                        <div className="bg-[#111728] border border-slate-800/80 rounded-xl overflow-hidden">
-                          <table className="w-full text-left text-[11px] border-collapse">
-                            <tbody>
-                              {Object.entries(selectedChunk.metadata).map(([key, value]) => (
-                                <tr key={key} className="border-b border-slate-800/40">
-                                  <td className="p-2.5 font-bold text-slate-400 border-r border-slate-800/40 bg-[#0d1220] select-none capitalize">
-                                    {key.replace("_", " ")}
-                                  </td>
-                                  <td className="p-2.5 text-slate-200 break-all select-text font-mono">
-                                    {typeof value === "object" ? JSON.stringify(value) : String(value)}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
+                  {/* Finish Button */}
+                  <div className="flex justify-end mt-4">
+                    <button
+                      onClick={closeWizard}
+                      className="px-6 py-2.5 bg-primary hover:bg-primary/95 text-white rounded-xl text-xs font-bold transition shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-2"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Finish & Close Pipeline</span>
+                    </button>
                   </div>
                 </div>
               )}
