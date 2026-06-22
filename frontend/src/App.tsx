@@ -9,6 +9,52 @@ import { Message, RAGStatus, PipelineConfig, ToastState, UploadLog } from "./typ
 
 const API_BASE = "http://localhost:8000";
 
+function jsonToYaml(obj: any, indent = 0): string {
+  if (obj === null || obj === undefined) return "null";
+  if (typeof obj !== "object") {
+    if (typeof obj === "string") {
+      if (obj.includes("\n")) {
+        const lines = obj.split("\n");
+        const spaces = " ".repeat(indent + 2);
+        return "|\n" + lines.map(line => spaces + line).join("\n");
+      }
+      const hasSpecial = /[:#\?\{\}\[\]\s,\|&\*!%@`"']/.test(obj) || obj === "true" || obj === "false" || obj === "null" || !isNaN(Number(obj));
+      if (hasSpecial) {
+        return `"${obj.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+      }
+      return obj;
+    }
+    return String(obj);
+  }
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) return "[]";
+    const spaces = " ".repeat(indent);
+    return obj.map(item => `\n${spaces}- ${jsonToYaml(item, indent + 2)}`).join("");
+  }
+  
+  let yamlStr = "";
+  const keys = Object.keys(obj);
+  keys.forEach((key, idx) => {
+    const val = obj[key];
+    const spaces = " ".repeat(indent);
+    
+    if (val === null || val === undefined) {
+      yamlStr += `${spaces}${key}: null`;
+    } else if (typeof val === "object" && !Array.isArray(val) && Object.keys(val).length === 0) {
+      yamlStr += `${spaces}${key}: {}`;
+    } else if (typeof val === "object") {
+      yamlStr += `${spaces}${key}:\n${jsonToYaml(val, indent + 2)}`;
+    } else {
+      yamlStr += `${spaces}${key}: ${jsonToYaml(val, indent)}`;
+    }
+    
+    if (idx < keys.length - 1) {
+      yamlStr += "\n";
+    }
+  });
+  return yamlStr;
+}
+
 export default function App() {
   const [activePage, setActivePage] = useState<"chat" | "ingest" | "config">("chat");
   const [messages, setMessages] = useState<Message[]>([
@@ -329,6 +375,42 @@ export default function App() {
     document.documentElement.setAttribute("data-theme", nextDark ? "dark" : "light");
   };
 
+  const handleSetEditMode = async (mode: "visual" | "yaml") => {
+    if (mode === "yaml" && editMode === "visual" && configData) {
+      try {
+        const yamlStr = jsonToYaml(configData);
+        setRawYaml(yamlStr);
+      } catch (e) {
+        console.error("Failed to serialize visual config to YAML", e);
+      }
+    } else if (mode === "visual" && editMode === "yaml" && rawYaml) {
+      try {
+        const res = await fetch(`${API_BASE}/api/config/parse`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ yaml_content: rawYaml }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setConfigData(data.resolved_config);
+        } else {
+          const data = await res.json();
+          const detail = data.detail;
+          let errMsg = typeof detail === "string" ? detail : detail.message || "Invalid YAML";
+          if (detail.errors) {
+            errMsg += ": " + detail.errors.map((err: any) => `${err.loc.join(".")}: ${err.msg}`).join(", ");
+          }
+          showToast(`YAML parsing failed: ${errMsg}`, "error");
+          return;
+        }
+      } catch (e) {
+        showToast("Error connecting to parser endpoint", "error");
+        return;
+      }
+    }
+    setEditMode(mode);
+  };
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
       {/* Toast popup */}
@@ -383,7 +465,7 @@ export default function App() {
               rawYaml={rawYaml}
               setRawYaml={setRawYaml}
               editMode={editMode}
-              setEditMode={setEditMode}
+              setEditMode={handleSetEditMode}
               handleUpdateConfigValue={handleUpdateConfigValue}
               handleSaveConfig={handleSaveConfig}
               fetchConfig={fetchConfig}

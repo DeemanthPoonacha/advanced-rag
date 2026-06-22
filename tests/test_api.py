@@ -81,6 +81,25 @@ def test_api_endpoints():
                 if chunk_count >= 5:
                     break
 
+    # 9. Test POST /api/config/parse
+    print("\nTesting POST /api/config/parse:")
+    valid_yaml = """
+project:
+  name: test-parse-pipeline
+  environment: development
+"""
+    res = client.post("/api/config/parse", json={"yaml_content": valid_yaml})
+    print(f"Status Code: {res.status_code}")
+    print(f"Response: {res.json()}")
+    assert res.status_code == 200
+    assert res.json()["status"] == "success"
+    assert res.json()["resolved_config"]["project"]["name"] == "test-parse-pipeline"
+
+    # Test parse with invalid yaml
+    res = client.post("/api/config/parse", json={"yaml_content": "invalid: - yaml: : syntax"})
+    print(f"Status Code: {res.status_code} (should be 400 or 422)")
+    assert res.status_code in [400, 422]
+
     print("\n--- All API Integration Tests Passed! ---")
 
 if __name__ == "__main__":

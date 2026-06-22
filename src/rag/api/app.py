@@ -354,6 +354,29 @@ async def update_config_json(req: Dict[str, Any]):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to reload pipeline: {str(e)}")
 
+@app.post("/api/config/parse")
+async def parse_config_yaml(req: ConfigUpdateRequest):
+    """Validate and return JSON representation of raw yaml without saving it."""
+    try:
+        raw_data = yaml.safe_load(req.yaml_content)
+        if not isinstance(raw_data, dict):
+            raise HTTPException(status_code=400, detail="Config must be a key-value dictionary.")
+        # Validate using Pydantic Loader
+        validated_config = load_config_from_dict(raw_data)
+        return {
+            "status": "success",
+            "resolved_config": validated_config.model_dump()
+        }
+    except ValidationError as ve:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "Pydantic validation failed for configuration", "errors": ve.errors()}
+        )
+    except yaml.YAMLError as ye:
+        raise HTTPException(status_code=400, detail=f"Invalid YAML syntax: {str(ye)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse yaml: {str(e)}")
+
 @app.post("/api/query")
 async def query_pipeline(req: QueryRequest):
     global orchestrator
