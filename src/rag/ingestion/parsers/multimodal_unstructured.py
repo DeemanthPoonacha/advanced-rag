@@ -87,14 +87,53 @@ class MultimodalUnstructuredParser(BaseParser):
         return documents
 
     def _partition(self, file_path: str) -> list[Any]:
-        from unstructured.partition.pdf import partition_pdf
-        return partition_pdf(
-            filename=file_path,
-            strategy=self._strategy,
-            infer_table_structure=True,
-            extract_image_block_types=["Image"] if self._extract_images else [],
-            extract_image_block_to_payload=True
-        )
+        try:
+            from unstructured.partition.pdf import partition_pdf
+            return partition_pdf(
+                filename=file_path,
+                strategy=self._strategy,
+                infer_table_structure=True,
+                extract_image_block_types=["Image"] if self._extract_images else [],
+                extract_image_block_to_payload=True
+            )
+        except Exception as e:
+            logger.warning(
+                "multimodal_partition_failed_using_fallback",
+                file_path=file_path,
+                error=str(e)
+            )
+
+            class FallbackElement:
+                def __init__(self, text: str, page_number: int | None = None) -> None:
+                    self.text = text
+                    self.metadata = type("ElementMetadata", (), {"page_number": page_number})()
+                def __str__(self) -> str:
+                    return self.text
+
+            # Parse files locally
+            suffix = Path(file_path).suffix.lower()
+            if suffix in [".txt", ".md", ".py", ".json", ".yaml", ".yml", ".csv", ".ini", ".conf"]:
+                try:
+                    content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+                    return [FallbackElement(content, page_number=1)]
+                except Exception:
+                    pass
+            elif suffix == ".pdf":
+                try:
+                    import pypdf
+                    reader = pypdf.PdfReader(file_path)
+                    pages = []
+                    for idx, page in enumerate(reader.pages):
+                        text = page.extract_text()
+                        if text and text.strip():
+                            pages.append(FallbackElement(text, page_number=idx + 1))
+                    if pages:
+                        return pages
+                except Exception as pdf_err:
+                    logger.error("multimodal_fallback_pdf_parsing_failed", error=str(pdf_err))
+
+            content = f"[Fallback Parser] Failed to partition multimodal document content from {file_path}."
+            return [FallbackElement(content, page_number=1)]
 
     def _separate_content_types(self, chunk: Any) -> dict[str, Any]:
         content_data = {

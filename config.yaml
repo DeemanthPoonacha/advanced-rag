@@ -39,7 +39,7 @@ retrieval:
 vector_store:
   provider: qdrant
   config:
-    url: "http://localhost:6333"
+    url: "data/qdrant_db"
     collection_name: "documents"
     vector_size: 384
     prefer_grpc: false

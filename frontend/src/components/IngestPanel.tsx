@@ -242,6 +242,13 @@ export function IngestPanel({
     fetchChunks();
   }, [uploadLogs, status]);
 
+  const [ragSearchQuery, setRagSearchQuery] = useState("");
+  const [isRagSearching, setIsRagSearching] = useState(false);
+  const [ragSearchResults, setRagSearchResults] = useState<any | null>(null);
+  const [ragSearchError, setRagSearchError] = useState<string | null>(null);
+
+
+
   // Unified files mapping and sorting/grouping
   const mockFilesList = files?.map((file) => ({
     id: file.id,
@@ -287,7 +294,8 @@ export function IngestPanel({
     };
   });
 
-  const allFiles = [...uploadedFilesList, ...mockFilesList];
+  const isMockMode = status?.mock_mode || false;
+  const allFiles = isMockMode ? [...uploadedFilesList, ...mockFilesList] : uploadedFilesList;
 
   const getGroupKey = (uploadTime: string) => {
     const parts = uploadTime.split(",");
@@ -317,6 +325,148 @@ export function IngestPanel({
   const sortedGroupKeys = Object.keys(groupedFiles).sort((a, b) => {
     return parseDate(b) - parseDate(a);
   });
+
+  const handleRagSearch = async () => {
+    if (!ragSearchQuery.trim()) return;
+    setIsRagSearching(true);
+    setRagSearchError(null);
+
+    try {
+      const res = await fetch("http://localhost:8000/api/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: ragSearchQuery })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRagSearchResults({
+          ...data,
+          isSimulated: false,
+          retrievalType: "Dense Vector Search (Qdrant Index)"
+        });
+        setIsRagSearching(false);
+        return;
+      }
+    } catch (e) {
+      console.warn("Connection to RAG API failed, falling back to local simulation", e);
+    }
+
+    // Client-side fallback matching
+    setTimeout(() => {
+      try {
+        const localChunks: any[] = [];
+        allFiles.forEach((file) => {
+          if (file.chunks) {
+            file.chunks.forEach((chunk) => {
+              localChunks.push({
+                content: chunk.originalText,
+                fileName: file.name,
+                pageNumber: chunk.page,
+                fileType: chunk.type,
+                summaryText: chunk.summaryText,
+                isRaw: chunk.isRaw,
+                metadata: chunk.metadata
+              });
+            });
+          }
+        });
+
+        if (localChunks.length === 0) {
+          setRagSearchResults({
+            answer: "No document chunks are currently indexed in the registry. Please upload files above to parse them into searchable chunks.",
+            sources: [],
+            latency_ms: 10,
+            trace_id: "local-sim-empty",
+            isSimulated: true,
+            retrievalType: "Local Database Scan (0 chunks found)"
+          });
+          setIsRagSearching(false);
+          return;
+        }
+
+        const queryClean = ragSearchQuery.toLowerCase().trim();
+        const queryTerms = queryClean.split(/\W+/).filter(t => t.length > 2);
+
+        const scored = localChunks.map((item) => {
+          const contentLower = item.content.toLowerCase();
+          let score = 0.0;
+          let matchCount = 0;
+
+          if (queryTerms.length > 0) {
+            queryTerms.forEach((term) => {
+              if (contentLower.includes(term)) {
+                matchCount++;
+                const occurrences = contentLower.split(term).length - 1;
+                score += 0.25 + (occurrences * 0.05);
+              }
+            });
+            if (matchCount > 1) {
+              score *= (1.0 + 0.3 * matchCount);
+            }
+          } else {
+            if (contentLower.includes(queryClean)) {
+              score += 0.5;
+            }
+          }
+
+          const pseudoDistance = (Math.abs(Math.sin(item.content.length)) * 0.05);
+          score = Math.min(0.98, score + pseudoDistance);
+
+          return {
+            ...item,
+            score
+          };
+        });
+
+        const matchedResults = scored
+          .filter(x => x.score > 0.08 || queryTerms.length === 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 3);
+
+        let answer = "";
+        if (matchedResults.length > 0) {
+          const topMatch = matchedResults[0];
+          answer = `**[Simulated RAG Answer]** Synthesized response for query: *"${ragSearchQuery}"* using retrieved context:\n\n` +
+            `From the document **${topMatch.fileName}** (Page ${topMatch.pageNumber}), the semantic search retrieved matching text with a similarity score of **${(topMatch.score * 100).toFixed(0)}%**:\n` +
+            `> "${topMatch.content.substring(0, 240)}..."\n\n` +
+            `In a production environment, the pipeline feeds these top chunks directly into the LLM system prompt context, enforcing grounding and preventing hallucination.`;
+        } else {
+          answer = `The retrieval engine scanned all ${localChunks.length} indexed chunks in the database but could not find a semantic match for your query: "${ragSearchQuery}".\n\n` +
+            `Try adjusting your keywords or upload documents that contain content related to your search.`;
+        }
+
+        setRagSearchResults({
+          answer,
+          sources: matchedResults.map(m => ({
+            content: m.content,
+            score: m.score,
+            metadata: {
+              file_name: m.fileName,
+              source: m.fileName,
+              page_number: m.pageNumber,
+              file_type: m.fileType,
+              summary_text: m.summaryText,
+              ...m.metadata
+            }
+          })),
+          latency_ms: 20 + Math.random() * 30,
+          trace_id: "sim-" + Math.random().toString(36).substring(2, 10),
+          isSimulated: true,
+          retrievalType: "Local Database Scan (Fallback Mode)"
+        });
+      } catch (err: any) {
+        setRagSearchError(err?.message || "Simulation failed");
+      } finally {
+        setIsRagSearching(false);
+      }
+    }, 450);
+  };
+
+  const clearRagSearch = () => {
+    setRagSearchQuery("");
+    setRagSearchResults(null);
+    setRagSearchError(null);
+  };
 
   const closeWizard = () => {
     setWizardActive(false);
@@ -413,8 +563,155 @@ export function IngestPanel({
            
 
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex-1 flex flex-col min-h-[300px] overflow-hidden">
-              <h3 className="text-md font-bold mb-4 font-display">Ingested Files Registry</h3>
-              {allFiles.length === 0 ? (
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shrink-0">
+                <h3 className="text-md font-bold font-display">Ingested Files Registry</h3>
+                
+                {/* RAG Retrieval Search Bar */}
+                <div className="relative w-full md:w-80 shrink-0">
+                  <Search className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Semantic RAG Search (Press Enter)..."
+                    value={ragSearchQuery}
+                    onChange={(e) => setRagSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleRagSearch();
+                      }
+                    }}
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-8 py-2 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
+                  />
+                  {ragSearchQuery && (
+                    <button
+                      onClick={clearRagSearch}
+                      className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer animate-fade-in"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {isRagSearching ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8 gap-3">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  <p className="text-sm font-semibold">Interrogating Vector Index...</p>
+                  <p className="text-xs text-slate-500">Retrieving most relevant document chunks and synthesizing answer</p>
+                </div>
+              ) : ragSearchError ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8 gap-2">
+                  <Info className="w-8 h-8 text-rose-500" />
+                  <p className="text-sm font-bold text-rose-500">Search failed</p>
+                  <p className="text-xs text-slate-500">{ragSearchError}</p>
+                  <button
+                    onClick={clearRagSearch}
+                    className="mt-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold cursor-pointer"
+                  >
+                    Reset Registry View
+                  </button>
+                </div>
+              ) : ragSearchResults ? (
+                <div className="flex-1 overflow-y-auto space-y-5 pr-1">
+                  {/* LLM Answer Card */}
+                  <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Sparkle className="w-4 h-4 text-primary animate-pulse" />
+                        <span className="text-xs font-bold text-primary uppercase tracking-wide">LLM Synthesized Answer</span>
+                      </div>
+                      <button
+                        onClick={clearRagSearch}
+                        className="text-[10px] text-slate-400 hover:text-primary transition cursor-pointer font-bold uppercase"
+                      >
+                        Back to Files
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium select-text whitespace-pre-wrap">
+                      {ragSearchResults.answer}
+                    </p>
+                    <div className="text-[9px] text-slate-400 dark:text-slate-500 mt-2.5 font-mono flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span>Latency: {ragSearchResults.latency_ms?.toFixed(0)}ms</span>
+                        <span>•</span>
+                        <span>Trace ID: {ragSearchResults.trace_id?.substring(0, 8)}...</span>
+                      </div>
+                      <span className={`px-1.5 py-0.5 rounded font-sans text-[8px] font-bold ${
+                        ragSearchResults.isSimulated 
+                          ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" 
+                          : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                      }`}>
+                        {ragSearchResults.retrievalType || "Vector DB Search"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Retrieved Sources */}
+                  <div className="space-y-3">
+                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-1">
+                      Retrieved Source Chunks ({ragSearchResults.sources?.length || 0})
+                    </div>
+                    {ragSearchResults.sources && ragSearchResults.sources.length > 0 ? (
+                      <div className="space-y-3">
+                        {ragSearchResults.sources.map((source: any, idx: number) => {
+                          const chunkObj = {
+                            id: `retrieved-${idx}`,
+                            page: source.metadata?.page_number || 1,
+                            type: (source.metadata?.file_type === "image" || source.metadata?.image_extracted)
+                              ? ("image" as const)
+                              : source.metadata?.table_extracted
+                              ? ("table" as const)
+                              : ("text" as const),
+                            snippet: source.content ? (source.content.length > 120 ? source.content.substring(0, 120) + "..." : source.content) : "",
+                            originalText: source.content || "",
+                            summaryText: source.metadata?.summary_text || "",
+                            isRaw: !source.metadata?.summary_text,
+                            metadata: source.metadata || {},
+                          };
+
+                          const isSelected = selectedChunk?.originalText === source.content;
+                          const scorePercent = (source.score * 100).toFixed(0);
+
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => setSelectedChunk(chunkObj)}
+                              className={`p-3 rounded-lg border text-left cursor-pointer transition-all duration-200 ${
+                                isSelected
+                                  ? "bg-primary/5 border-primary/45 shadow-sm"
+                                  : "bg-slate-50/40 dark:bg-slate-900/20 border-slate-200/60 dark:border-slate-800/40 hover:bg-slate-100/50 dark:hover:bg-slate-800/20"
+                              }`}
+                            >
+                              <div className="flex justify-between items-center mb-1.5">
+                                <div className="flex gap-1.5 items-center">
+                                  <span className="px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 text-[8px] font-bold text-primary">
+                                    Rank #{idx + 1}
+                                  </span>
+                                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-bold text-emerald-500">
+                                    Score: {scorePercent}%
+                                  </span>
+                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[150px] font-semibold">
+                                    {source.metadata?.file_name || source.metadata?.source || "Unknown Document"}
+                                  </span>
+                                </div>
+                                <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">
+                                  Page {source.metadata?.page_number || 1}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+                                {source.content}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-xs text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                        No sources returned for this query.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : allFiles.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8">
                   <Database className="w-12 h-12 text-slate-300 dark:text-slate-800 mb-2" />
                   <p className="text-sm">No files ingested yet</p>

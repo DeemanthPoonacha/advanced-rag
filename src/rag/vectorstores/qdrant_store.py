@@ -69,15 +69,22 @@ class QdrantVectorStore(BaseVectorStore):
         if self._client is None:
             from qdrant_client import AsyncQdrantClient
 
-            kwargs: dict[str, Any] = {
-                "url": self._url,
-                "prefer_grpc": self._prefer_grpc,
-            }
+            kwargs: dict[str, Any] = {}
+            if self._url.startswith("http://") or self._url.startswith("https://"):
+                kwargs["url"] = self._url
+                kwargs["prefer_grpc"] = self._prefer_grpc
+            elif self._url == ":memory:":
+                kwargs["location"] = ":memory:"
+            else:
+                # Treat self._url as a local database directory path for serverless Qdrant
+                kwargs["path"] = self._url
+
             if self._api_key:
                 kwargs["api_key"] = self._api_key
 
             self._client = AsyncQdrantClient(**kwargs)
         return self._client
+
 
     @trace_operation(LifecycleStage.UPSERT, "qdrant_initialize")
     async def initialize(self) -> None:
