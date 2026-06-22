@@ -188,7 +188,7 @@ class LlamaParseParser(BaseParser):
 
             meta = DocumentMetadata(
                 source=file_path,
-                file_name=path.name,
+                file_name=extra_meta.get("filename") or path.name,
                 file_type=path.suffix.lstrip("."),
                 page_number=i + 1 if len(llama_docs) > 1 else None,
                 total_pages=len(llama_docs) if len(llama_docs) > 1 else None,

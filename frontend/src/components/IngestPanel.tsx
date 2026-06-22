@@ -263,8 +263,15 @@ export function IngestPanel({
 
   const uploadedFilesList = uploadLogs.map((log, idx) => {
     const matchedChunks = apiChunks.filter((c) => {
-      const docName = c.metadata?.file_name || c.metadata?.source || "";
-      return docName.endsWith(log.filename) || log.filename.endsWith(docName);
+      const docName = (c.metadata?.file_name || c.metadata?.source || "").toLowerCase();
+      const logName = log.filename.toLowerCase();
+      const cleanDoc = docName.split("/").pop() || "";
+      const cleanLog = logName.split("/").pop() || "";
+      return (
+        cleanDoc === cleanLog ||
+        cleanDoc.endsWith(cleanLog) ||
+        cleanLog.endsWith(cleanDoc)
+      );
     });
 
     const formattedChunks = matchedChunks.map((c, cIdx) => ({
@@ -282,13 +289,29 @@ export function IngestPanel({
       metadata: c.metadata || {},
     }));
 
+    const textCount = formattedChunks.filter(c => c.type === "text").length;
+    const tableCount = formattedChunks.filter(c => c.type === "table").length;
+    const imageCount = formattedChunks.filter(c => c.type === "image").length;
+    const titleCount = formattedChunks.filter(c => c.metadata?.title_extracted).length;
+    const otherCount = 0;
+    const totalChunks = formattedChunks.length || log.chunks_count || 0;
+    const totalElements = textCount + tableCount + imageCount || totalChunks || 1;
+    const summarizedChunks = formattedChunks.filter(c => !c.isRaw).length;
+
     return {
       id: `uploaded-${idx}-${log.filename}`,
       name: log.filename,
       size: "N/A",
       status: "completed" as const,
       uploadTime: log.date,
-      chunksCount: log.chunks_count,
+      textCount,
+      tableCount,
+      imageCount,
+      titleCount,
+      otherCount,
+      totalElements,
+      totalChunks,
+      summarizedChunks,
       chunks: formattedChunks,
       isMock: false,
     };
@@ -327,7 +350,10 @@ export function IngestPanel({
   });
 
   const handleRagSearch = async () => {
-    if (!ragSearchQuery.trim()) return;
+    if (!ragSearchQuery.trim()) {
+      clearRagSearch();
+      return;
+    }
     setIsRagSearching(true);
     setRagSearchError(null);
 
@@ -470,6 +496,13 @@ export function IngestPanel({
     setRagSearchError(null);
   };
 
+  useEffect(() => {
+    if (!ragSearchQuery.trim()) {
+      setRagSearchResults(null);
+      setRagSearchError(null);
+    }
+  }, [ragSearchQuery]);
+
   const closeWizard = () => {
     setWizardActive(false);
   };
@@ -489,19 +522,77 @@ export function IngestPanel({
     setOpenRegistryFiles(prev => ({ ...prev, [fileId]: !prev[fileId] }));
   };
 
-  // Launch visual wizard simulation
-  const startIngestionWizard = () => {
-    setWizardActive(true);
-    setActiveStep(1);
-    
-    // Automatically set accordions open by default
-    setOpenPartitionFiles({ f1: true, f2: false, f3: false });
-    setOpenChunkFiles({ f1: true, f2: false, f3: false });
-    setOpenRegistryFiles({ f1: true, f2: false, f3: false });
+  // Select active files with potential in-progress upload item appended dynamically
+  const activeUploadFiles = React.useMemo(() => {
+    const list = isMockMode ? files : (uploadedFilesList as unknown as ProcessingFile[]);
+    if (isUploading) {
+      let tempName = "Uploading document...";
+      if (fileInputRef.current && fileInputRef.current.files && fileInputRef.current.files.length > 0) {
+        tempName = Array.from(fileInputRef.current.files).map(f => f.name).join(", ");
+      }
+      
+      const alreadyPresent = list.some(f => f.name === tempName);
+      if (!alreadyPresent) {
+        return [
+          {
+            id: "temp-upload-item",
+            name: tempName,
+            size: "Calculating...",
+            status: "processing" as const,
+            textCount: 0,
+            tableCount: 0,
+            imageCount: 0,
+            titleCount: 0,
+            otherCount: 0,
+            totalElements: 0,
+            totalChunks: 0,
+            summarizedChunks: 0,
+            chunks: []
+          },
+          ...list
+        ];
+      }
+    }
+    return list;
+  }, [isMockMode, files, uploadedFilesList, isUploading]);
 
-    // Set first chunk selected
-    setSelectedChunk(files[0].chunks[0]);
+  const wizardFiles = activeUploadFiles;
+
+  // Launch visual wizard simulation
+  const startIngestionWizard = (targetFileId?: string) => {
+    setWizardActive(true);
+    setActiveStep(targetFileId ? 3 : 1);
+    
+    const selectFile = targetFileId 
+      ? (activeUploadFiles.find(f => f.id === targetFileId) || activeUploadFiles[0])
+      : activeUploadFiles[0];
+
+    if (selectFile) {
+      setOpenPartitionFiles({ [selectFile.id]: true });
+      setOpenChunkFiles({ [selectFile.id]: true });
+      setOpenRegistryFiles(prev => ({ ...prev, [selectFile.id]: true }));
+
+      if (selectFile.chunks && selectFile.chunks.length > 0) {
+        setSelectedChunk(selectFile.chunks[0]);
+      } else {
+        setSelectedChunk(null);
+      }
+    } else {
+      setSelectedChunk(null);
+    }
   };
+
+  // Automatically select the first chunk when files become available
+  useEffect(() => {
+    if (wizardActive && !selectedChunk) {
+      const activeFilesList = isMockMode ? files : (uploadedFilesList as unknown as ProcessingFile[]);
+      if (activeFilesList.length > 0 && activeFilesList[0].chunks && activeFilesList[0].chunks.length > 0) {
+        setSelectedChunk(activeFilesList[0].chunks[0]);
+        setOpenPartitionFiles({ [activeFilesList[0].id]: true });
+        setOpenChunkFiles({ [activeFilesList[0].id]: true });
+      }
+    }
+  }, [wizardActive, selectedChunk, isMockMode, files, uploadedFilesList]);
 
   // Auto-progress simulation logic
   useEffect(() => {
@@ -545,15 +636,15 @@ export function IngestPanel({
   };
 
   // Step 1 helper aggregates
-  const totalUploaded = files.length;
-  const countFailed = files.filter(f => f.status === "failed").length;
-  const countProgress = isUploading ? 1 : 0;
-  const countSuccess = files.filter(f => f.status === "completed").length - countProgress;
+  const totalUploaded = wizardFiles.length;
+  const countFailed = wizardFiles.filter(f => f.status === "failed").length;
+  const countProgress = wizardFiles.filter(f => f.status === "processing").length;
+  const countSuccess = wizardFiles.filter(f => f.status === "completed").length;
 
   // Step 3 helper aggregates
-  const sumTotalElements = files.reduce((acc, f) => acc + f.totalElements, 0);
-  const sumTotalChunks = files.reduce((acc, f) => acc + f.totalChunks, 0);
-  const sumSummarizedChunks = files.reduce((acc, f) => acc + f.summarizedChunks, 0);
+  const sumTotalElements = wizardFiles.reduce((acc, f) => acc + f.totalElements, 0);
+  const sumTotalChunks = wizardFiles.reduce((acc, f) => acc + f.totalChunks, 0);
+  const sumSummarizedChunks = wizardFiles.reduce((acc, f) => acc + f.summarizedChunks, 0);
   const sumRawChunks = sumTotalChunks - sumSummarizedChunks;
 
   return (
@@ -778,8 +869,7 @@ export function IngestPanel({
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        startIngestionWizard();
-                                        setActiveStep(3);
+                                        startIngestionWizard(file.id);
                                       }}
                                       className="ml-2 px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 hover:border-primary/30 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
                                       title="Open Multi-Step Processing Pipeline Visualizer"
@@ -1002,7 +1092,7 @@ export function IngestPanel({
               >
                 <UploadCloud className="w-12 h-12 text-primary animate-pulse" />
                 <div className="text-sm font-semibold">Click or drag files to upload</div>
-                <div className="text-xs text-slate-400">Supports PDF, DOCX, TXT, or Markdown (Upload multiple files)</div>
+                <div className="text-xs text-slate-400">Supports PDF, DOCX, CSV, PPTX, TXT, or Markdown (Upload multiple files)</div>
                 <input
                   type="file"
                   multiple
@@ -1143,7 +1233,7 @@ export function IngestPanel({
                   <div className="bg-[#111728] border border-slate-800/80 rounded-2xl p-6 shadow-xl space-y-3">
                     <div className="text-xs font-bold text-primary mb-3 uppercase tracking-wide">Files List ({totalUploaded})</div>
                     <div className="space-y-3">
-                      {files.map((file) => (
+                      {wizardFiles.map((file) => (
                         <div key={file.id} className="flex justify-between items-center p-3 bg-[#0d1220] border border-slate-800/60 rounded-xl">
                           <div className="flex items-center gap-2">
                             <FileText className="w-4 h-4 text-slate-400" />
@@ -1178,7 +1268,7 @@ export function IngestPanel({
                   </div>
 
                   <div className="space-y-4 w-full">
-                    {files.map((file) => {
+                    {wizardFiles.map((file) => {
                       const isOpen = !!openPartitionFiles[file.id];
                       return (
                         <div 
@@ -1280,7 +1370,7 @@ export function IngestPanel({
                     </div>
                     
                     <div className="divide-y divide-slate-800/60 max-h-[160px] overflow-y-auto pr-1">
-                      {files.map((file) => (
+                      {wizardFiles.map((file) => (
                         <div key={file.id} className="py-2.5 flex items-center justify-between text-xs">
                           <div className="flex items-center gap-2">
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
@@ -1300,7 +1390,7 @@ export function IngestPanel({
 
                   {/* Collapsible details list */}
                   <div className="space-y-3">
-                    {files.map((file) => {
+                    {wizardFiles.map((file) => {
                       const isOpen = !!openChunkFiles[file.id];
                       return (
                         <div 

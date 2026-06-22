@@ -34,10 +34,10 @@ class SandboxParser(BaseParser):
 
     async def parse(self, source, metadata=None):
         from rag.core.types import Document, DocumentMetadata
-        name = getattr(source, "filename", str(source))
+        name = (metadata or {}).get("filename") or getattr(source, "filename", str(source))
         if isinstance(source, bytes):
             name = "uploaded_document"
-        return [Document(content=f"Extracted content from {name}. This is mock information stored to test the RAG flow.", metadata=DocumentMetadata(source=name))]
+        return [Document(content=f"Extracted content from {name}. This is mock information stored to test the RAG flow.", metadata=DocumentMetadata(source=name, file_name=name))]
     async def parse_batch(self, sources, metadata=None):
         return []
 
@@ -398,7 +398,7 @@ async def get_all_chunks(limit: int = 100):
                 "chunk_index": c.chunk_index,
                 "metadata": {
                     "source": getattr(c.metadata, "source", ""),
-                    "file_name": getattr(c.metadata, "file_name", ""),
+                    "file_name": getattr(c.metadata, "file_name", "") or getattr(c.metadata, "source", ""),
                     "file_type": getattr(c.metadata, "file_type", ""),
                     "language": getattr(c.metadata, "language", "en"),
                 },
@@ -432,7 +432,7 @@ async def get_all_chunks(limit: int = 100):
                 "chunk_index": payload.get("chunk_index", 0),
                 "metadata": {
                     "source": payload.get("source", payload.get("file_name", "")),
-                    "file_name": payload.get("file_name", ""),
+                    "file_name": payload.get("filename") or payload.get("file_name", ""),
                     "file_type": payload.get("file_type", ""),
                     "language": payload.get("language", "en"),
                 },

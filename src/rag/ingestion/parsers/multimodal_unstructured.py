@@ -70,7 +70,7 @@ class MultimodalUnstructuredParser(BaseParser):
 
             doc_meta = DocumentMetadata(
                 source=str(source),
-                file_name=Path(source).name,
+                file_name=(metadata or {}).get("filename") or Path(source).name,
                 file_type=Path(source).suffix.lstrip("."),
                 language=self._languages[0] if self._languages else "en",
                 custom=custom_metadata,
@@ -131,6 +131,37 @@ class MultimodalUnstructuredParser(BaseParser):
                         return pages
                 except Exception as pdf_err:
                     logger.error("multimodal_fallback_pdf_parsing_failed", error=str(pdf_err))
+            elif suffix == ".docx":
+                try:
+                    import zipfile
+                    import xml.etree.ElementTree as ET
+                    with zipfile.ZipFile(file_path) as docx:
+                        tree = ET.fromstring(docx.read('word/document.xml'))
+                        namespaces = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+                        text_nodes = tree.findall('.//w:t', namespaces)
+                        docx_text = "\n\n".join([node.text for node in text_nodes if node.text])
+                        if docx_text.strip():
+                            return [FallbackElement(docx_text, page_number=1)]
+                except Exception as docx_err:
+                    logger.error("multimodal_fallback_docx_parsing_failed", error=str(docx_err))
+            elif suffix == ".pptx":
+                try:
+                    import zipfile
+                    import xml.etree.ElementTree as ET
+                    slide_texts = []
+                    with zipfile.ZipFile(file_path) as pptx:
+                        slide_files = sorted([f for f in pptx.namelist() if f.startswith("ppt/slides/slide") and f.endswith(".xml")])
+                        for slide_file in slide_files:
+                            tree = ET.fromstring(pptx.read(slide_file))
+                            namespaces = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}
+                            text_nodes = tree.findall('.//a:t', namespaces)
+                            slide_text = " ".join([node.text for node in text_nodes if node.text])
+                            if slide_text.strip():
+                                slide_texts.append(slide_text)
+                    if slide_texts:
+                        return [FallbackElement(txt, page_number=idx + 1) for idx, txt in enumerate(slide_texts)]
+                except Exception as pptx_err:
+                    logger.error("multimodal_fallback_pptx_parsing_failed", error=str(pptx_err))
 
             content = f"[Fallback Parser] Failed to partition multimodal document content from {file_path}."
             return [FallbackElement(content, page_number=1)]
