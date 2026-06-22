@@ -377,6 +377,77 @@ async def parse_config_yaml(req: ConfigUpdateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse yaml: {str(e)}")
 
+@app.get("/api/chunks")
+async def get_all_chunks(limit: int = 100):
+    global orchestrator, use_mock_mode
+    if not orchestrator:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Orchestrator not initialized. Error: {init_error}"
+        )
+    
+    if use_mock_mode:
+        db = orchestrator.vector_store
+        storage = getattr(db, "storage", [])
+        chunks_list = []
+        for c in storage[:limit]:
+            chunks_list.append({
+                "id": c.id,
+                "content": c.content,
+                "document_id": c.document_id,
+                "chunk_index": c.chunk_index,
+                "metadata": {
+                    "source": getattr(c.metadata, "source", ""),
+                    "file_name": getattr(c.metadata, "file_name", ""),
+                    "file_type": getattr(c.metadata, "file_type", ""),
+                    "language": getattr(c.metadata, "language", "en"),
+                },
+                "token_count": c.token_count
+            })
+        return {
+            "status": "success",
+            "chunks": chunks_list
+        }
+    
+    try:
+        db = orchestrator.vector_store
+        client = db._get_client()
+        collection_name = db._collection_name
+        
+        # Scroll points from Qdrant collection
+        records, _ = await client.scroll(
+            collection_name=collection_name,
+            limit=limit,
+            with_payload=True,
+            with_vectors=False
+        )
+        
+        chunks_list = []
+        for record in records:
+            payload = record.payload or {}
+            chunks_list.append({
+                "id": str(record.id),
+                "content": payload.get("content", ""),
+                "document_id": payload.get("document_id", ""),
+                "chunk_index": payload.get("chunk_index", 0),
+                "metadata": {
+                    "source": payload.get("source", payload.get("file_name", "")),
+                    "file_name": payload.get("file_name", ""),
+                    "file_type": payload.get("file_type", ""),
+                    "language": payload.get("language", "en"),
+                },
+                "token_count": payload.get("token_count", 0)
+            })
+        return {
+            "status": "success",
+            "chunks": chunks_list
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to scroll chunks: {str(e)}"
+        )
+
 @app.post("/api/query")
 async def query_pipeline(req: QueryRequest):
     global orchestrator

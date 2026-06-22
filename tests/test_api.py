@@ -100,6 +100,15 @@ project:
     print(f"Status Code: {res.status_code} (should be 400 or 422)")
     assert res.status_code in [400, 422]
 
+    # 10. Test GET /api/chunks
+    print("\nTesting GET /api/chunks:")
+    res = client.get("/api/chunks?limit=10")
+    print(f"Status Code: {res.status_code}")
+    print(f"Response: {res.json()}")
+    assert res.status_code == 200
+    assert "chunks" in res.json()
+    assert isinstance(res.json()["chunks"], list)
+
     print("\n--- All API Integration Tests Passed! ---")
 
 if __name__ == "__main__":

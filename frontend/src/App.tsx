@@ -4,6 +4,7 @@ import { Header } from "./components/Header";
 import { ChatPanel } from "./components/ChatPanel";
 import { IngestPanel } from "./components/IngestPanel";
 import { ConfigPanel } from "./components/ConfigPanel";
+import { ChunksPanel } from "./components/ChunksPanel";
 import { Toast } from "./components/ui/Toast";
 import { Message, RAGStatus, PipelineConfig, ToastState, UploadLog } from "./types";
 
@@ -56,7 +57,7 @@ function jsonToYaml(obj: any, indent = 0): string {
 }
 
 export default function App() {
-  const [activePage, setActivePage] = useState<"chat" | "ingest" | "config">("chat");
+  const [activePage, setActivePage] = useState<"chat" | "ingest" | "config" | "chunks">("chat");
   const [messages, setMessages] = useState<Message[]>([
     {
       sender: "assistant",
@@ -470,6 +471,11 @@ export default function App() {
               handleSaveConfig={handleSaveConfig}
               fetchConfig={fetchConfig}
             />
+          )}
+
+          {/* PAGE 4: CHUNK VISUALIZER */}
+          {activePage === "chunks" && (
+            <ChunksPanel />
           )}
         </main>
       </div>

@@ -13,7 +13,7 @@ graph TD
     YAML[config.yaml] --> Loader[Config Loader]
     Loader --> Schema[PipelineConfig Schema]
     Schema --> Factory[ComponentFactory]
-    
+
     Registry[Component Registry] -- "Auto-Discovery" --> Implementations
     Factory -- "Query Class" --> Registry
     Factory -- "Instantiate with config" --> Component[Swappable Component]
@@ -24,6 +24,7 @@ graph TD
 ## 🔁 Pipeline Execution Flows
 
 ### 1. Ingestion Flow (Document indexing)
+
 This flow handles parsing raw sources, splitting them into chunks, generating embeddings, and upserting vectors.
 
 ```mermaid
@@ -38,6 +39,7 @@ graph LR
 ```
 
 ### 2. Retrieval & Generation Flow (User Querying)
+
 This flow processes user inputs, performs semantic retrieval, reranks results, synthesizes answers, and validates safety/quality.
 
 ```mermaid
@@ -80,6 +82,7 @@ sequenceDiagram
 ## 🏗️ Core Design Patterns
 
 ### 1. Component Registry Pattern
+
 All swappable modules register themselves using decorators at import time. This keeps modules decoupled and avoids monolithic import blocks in the factory or main orchestrator.
 
 The `ComponentRegistry` auto-discovery module imports every module in its registry list. Any optional modules missing third-party dependencies are skipped gracefully with standard warning logs, preventing startup failures.
@@ -92,6 +95,7 @@ class PGVectorStore(BaseVectorStore):
 ```
 
 ### 2. Factory Pattern & Dependency Injection
+
 The `ComponentFactory` maps keys from the configuration models to resolved registry components. It acts as the dependency injector, ensuring that components are built with their appropriate nested settings.
 
 ```python
@@ -106,14 +110,14 @@ return klass(**config)
 
 The framework defines 9 core interfaces, declared as Python Abstract Base Classes (ABCs) in [interfaces.py](../src/rag/core/interfaces.py).
 
-| Interface | Purpose | Standard Implementations |
-| :--- | :--- | :--- |
-| `BaseParser` | Extracts text and metadata from files/bytes. | `UnstructuredParser`, `LlamaParseParser` |
-| `BaseChunker` | Splits documents into chunks with overlap. | `SemanticChunker`, `RecursiveChunker`, `HierarchicalChunker` |
-| `BaseEmbeddingModel` | Computes dense and sparse representation vectors. | `OpenAIEmbeddings`, `CohereEmbeddings`, `LocalEmbeddings` |
-| `BaseLLM` | Generates streaming, completion, or structured text. | `OpenAILLM`, `AnthropicLLM`, `CohereLLM`, `LocalLLM` |
-| `BaseVectorStore` | Initializes indexes, upserts chunks, and runs searches. | `QdrantStore`, `PineconeStore`, `MilvusStore`, `PGVectorStore` |
-| `BaseRetriever` | Coordinates retrieval strategies (e.g. multi-query). | `SimpleRetriever`, `MultiQueryRetriever`, `AutoMergingRetriever`, `ContextualCompression` |
-| `BaseReranker` | Reranks candidate vectors using Cross-Encoders. | `CohereReranker`, `CrossEncoderReranker` |
-| `BaseGuardrail` | Performs input/output content moderation checks. | `LlamaGuard`, `NeMoGuardrails` |
-| `BaseEvaluator` | Runs automated RAG loop quality evaluations. | `RagasEvaluator`, `TruLensEvaluator` |
+| Interface            | Purpose                                                 | Standard Implementations                                                                  |
+| :------------------- | :------------------------------------------------------ | :---------------------------------------------------------------------------------------- |
+| `BaseParser`         | Extracts text and metadata from files/bytes.            | `UnstructuredParser`, `LlamaParseParser`                                                  |
+| `BaseChunker`        | Splits documents into chunks with overlap.              | `SemanticChunker`, `RecursiveChunker`, `HierarchicalChunker`                              |
+| `BaseEmbeddingModel` | Computes dense and sparse representation vectors.       | `OpenAIEmbeddings`, `CohereEmbeddings`, `LocalEmbeddings`                                 |
+| `BaseLLM`            | Generates streaming, completion, or structured text.    | `OpenAILLM`, `AnthropicLLM`, `CohereLLM`, `LocalLLM`                                      |
+| `BaseVectorStore`    | Initializes indexes, upserts chunks, and runs searches. | `QdrantStore`, `PineconeStore`, `MilvusStore`, `PGVectorStore`                            |
+| `BaseRetriever`      | Coordinates retrieval strategies (e.g. multi-query).    | `SimpleRetriever`, `MultiQueryRetriever`, `AutoMergingRetriever`, `ContextualCompression` |
+| `BaseReranker`       | Reranks candidate vectors using Cross-Encoders.         | `CohereReranker`, `CrossEncoderReranker`                                                  |
+| `BaseGuardrail`      | Performs input/output content moderation checks.        | `LlamaGuard`, `NeMoGuardrails`                                                            |
+| `BaseEvaluator`      | Runs automated RAG loop quality evaluations.            | `RagasEvaluator`, `TruLensEvaluator`                                                      |
