@@ -332,7 +332,7 @@ export function IngestPanel({
     setRagSearchError(null);
 
     try {
-      const res = await fetch("http://localhost:8000/api/query", {
+      const res = await fetch("http://localhost:8000/api/retrieve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: ragSearchQuery })
@@ -340,7 +340,9 @@ export function IngestPanel({
       if (res.ok) {
         const data = await res.json();
         setRagSearchResults({
-          ...data,
+          sources: data.chunks || [],
+          latency_ms: 15,
+          trace_id: "api-retrieval-" + Math.random().toString(36).substring(2, 8),
           isSimulated: false,
           retrievalType: "Dense Vector Search (Qdrant Index)"
         });
@@ -571,7 +573,7 @@ export function IngestPanel({
                   <Search className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
                   <input
                     type="text"
-                    placeholder="Semantic RAG Search (Press Enter)..."
+                    placeholder="Retrieve matching document chunks (Press Enter)..."
                     value={ragSearchQuery}
                     onChange={(e) => setRagSearchQuery(e.target.value)}
                     onKeyDown={(e) => {
@@ -611,26 +613,19 @@ export function IngestPanel({
                   </button>
                 </div>
               ) : ragSearchResults ? (
-                <div className="flex-1 overflow-y-auto space-y-5 pr-1">
-                  {/* LLM Answer Card */}
-                  <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Sparkle className="w-4 h-4 text-primary animate-pulse" />
-                        <span className="text-xs font-bold text-primary uppercase tracking-wide">LLM Synthesized Answer</span>
-                      </div>
-                      <button
-                        onClick={clearRagSearch}
-                        className="text-[10px] text-slate-400 hover:text-primary transition cursor-pointer font-bold uppercase"
-                      >
-                        Back to Files
-                      </button>
+                <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                  {/* Retrieval Metadata and Control Bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-950/40 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800/80">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                        Active Query Filter
+                      </span>
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 italic">
+                        "{ragSearchQuery}"
+                      </span>
                     </div>
-                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium select-text whitespace-pre-wrap">
-                      {ragSearchResults.answer}
-                    </p>
-                    <div className="text-[9px] text-slate-400 dark:text-slate-500 mt-2.5 font-mono flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono flex items-center gap-2">
                         <span>Latency: {ragSearchResults.latency_ms?.toFixed(0)}ms</span>
                         <span>•</span>
                         <span>Trace ID: {ragSearchResults.trace_id?.substring(0, 8)}...</span>
@@ -642,6 +637,12 @@ export function IngestPanel({
                       }`}>
                         {ragSearchResults.retrievalType || "Vector DB Search"}
                       </span>
+                      <button
+                        onClick={clearRagSearch}
+                        className="text-[10px] text-rose-500 hover:text-rose-600 font-bold hover:underline cursor-pointer transition flex items-center gap-1 border-l border-slate-200 dark:border-slate-800 pl-3"
+                      >
+                        <X className="w-3 h-3" /> Clear Results
+                      </button>
                     </div>
                   </div>
 

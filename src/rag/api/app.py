@@ -484,6 +484,49 @@ async def query_pipeline(req: QueryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/retrieve")
+async def retrieve_pipeline(req: QueryRequest):
+    global orchestrator
+    if not orchestrator:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Orchestrator not initialized. Error: {init_error}"
+        )
+        
+    try:
+        await orchestrator.initialize()
+        trace_id = str(uuid.uuid4())
+        
+        from rag.core.types import QueryContext
+        q_ctx = QueryContext(
+            original_query=req.query,
+            filters=req.metadata.get("filters", {}) if req.metadata else {},
+            top_k=orchestrator.config.retrieval.top_k,
+            similarity_threshold=orchestrator.config.retrieval.similarity_threshold,
+            trace_id=trace_id,
+            metadata=req.metadata or {},
+        )
+        
+        retrieved_results = await orchestrator.retriever.retrieve(q_ctx)
+        
+        if hasattr(orchestrator, "reranker") and orchestrator.reranker and retrieved_results:
+            retrieved_results = await orchestrator.reranker.rerank(q_ctx, retrieved_results)
+            
+        chunks_list = []
+        for r in retrieved_results:
+            chunks_list.append({
+                "content": r.chunk.content,
+                "score": r.score,
+                "metadata": r.chunk.metadata.model_dump() if hasattr(r.chunk.metadata, "model_dump") else r.chunk.metadata
+            })
+            
+        return {
+            "status": "success",
+            "chunks": chunks_list
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/query/stream")
 async def query_stream_pipeline(req: QueryRequest):
     global orchestrator
