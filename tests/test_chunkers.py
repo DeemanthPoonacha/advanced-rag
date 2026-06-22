@@ -5,6 +5,7 @@ from rag.core.interfaces import BaseEmbeddingModel
 from rag.ingestion.chunkers.recursive_chunker import RecursiveChunker
 from rag.ingestion.chunkers.semantic_chunker import SemanticChunker, _cosine_similarity, _split_sentences
 from rag.ingestion.chunkers.hierarchical_chunker import HierarchicalChunker
+from rag.ingestion.chunkers.multimodal_summarizer import MultimodalSummarizerChunker
 
 
 class MockEmbeddingModel(BaseEmbeddingModel):
@@ -130,3 +131,39 @@ async def test_hierarchical_chunker():
             child = next((c for c in children if c.id == child_id), None)
             assert child is not None
             assert child.parent_id == p.id
+
+
+@pytest.mark.asyncio
+async def test_multimodal_summarizer_chunker():
+    # 1. Text-only document (no tables/images) - should bypass LLM call
+    chunker = MultimodalSummarizerChunker()
+    doc_text = Document(content="Simple text page.", metadata={"custom": {}})
+    chunks = await chunker.chunk(doc_text)
+    
+    assert len(chunks) == 1
+    assert chunks[0].content == "Simple text page."
+    assert chunks[0].token_count == 3
+
+    # 2. Multimodal document (with table/image) - should trigger LLM call
+    doc_mm = Document(
+        content="Overview text.",
+        metadata={
+            "custom": {
+                "raw_text": "Overview text.",
+                "tables_html": ["<table>Mock Table</table>"],
+                "images_base64": ["base64string"],
+            }
+        }
+    )
+    
+    # Configure mock completions create method
+    from unittest.mock import AsyncMock, MagicMock
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "AI Enhanced Search Description."
+    
+    chunker._client.chat.completions.create = AsyncMock(return_value=mock_response)
+    
+    chunks_mm = await chunker.chunk(doc_mm)
+    assert len(chunks_mm) == 1
+    assert chunks_mm[0].content == "AI Enhanced Search Description."

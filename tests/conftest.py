@@ -21,6 +21,8 @@ mock_trulens = MagicMock()
 mock_trulens_provider = MagicMock()
 mock_trulens_groundedness = MagicMock()
 mock_unstructured_partition = MagicMock()
+mock_unstructured_pdf = MagicMock()
+mock_unstructured_chunking = MagicMock()
 mock_llama_parse = MagicMock()
 
 sys.modules["openai"] = mock_openai
@@ -46,6 +48,9 @@ sys.modules["trulens.feedback.groundedness"] = mock_trulens_groundedness
 sys.modules["unstructured"] = MagicMock()
 sys.modules["unstructured.partition"] = MagicMock()
 sys.modules["unstructured.partition.auto"] = mock_unstructured_partition
+sys.modules["unstructured.partition.pdf"] = mock_unstructured_pdf
+sys.modules["unstructured.chunking"] = MagicMock()
+sys.modules["unstructured.chunking.title"] = mock_unstructured_chunking
 sys.modules["llama_parse"] = mock_llama_parse
 
 

@@ -86,13 +86,13 @@ class ProviderConfig(BaseModel):
 class ParserConfig(ProviderConfig):
     """Document parser provider selection."""
 
-    provider: Literal["unstructured", "llamaparse"] = "unstructured"
+    provider: Literal["unstructured", "llamaparse", "multimodal_unstructured"] = "unstructured"
 
 
 class ChunkerConfig(ProviderConfig):
     """Chunking strategy selection."""
 
-    provider: Literal["semantic", "recursive", "hierarchical", "fixed_size"] = "semantic"
+    provider: Literal["semantic", "recursive", "hierarchical", "fixed_size", "multimodal_summarizer"] = "semantic"
 
 
 class IngestionConfig(BaseModel):

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { InfoTooltip } from "./ui/Tooltip";
 import { PipelineConfig } from "../types";
 import { ChevronDown, ChevronUp, Sliders, Eye, ShieldAlert, Sparkles, Settings as SettingsIcon, Database } from "lucide-react";

@@ -1,4 +1,3 @@
-import React from "react";
 import { ToastState } from "../../types";
 
 interface ToastProps {

@@ -24,6 +24,7 @@ An enterprise-ready, async-first, and completely configuration-driven Generic Re
 *   📖 **[Architecture & Design Guide](docs/architecture.md):** Deep-dive into registry auto-discovery, dependency injection, and core abstract interfaces.
 *   ⚙️ **[Configuration Reference](docs/configuration.md):** Comprehensive parameter reference guide for `config.yaml` options.
 *   💻 **[Developer API Guide](docs/api_guide.md):** Code examples for custom implementations, streaming output, and system tracing.
+*   🖼️ **[Multi-Modal RAG Guide](docs/multimodal_rag.md):** Comprehensive guide to building a production-grade multi-modal RAG pipeline using Unstructured.io (extracting text, tables, and images) and vision LLMs.
 
 ---
 

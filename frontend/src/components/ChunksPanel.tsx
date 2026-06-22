@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Search,
   FileText,
@@ -226,7 +226,7 @@ export function ChunksPanel() {
 
                 {/* Timeline scroll area */}
                 <div className="flex-1 overflow-y-auto pr-1 space-y-4 scrollbar-thin">
-                  {selectedChunks.map((chunk, index) => {
+                  {selectedChunks.map((chunk) => {
                     const charactersCount = chunk.content.length;
                     const isExpanded = expandedChunkId === chunk.id;
                     return (

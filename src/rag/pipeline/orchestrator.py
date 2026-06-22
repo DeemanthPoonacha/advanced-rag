@@ -292,10 +292,23 @@ class RAGPipelineOrchestrator:
 
         # 4. Generate Answer
         logger.info("pipeline_generate_start")
-        context_str = "\n\n".join(
-            f"Document {i+1}:\n{res.chunk.content}"
-            for i, res in enumerate(reranked_results)
-        )
+        context_parts = []
+        images = []
+        for i, res in enumerate(reranked_results):
+            custom = res.chunk.metadata.custom if (hasattr(res.chunk.metadata, "custom") and res.chunk.metadata.custom) else {}
+            raw_text = custom.get("raw_text", res.chunk.content)
+            part_str = f"Document {i+1}:\n{raw_text}"
+            
+            tables_html = custom.get("tables_html", [])
+            if tables_html:
+                part_str += "\nTABLES:\n" + "\n".join(tables_html)
+                
+            context_parts.append(part_str)
+            
+            images_base64 = custom.get("images_base64", [])
+            images.extend(images_base64)
+            
+        context_str = "\n\n".join(context_parts)
 
         prompt = self.config.generation.prompt_template.format(
             context=context_str,
@@ -305,6 +318,7 @@ class RAGPipelineOrchestrator:
         answer = await self.llm.generate(
             prompt,
             system_prompt=self.config.generation.system_prompt,
+            images=images if images else None,
         )
         logger.info("pipeline_generate_complete")
 
@@ -407,10 +421,23 @@ class RAGPipelineOrchestrator:
         else:
             reranked_results = retrieved_results[:self.config.generation.max_context_chunks]
 
-        context_str = "\n\n".join(
-            f"Document {i+1}:\n{res.chunk.content}"
-            for i, res in enumerate(reranked_results)
-        )
+        context_parts = []
+        images = []
+        for i, res in enumerate(reranked_results):
+            custom = res.chunk.metadata.custom if (hasattr(res.chunk.metadata, "custom") and res.chunk.metadata.custom) else {}
+            raw_text = custom.get("raw_text", res.chunk.content)
+            part_str = f"Document {i+1}:\n{raw_text}"
+            
+            tables_html = custom.get("tables_html", [])
+            if tables_html:
+                part_str += "\nTABLES:\n" + "\n".join(tables_html)
+                
+            context_parts.append(part_str)
+            
+            images_base64 = custom.get("images_base64", [])
+            images.extend(images_base64)
+            
+        context_str = "\n\n".join(context_parts)
 
         prompt = self.config.generation.prompt_template.format(
             context=context_str,
@@ -420,6 +447,7 @@ class RAGPipelineOrchestrator:
         async for token in self.llm.generate_stream(
             prompt,
             system_prompt=self.config.generation.system_prompt,
+            images=images if images else None,
         ):
             yield token
 

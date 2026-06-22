@@ -51,10 +51,12 @@ _IMPLEMENTATION_MODULES: list[str] = [
     # Parsers
     "rag.ingestion.parsers.unstructured_parser",
     "rag.ingestion.parsers.llamaparse_parser",
+    "rag.ingestion.parsers.multimodal_unstructured",
     # Chunkers
     "rag.ingestion.chunkers.semantic_chunker",
     "rag.ingestion.chunkers.recursive_chunker",
     "rag.ingestion.chunkers.hierarchical_chunker",
+    "rag.ingestion.chunkers.multimodal_summarizer",
     # Embedding models
     "rag.embeddings.openai_embeddings",
     "rag.embeddings.cohere_embeddings",

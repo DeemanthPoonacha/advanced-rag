@@ -1,0 +1,135 @@
+"""Multi-modal Unstructured parser.
+
+Extracts text, structural tables (as HTML), and images (as base64) from PDFs.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+from typing import Any
+
+import structlog
+
+from ...core.interfaces import BaseParser
+from ...core.registry import ComponentRegistry
+from ...core.types import Document, DocumentMetadata
+from ...observability.tracing import trace_operation
+from ...core.types import LifecycleStage
+
+logger = structlog.get_logger(__name__)
+
+
+@ComponentRegistry.register("parser", "multimodal_unstructured")
+class MultimodalUnstructuredParser(BaseParser):
+    """Parser that extracts text, HTML tables, and Base64 images from documents using unstructured."""
+
+    def __init__(
+        self,
+        strategy: str = "hi_res",
+        extract_images: bool = True,
+        languages: list[str] | None = None,
+    ) -> None:
+        self._strategy = strategy
+        self._extract_images = extract_images
+        self._languages = languages or ["en"]
+
+    @trace_operation(LifecycleStage.PARSE, "multimodal_unstructured_parse")
+    async def parse(
+        self,
+        source: str | bytes,
+        metadata: dict[str, Any] | None = None,
+    ) -> list[Document]:
+        """Parse source document into documents with embedded tables/images in custom metadata."""
+        if not isinstance(source, str):
+            raise NotImplementedError("Parsing raw bytes is not supported for multimodal unstructured parser.")
+
+        loop = asyncio.get_running_loop()
+        elements = await loop.run_in_executor(
+            None, self._partition, source
+        )
+
+        from unstructured.chunking.title import chunk_by_title
+        chunks = chunk_by_title(
+            elements,
+            max_characters=3000,
+            new_after_n_chars=2400,
+            combine_text_under_n_chars=500
+        )
+
+        documents: list[Document] = []
+        for i, chunk in enumerate(chunks):
+            content_data = self._separate_content_types(chunk)
+            
+            custom_metadata = {
+                "raw_text": content_data["text"],
+                "tables_html": content_data["tables"],
+                "images_base64": content_data["images"],
+                **(metadata or {})
+            }
+
+            doc_meta = DocumentMetadata(
+                source=str(source),
+                file_name=Path(source).name,
+                file_type=Path(source).suffix.lstrip("."),
+                language=self._languages[0] if self._languages else "en",
+                custom=custom_metadata,
+            )
+
+            # Standard document structure: we store raw text as content for search
+            documents.append(Document(content=content_data["text"], metadata=doc_meta))
+
+        logger.info(
+            "multimodal_unstructured_parse_complete",
+            source=source,
+            documents=len(documents),
+        )
+        return documents
+
+    def _partition(self, file_path: str) -> list[Any]:
+        from unstructured.partition.pdf import partition_pdf
+        return partition_pdf(
+            filename=file_path,
+            strategy=self._strategy,
+            infer_table_structure=True,
+            extract_image_block_types=["Image"] if self._extract_images else [],
+            extract_image_block_to_payload=True
+        )
+
+    def _separate_content_types(self, chunk: Any) -> dict[str, Any]:
+        content_data = {
+            "text": chunk.text,
+            "tables": [],
+            "images": []
+        }
+        if hasattr(chunk, "metadata") and hasattr(chunk.metadata, "orig_elements"):
+            for element in chunk.metadata.orig_elements:
+                el_type = type(element).__name__
+                if el_type == "Table":
+                    table_html = getattr(element.metadata, "text_as_html", element.text)
+                    content_data["tables"].append(table_html)
+                elif el_type == "Image":
+                    if hasattr(element, "metadata") and hasattr(element.metadata, "image_base64"):
+                        content_data["images"].append(element.metadata.image_base64)
+        return content_data
+
+    @trace_operation(LifecycleStage.PARSE, "multimodal_unstructured_parse_batch")
+    async def parse_batch(
+        self,
+        sources: list[str | bytes],
+        metadata: list[dict[str, Any]] | None = None,
+    ) -> list[Document]:
+        meta_list = metadata or [{}] * len(sources)
+        tasks = [
+            self.parse(source, meta)
+            for source, meta in zip(sources, meta_list)
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        documents: list[Document] = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error("multimodal_parse_batch_item_failed", source_index=i, error=str(result))
+                continue
+            documents.extend(result)
+        return documents

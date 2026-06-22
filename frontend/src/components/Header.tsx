@@ -1,4 +1,3 @@
-import React from "react";
 import { RAGStatus } from "../types";
 
 interface HeaderProps {

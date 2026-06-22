@@ -94,7 +94,8 @@ class OpenAILLM(BaseLLM):
             The generated text.
         """
         client = self._get_client()
-        messages = self._build_messages(prompt)
+        images = kwargs.pop("images", None)
+        messages = self._build_messages(prompt, images=images)
 
         response = await client.chat.completions.create(
             model=kwargs.get("model", self._model),
@@ -125,7 +126,8 @@ class OpenAILLM(BaseLLM):
             Token strings.
         """
         client = self._get_client()
-        messages = self._build_messages(prompt)
+        images = kwargs.pop("images", None)
+        messages = self._build_messages(prompt, images=images)
 
         stream = await client.chat.completions.create(
             model=kwargs.get("model", self._model),
@@ -196,10 +198,20 @@ class OpenAILLM(BaseLLM):
 
     # ── Internal ─────────────────────────────────────────────────────
 
-    def _build_messages(self, prompt: str) -> list[dict[str, str]]:
-        """Build the messages array with optional system message."""
-        messages: list[dict[str, str]] = []
+    def _build_messages(self, prompt: str, images: list[str] | None = None) -> list[dict[str, Any]]:
+        """Build the messages array with optional system message and base64 images."""
+        messages: list[dict[str, Any]] = []
         if self._system_message:
             messages.append({"role": "system", "content": self._system_message})
-        messages.append({"role": "user", "content": prompt})
+        
+        if not images:
+            messages.append({"role": "user", "content": prompt})
+        else:
+            content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+            for img in images:
+                content.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{img}"}
+                })
+            messages.append({"role": "user", "content": content})
         return messages
