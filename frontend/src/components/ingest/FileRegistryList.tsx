@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { 
   Search, 
   X, 
@@ -48,6 +49,8 @@ export function FileRegistryList({
   ragSearchQuery,
   setRagSearchQuery,
 }: FileRegistryListProps) {
+  
+  const [registryChunkFilters, setRegistryChunkFilters] = useState<Record<string, "all" | "text" | "table" | "image">>({});
   
   // Helper to color-code similarity scores dynamically
   const getScoreBadgeClass = (score: number) => {
@@ -154,9 +157,17 @@ export function FileRegistryList({
                   const chunkObj = {
                     id: `retrieved-${idx}`,
                     page: source.metadata?.page_number || 1,
-                    type: (source.metadata?.file_type === "image" || source.metadata?.image_extracted)
+                    type: (
+                      source.metadata?.file_type === "image" || 
+                      source.metadata?.image_extracted || 
+                      source.metadata?.image_base64 ||
+                      (Array.isArray(source.metadata?.images_base64) && source.metadata.images_base64.length > 0)
+                    )
                       ? ("image" as const)
-                      : source.metadata?.table_extracted
+                      : (
+                        source.metadata?.table_extracted || 
+                        (Array.isArray(source.metadata?.tables_html) && source.metadata.tables_html.length > 0)
+                      )
                       ? ("table" as const)
                       : ("text" as const),
                     snippet: source.content ? (source.content.length > 120 ? source.content.substring(0, 120) + "..." : source.content) : "",
@@ -346,57 +357,109 @@ export function FileRegistryList({
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                        </div>
-
-                        {/* Expanded Ingestion details panel */}
+                        </div>                        {/* Expanded Ingestion details panel */}
                         {isExpanded && (
                           <div className="border-t border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-950/20 p-5 space-y-4 animate-fade-in">
                             {/* Chunks breakdown List */}
-                            <div className="space-y-3">
-                              <div className="text-xs font-bold text-slate-700 dark:text-slate-300">Document Chunk Index Registry</div>
+                            <div className="space-y-4">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 select-none">
+                                <div className="text-xs font-bold text-slate-700 dark:text-slate-300">Document Chunk Index Registry</div>
+                                
+                                {/* Filter Button Row */}
+                                {file.chunks && file.chunks.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-200/55 dark:border-slate-800/50 shrink-0">
+                                    {[
+                                      { key: "all", label: "All" },
+                                      { key: "text", label: "Text" },
+                                      { key: "table", label: "Tables" },
+                                      { key: "image", label: "Images" },
+                                    ].map((filter) => {
+                                      const count = filter.key === "all" 
+                                        ? file.chunks.length
+                                        : file.chunks.filter((c: any) => c.type === filter.key).length;
+                                      
+                                      const activeFilter = registryChunkFilters[file.id] || "all";
+                                      const isActive = activeFilter === filter.key;
+                                      
+                                      return (
+                                        <button
+                                          key={filter.key}
+                                          onClick={() => setRegistryChunkFilters(prev => ({ ...prev, [file.id]: filter.key as any }))}
+                                          className={`px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold border transition-all duration-200 cursor-pointer ${
+                                            isActive
+                                              ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 shadow-sm"
+                                              : "bg-transparent text-slate-500 border-transparent hover:text-slate-800 dark:hover:text-slate-200"
+                                          }`}
+                                        >
+                                          {filter.label} ({count})
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+
                               {file.chunks && file.chunks.length > 0 ? (
-                                <div className="space-y-3">
-                                  {file.chunks.map((chunk: any) => {
-                                    const isSelected = selectedChunk?.id === chunk.id;
+                                (() => {
+                                  const activeFilter = registryChunkFilters[file.id] || "all";
+                                  const filteredChunks = file.chunks.filter((chunk: any) => {
+                                    if (activeFilter === "all") return true;
+                                    return chunk.type === activeFilter;
+                                  });
+
+                                  if (filteredChunks.length === 0) {
                                     return (
-                                      <div
-                                        key={chunk.id}
-                                        onClick={() => setSelectedChunk(chunk)}
-                                        className={`p-3 rounded-lg border text-left cursor-pointer transition-all duration-200 hover:scale-[1.005] ${
-                                          isSelected
-                                            ? "bg-primary/5 border-primary/45 shadow-sm"
-                                            : "bg-slate-50/40 dark:bg-slate-900/20 border-slate-200/60 dark:border-slate-800/40 hover:bg-slate-100/50 dark:hover:bg-slate-800/20"
-                                        }`}
-                                      >
-                                        <div className="flex justify-between items-center mb-1.5">
-                                          <div className="flex gap-1.5 items-center">
-                                            <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[8px] font-extrabold text-slate-500 dark:text-slate-400 uppercase">
-                                              Page {chunk.page}
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800/60 text-[8px] font-bold text-slate-500 dark:text-slate-400 capitalize">
-                                              {chunk.type}
-                                            </span>
-                                            {chunk.isRaw ? (
-                                              <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-bold text-emerald-500">
-                                                raw
-                                              </span>
-                                            ) : (
-                                              <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-[8px] font-bold text-yellow-600 dark:text-yellow-500">
-                                                summarized
-                                              </span>
-                                            )}
-                                          </div>
-                                          <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500 truncate max-w-[120px]" title={chunk.id}>
-                                            ID: {chunk.id}
-                                          </span>
-                                        </div>
-                                        <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
-                                          {chunk.originalText || chunk.snippet}
-                                        </p>
+                                      <div className="text-center py-8 text-xs text-slate-400 dark:text-slate-500 bg-slate-50/20 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl animate-fade-in">
+                                        No chunks match the active filter "{activeFilter}".
                                       </div>
                                     );
-                                  })}
-                                </div>
+                                  }
+
+                                  return (
+                                    <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1.5 scrollbar-thin animate-fade-in">
+                                      {filteredChunks.map((chunk: any) => {
+                                        const isSelected = selectedChunk?.id === chunk.id;
+                                        return (
+                                          <div
+                                            key={chunk.id}
+                                            onClick={() => setSelectedChunk(chunk)}
+                                            className={`p-3 rounded-lg border text-left cursor-pointer transition-all duration-200 hover:scale-[1.005] ${
+                                              isSelected
+                                                ? "bg-primary/5 border-primary/45 shadow-sm"
+                                                : "bg-slate-50/40 dark:bg-slate-900/20 border-slate-200/60 dark:border-slate-800/40 hover:bg-slate-100/50 dark:hover:bg-slate-800/20"
+                                            }`}
+                                          >
+                                            <div className="flex justify-between items-center mb-1.5">
+                                              <div className="flex gap-1.5 items-center">
+                                                <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[8px] font-extrabold text-slate-500 dark:text-slate-400 uppercase">
+                                                  Page {chunk.page}
+                                                </span>
+                                                <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800/60 text-[8px] font-bold text-slate-500 dark:text-slate-400 capitalize">
+                                                  {chunk.type}
+                                                </span>
+                                                {chunk.isRaw ? (
+                                                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-bold text-emerald-500">
+                                                    raw
+                                                  </span>
+                                                ) : (
+                                                  <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-[8px] font-bold text-yellow-600 dark:text-yellow-500">
+                                                    summarized
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500 truncate max-w-[120px]" title={chunk.id}>
+                                                ID: {chunk.id}
+                                              </span>
+                                            </div>
+                                            <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+                                              {chunk.originalText || chunk.snippet}
+                                            </p>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  );
+                                })()
                               ) : (
                                 <div className="text-center py-4 text-xs text-slate-400 dark:text-slate-500">
                                   No chunks generated or indexed for this document.

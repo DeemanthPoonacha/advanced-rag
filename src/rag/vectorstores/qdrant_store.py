@@ -170,6 +170,8 @@ class QdrantVectorStore(BaseVectorStore):
                 "file_name": chunk.metadata.file_name,
                 "file_type": chunk.metadata.file_type,
                 "language": chunk.metadata.language,
+                "page_number": chunk.metadata.page_number,
+                "total_pages": chunk.metadata.total_pages,
                 "parent_id": chunk.parent_id,
                 "token_count": chunk.token_count,
                 **chunk.metadata.custom,

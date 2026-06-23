@@ -77,10 +77,10 @@ export function IngestPanel({
       const isExpanded = !prev[fileId];
       if (isExpanded) {
         setSelectedFileId(fileId);
-        setSelectedChunk(null);
       } else if (selectedFileId === fileId) {
         setSelectedFileId(null);
       }
+      setSelectedChunk(null);
       const newState: Record<string, boolean> = {};
       newState[fileId] = isExpanded;
       return newState;
@@ -344,9 +344,17 @@ export function IngestPanel({
       const formattedChunks = matchedChunks.map((c, cIdx) => ({
         id: c.id || `${filename}-chunk-${cIdx}`,
         page: c.metadata?.page_number || 1,
-        type: (c.metadata?.file_type === "image" || c.metadata?.image_extracted)
+        type: (
+          c.metadata?.file_type === "image" || 
+          c.metadata?.image_extracted || 
+          c.metadata?.image_base64 ||
+          (Array.isArray(c.metadata?.images_base64) && c.metadata.images_base64.length > 0)
+        )
           ? ("image" as const)
-          : c.metadata?.table_extracted
+          : (
+            c.metadata?.table_extracted || 
+            (Array.isArray(c.metadata?.tables_html) && c.metadata.tables_html.length > 0)
+          )
           ? ("table" as const)
           : ("text" as const),
         snippet: c.content ? (c.content.length > 120 ? c.content.substring(0, 120) + "..." : c.content) : "",

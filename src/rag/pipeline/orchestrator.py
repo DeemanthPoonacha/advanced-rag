@@ -197,17 +197,33 @@ class RAGPipelineOrchestrator:
                 if not isinstance(custom, dict):
                     custom = {}
                 
+                # Check for tables and images inside custom metadata (from MultimodalUnstructuredParser)
+                tables = custom.get("tables_html", [])
+                if not isinstance(tables, list):
+                    tables = [tables] if tables else []
+                
+                images = custom.get("images_base64", [])
+                if not isinstance(images, list):
+                    images = [images] if images else []
+
+                if tables:
+                    table_count += len(tables)
+                if images:
+                    image_count += len(images)
+
                 el_type = custom.get("element_type", "text")
                 if el_type == "text":
                     text_count += 1
                 elif el_type == "table":
-                    table_count += 1
+                    if not tables:
+                        table_count += 1
                 elif el_type == "image":
-                    image_count += 1
+                    if not images:
+                        image_count += 1
                 elif el_type == "title":
                     title_count += 1
             
-            total_elements = len(documents)
+            total_elements = text_count + table_count + image_count + title_count
 
             # Update status to step 3: chunking & AI summarization
             self.ingestion_status[filename] = {
@@ -292,9 +308,17 @@ class RAGPipelineOrchestrator:
                     custom = {}
                     
                 c_type = "text"
-                if file_type == "image" or custom.get("image_extracted"):
+                if (
+                    file_type == "image" 
+                    or custom.get("image_extracted") 
+                    or custom.get("image_base64")
+                    or (isinstance(custom.get("images_base64"), list) and len(custom["images_base64"]) > 0)
+                ):
                     c_type = "image"
-                elif custom.get("table_extracted"):
+                elif (
+                    custom.get("table_extracted")
+                    or (isinstance(custom.get("tables_html"), list) and len(custom["tables_html"]) > 0)
+                ):
                     c_type = "table"
                     
                 summary = custom.get("summary_text", "")

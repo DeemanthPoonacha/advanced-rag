@@ -48,7 +48,7 @@ class UnstructuredParser(BaseParser):
         self,
         strategy: str = "hi_res",
         languages: list[str] | None = None,
-        extract_images: bool = False,
+        extract_images: bool = True,
         include_page_breaks: bool = True,
         max_characters: int = 0,
         combine_text_under_n_chars: int = 200,
@@ -153,6 +153,13 @@ class UnstructuredParser(BaseParser):
 
         Uses tenacity retry for transient I/O failures.
         """
+        import tempfile
+
+        # Create a temporary directory for image extraction fallback
+        image_output_dir = None
+        if self._extract_images:
+            image_output_dir = tempfile.mkdtemp(prefix="unstructured_images_")
+
         kwargs: dict[str, Any] = {
             "strategy": self._strategy,
             "languages": self._languages,
@@ -160,7 +167,12 @@ class UnstructuredParser(BaseParser):
             "infer_table_structure": True,
             "extract_images_in_pdf": self._extract_images,
             "extract_image_block_to_payload": self._extract_images,
+            "extract_image_block_types": ["Image"] if self._extract_images else [],
         }
+
+        # Also save images to disk as a fallback in case to_payload fails
+        if image_output_dir:
+            kwargs["extract_image_block_output_dir"] = image_output_dir
 
         if self._max_characters > 0:
             kwargs["max_characters"] = self._max_characters
@@ -177,8 +189,17 @@ class UnstructuredParser(BaseParser):
 
         try:
             from unstructured.partition.auto import partition
-            return partition(**kwargs)
+            elements = partition(**kwargs)
+            
+            # Post-process: fill in missing image_base64 from saved files
+            if self._extract_images and image_output_dir:
+                self._backfill_image_payloads(elements, image_output_dir)
+
+            return elements
         except Exception as e:
+            # Clean up temp image dir on failure
+            if image_output_dir:
+                self._cleanup_image_dir(image_output_dir)
             if kwargs.get("strategy") == "hi_res":
                 logger.warning(
                     "unstructured_hi_res_failed_falling_back_to_fast",
@@ -189,6 +210,8 @@ class UnstructuredParser(BaseParser):
                     kwargs_fast = kwargs.copy()
                     kwargs_fast["strategy"] = "fast"
                     kwargs_fast["extract_images_in_pdf"] = False
+                    kwargs_fast.pop("extract_image_block_output_dir", None)
+                    kwargs_fast.pop("extract_image_block_to_payload", None)
                     from unstructured.partition.auto import partition
                     return partition(**kwargs_fast)
                 except Exception as fast_err:
@@ -293,6 +316,114 @@ class UnstructuredParser(BaseParser):
 
             return [FallbackElement(content, page_number=1)]
 
+
+    def _backfill_image_payloads(
+        self,
+        elements: list[Any],
+        image_output_dir: str,
+    ) -> None:
+        """Fill in missing ``image_base64`` on Image elements from saved files.
+
+        When ``extract_image_block_to_payload`` silently fails for certain PDFs,
+        ``extract_image_block_output_dir`` still saves the cropped images to disk.
+        This method reads those files and sets ``image_base64`` on any Image
+        element that lacks it.
+        """
+        import base64
+        import os
+
+        image_elements = [
+            el for el in elements
+            if getattr(el, "category", "") in ("Image", "Picture")
+            and hasattr(el, "metadata")
+            and getattr(el.metadata, "image_base64", None) is None
+        ]
+
+        if not image_elements:
+            # Either no images or all already have payloads — clean up
+            self._cleanup_image_dir(image_output_dir)
+            return
+
+        # Collect saved image files from the output directory
+        saved_images: list[str] = []
+        try:
+            for fname in sorted(os.listdir(image_output_dir)):
+                fpath = os.path.join(image_output_dir, fname)
+                if os.path.isfile(fpath):
+                    saved_images.append(fpath)
+        except OSError:
+            self._cleanup_image_dir(image_output_dir)
+            return
+
+        # Also check if any image element already has an image_path set
+        for el in image_elements:
+            img_path = getattr(el.metadata, "image_path", None)
+            if img_path and os.path.isfile(img_path):
+                try:
+                    with open(img_path, "rb") as f:
+                        b64 = base64.b64encode(f.read()).decode("utf-8")
+                    el.metadata.image_base64 = b64
+                    logger.info(
+                        "backfill_image_from_path",
+                        path=img_path,
+                        base64_len=len(b64),
+                    )
+                except Exception as exc:
+                    logger.warning("backfill_image_read_failed", path=img_path, error=str(exc))
+
+        # For remaining elements without base64, try matching saved files
+        # by order (unstructured saves them in element order)
+        remaining = [
+            el for el in image_elements
+            if getattr(el.metadata, "image_base64", None) is None
+        ]
+
+        for idx, el in enumerate(remaining):
+            if idx < len(saved_images):
+                try:
+                    with open(saved_images[idx], "rb") as f:
+                        b64 = base64.b64encode(f.read()).decode("utf-8")
+                    el.metadata.image_base64 = b64
+                    logger.info(
+                        "backfill_image_from_dir",
+                        file=saved_images[idx],
+                        base64_len=len(b64),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "backfill_image_file_read_failed",
+                        file=saved_images[idx],
+                        error=str(exc),
+                    )
+
+        backfilled = sum(
+            1 for el in image_elements
+            if getattr(el.metadata, "image_base64", None) is not None
+        )
+        still_missing = len(image_elements) - backfilled
+        if still_missing > 0:
+            logger.warning(
+                "image_base64_still_missing",
+                backfilled=backfilled,
+                still_missing=still_missing,
+                total_images=len(image_elements),
+            )
+        else:
+            logger.info(
+                "image_backfill_complete",
+                backfilled=backfilled,
+            )
+
+        self._cleanup_image_dir(image_output_dir)
+
+    @staticmethod
+    def _cleanup_image_dir(image_output_dir: str) -> None:
+        """Remove the temporary image extraction directory."""
+        import shutil
+        try:
+            shutil.rmtree(image_output_dir, ignore_errors=True)
+        except Exception:
+            pass
 
     def _elements_to_documents(
         self,

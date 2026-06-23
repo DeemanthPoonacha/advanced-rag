@@ -22,6 +22,67 @@ export function ChunkInspector({
   inspectorTab,
   setInspectorTab,
 }: ChunkInspectorProps) {
+  
+  const parseMarkdownTable = (markdown: string): string | null => {
+    const lines = markdown.trim().split("\n");
+    const tableLines = lines.filter(l => l.trim().startsWith("|") && l.trim().endsWith("|"));
+    if (tableLines.length < 2) return null;
+
+    const hasSeparator = tableLines[1].includes("-");
+    if (!hasSeparator) return null;
+
+    let html = "<table>";
+    tableLines.forEach((line, idx) => {
+      if (idx === 1) return;
+      const cols = line.split("|").slice(1, -1).map(c => c.trim());
+      html += "<tr>";
+      cols.forEach(col => {
+        const tag = idx === 0 ? "th" : "td";
+        html += `<${tag}>${col}</${tag}>`;
+      });
+      html += "</tr>";
+    });
+    html += "</table>";
+    return html;
+  };
+
+  const getImages = () => {
+    const imgs: string[] = [];
+    if (selectedChunk.metadata?.image_base64) {
+      imgs.push(selectedChunk.metadata.image_base64);
+    }
+    if (Array.isArray(selectedChunk.metadata?.images_base64)) {
+      imgs.push(...selectedChunk.metadata.images_base64);
+    }
+    return imgs.filter(Boolean);
+  };
+  const imagesList = getImages();
+
+  const getTables = () => {
+    const tbls: string[] = [];
+    if (selectedChunk.type === "table" && selectedChunk.originalText.includes("<table")) {
+      tbls.push(selectedChunk.originalText);
+    }
+    if (Array.isArray(selectedChunk.metadata?.tables_html)) {
+      tbls.push(...selectedChunk.metadata.tables_html);
+    }
+    if (tbls.length === 0 && selectedChunk.type === "table") {
+      const mdTable = parseMarkdownTable(selectedChunk.originalText);
+      if (mdTable) {
+        tbls.push(mdTable);
+      }
+    }
+    return tbls.filter(Boolean);
+  };
+  const tablesList = getTables();
+
+  const formatImageSrc = (b64: string) => {
+    if (b64.startsWith("data:image/")) {
+      return b64;
+    }
+    return `data:image/png;base64,${b64}`;
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden animate-fade-in">
       <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0 flex justify-between items-center bg-slate-50 dark:bg-slate-950/20">
@@ -31,7 +92,7 @@ export function ChunkInspector({
         </div>
         <button
           onClick={() => setSelectedChunk(null)}
-          className="p-1 hover:bg-slate-200 dark:hover:bg-slate-850 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-250 transition-all duration-200 active:scale-90 cursor-pointer"
+          className="p-1 hover:bg-slate-200 dark:hover:bg-slate-855 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-250 transition-all duration-200 active:scale-90 cursor-pointer"
           title="Close Inspector"
         >
           <X className="w-4 h-4" />
@@ -64,6 +125,30 @@ export function ChunkInspector({
         {/* ORIGINAL TEXT VIEW */}
         {inspectorTab === "original" && (
           <div className="space-y-4 animate-fade-in">
+            <style>{`
+              .table-render-container table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 0.5rem 0;
+                font-size: 11px;
+                line-height: 1.4;
+              }
+              .table-render-container th {
+                background-color: rgba(120, 120, 120, 0.1);
+                border: 1px solid rgba(120, 120, 120, 0.2);
+                padding: 6px 10px;
+                font-weight: 600;
+                text-align: left;
+              }
+              .table-render-container td {
+                border: 1px solid rgba(120, 120, 120, 0.15);
+                padding: 6px 10px;
+              }
+              .table-render-container tr:nth-child(even) {
+                background-color: rgba(120, 120, 120, 0.03);
+              }
+            `}</style>
+
             <div>
               <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-2 tracking-wide">
                 Original Content
@@ -73,27 +158,69 @@ export function ChunkInspector({
               </div>
             </div>
 
-            {selectedChunk.type === "image" && (
+            {/* REAL IMAGES VIEW */}
+            {imagesList.length > 0 && (
+              <div className="animate-fade-in space-y-2">
+                <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                  Images ({imagesList.length})
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  {imagesList.map((imgB64, idx) => (
+                    <div 
+                      key={idx}
+                      className="bg-white dark:bg-[#0c111e] p-3 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col items-center justify-center shadow-sm"
+                    >
+                      <img 
+                        src={formatImageSrc(imgB64)} 
+                        alt={`Extracted Layout Image ${idx + 1}`}
+                        className="max-w-full max-h-[350px] object-contain rounded-lg border border-slate-100 dark:border-slate-900 shadow-sm"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* REAL TABLES VIEW */}
+            {tablesList.length > 0 && (
+              <div className="animate-fade-in space-y-2">
+                <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                  Tables ({tablesList.length})
+                </div>
+                <div className="space-y-3">
+                  {tablesList.map((tableHtml, idx) => (
+                    <div 
+                      key={idx}
+                      className="bg-white dark:bg-[#0c111e] p-4 border border-slate-200 dark:border-slate-800 rounded-xl overflow-auto max-w-full text-slate-800 dark:text-slate-200 shadow-sm table-render-container"
+                    >
+                      <div 
+                        dangerouslySetInnerHTML={{ __html: tableHtml }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* IMAGE NOT AVAILABLE FALLBACK */}
+            {selectedChunk.type === "image" && imagesList.length === 0 && (
               <div className="animate-fade-in">
                 <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-2 tracking-wide">
-                  Images (1)
+                  Image Preview
                 </div>
-                <div className="bg-slate-50 dark:bg-slate-950 p-3 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col gap-2 items-center justify-center">
-                  {/* Transformer Architecture Diagram representation */}
-                  <div className="w-full aspect-[4/3] bg-white dark:bg-[#0c111e] rounded-lg border border-slate-200 dark:border-slate-800 flex flex-col p-2 text-[9px] font-semibold text-slate-500 dark:text-slate-400 shadow-inner">
-                    <div className="text-center font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Transformer Encoder-Decoder</div>
-                    <div className="flex-1 flex gap-2 justify-center py-2">
-                      <div className="w-20 bg-primary/10 border border-primary/20 rounded-md p-1 flex flex-col justify-between transition-all duration-300 hover:bg-primary/15">
-                        <div className="text-center font-bold text-primary">Encoder</div>
-                        <div className="bg-white dark:bg-[#10192e] border border-slate-200 dark:border-slate-800 text-center p-0.5 rounded shadow-sm text-[8px] truncate">Feed Forward</div>
-                        <div className="bg-white dark:bg-[#10192e] border border-slate-200 dark:border-slate-800 text-center p-0.5 rounded shadow-sm text-[8px] truncate">Multi-Head Attn</div>
-                      </div>
-                      <div className="w-20 bg-accent/10 border border-accent/20 rounded-md p-1 flex flex-col justify-between transition-all duration-300 hover:bg-accent/15">
-                        <div className="text-center font-bold text-accent">Decoder</div>
-                        <div className="bg-white dark:bg-[#141020] border border-slate-200 dark:border-slate-850 text-center p-0.5 rounded shadow-sm text-[8px] truncate">Feed Forward</div>
-                        <div className="bg-white dark:bg-[#141020] border border-slate-200 dark:border-slate-855 text-center p-0.5 rounded shadow-sm text-[8px] truncate">Masked Attn</div>
-                      </div>
-                    </div>
+                <div className="bg-amber-500/5 border border-amber-500/15 rounded-xl p-4 flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 bg-amber-500/10 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                    </svg>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400 mb-1">
+                      Image payload not extracted
+                    </p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs">
+                      The layout parser detected this image region and extracted OCR text, but the raw image bytes could not be captured. Try re-ingesting the document to trigger the image extraction fallback.
+                    </p>
                   </div>
                 </div>
               </div>
