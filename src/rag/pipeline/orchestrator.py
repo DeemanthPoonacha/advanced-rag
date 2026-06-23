@@ -224,7 +224,7 @@ class RAGPipelineOrchestrator:
             }
 
             logger.info("pipeline_ingest_chunk_start")
-            chunks = await self.chunker.chunk_batch(documents)
+            chunks = await self._chunk_documents(documents)
             logger.info("pipeline_ingest_chunk_complete", num_chunks=len(chunks))
 
             if not chunks:
@@ -336,6 +336,64 @@ class RAGPipelineOrchestrator:
             }
             raise file_error
 
+    async def _chunk_documents(self, documents: list[Document]) -> list[Chunk]:
+        """Chunk a list of documents, routing tables/images to MultimodalSummarizerChunker."""
+        standard_docs = []
+        multimodal_docs = []
+        for doc in documents:
+            m_dict = {}
+            if doc.metadata:
+                if hasattr(doc.metadata, "model_dump"):
+                    m_dict = doc.metadata.model_dump()
+                elif isinstance(doc.metadata, dict):
+                    m_dict = doc.metadata
+            custom = m_dict.get("custom", {}) or {}
+            if not isinstance(custom, dict):
+                custom = {}
+            el_type = custom.get("element_type", "text")
+            if el_type in ("table", "image"):
+                multimodal_docs.append(doc)
+            else:
+                standard_docs.append(doc)
+
+        chunks = []
+        if standard_docs:
+            chunks.extend(await self.chunker.chunk_batch(standard_docs))
+        
+        if multimodal_docs:
+            try:
+                from ..ingestion.chunkers.multimodal_summarizer import MultimodalSummarizerChunker
+                cfg = self.config.ingestion.multimodal_summarizer
+                summarizer = MultimodalSummarizerChunker(
+                    model_name=cfg.model_name,
+                    temperature=cfg.temperature,
+                    api_key=cfg.api_key,
+                    base_url=cfg.base_url
+                )
+                
+                # Prepare each document with the tables_html or images_base64 list structure expected by the summarizer
+                for doc in multimodal_docs:
+                    custom = doc.metadata.custom
+                    if not isinstance(custom, dict):
+                        custom = {}
+                        doc.metadata.custom = custom
+                    if custom.get("element_type") == "table":
+                        custom["tables_html"] = [doc.content]
+                    elif custom.get("element_type") == "image":
+                        image_b64 = custom.get("image_base64")
+                        if image_b64:
+                            custom["images_base64"] = [image_b64]
+                        else:
+                            custom["images_base64"] = []
+                            
+                mm_chunks = await summarizer.chunk_batch(multimodal_docs)
+                chunks.extend(mm_chunks)
+            except Exception as mm_err:
+                logger.error("multimodal_chunker_failed_falling_back_to_text", error=str(mm_err))
+                chunks.extend(await self.chunker.chunk_batch(multimodal_docs))
+
+        return chunks
+
     @trace_operation(LifecycleStage.INGEST, "pipeline_ingest_batch")
     async def ingest_batch(
         self,
@@ -363,7 +421,7 @@ class RAGPipelineOrchestrator:
             return []
 
         logger.info("pipeline_ingest_batch_chunk_start")
-        chunks = await self.chunker.chunk_batch(documents)
+        chunks = await self._chunk_documents(documents)
         logger.info("pipeline_ingest_batch_chunk_complete", num_chunks=len(chunks))
 
         if not chunks:

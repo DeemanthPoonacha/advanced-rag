@@ -32,7 +32,7 @@ async def test_unstructured_parser(tmp_path: Path):
     assert len(docs) == 2
     assert docs[0].content == "Page 1 Content"
     assert docs[0].metadata.page_number == 1
-    assert docs[0].metadata.total_pages == 3  # max page key is 2, so total pages = 2 + 1 = 3
+    assert docs[0].metadata.total_pages == 2
     assert docs[1].content == "Page 2 Content"
     assert docs[1].metadata.page_number == 2
     

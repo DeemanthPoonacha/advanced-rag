@@ -3,6 +3,9 @@
 # RAG Dashboard Run Script
 # Start backend (FastAPI) and frontend (Vite React) concurrently.
 
+source .venv/bin/activate
+pip install -e .
+
 # Print banner
 echo "============================================="
 echo "   Advanced RAG Framework Dashboard Runner   "

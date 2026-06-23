@@ -98,11 +98,22 @@ class ChunkerConfig(ProviderConfig):
 class IngestionConfig(BaseModel):
     """Full ingestion pipeline configuration."""
 
+    class MultimodalSummarizerConfig(BaseModel):
+        """Configuration for the multimodal summarizer."""
+        model_config = {"extra": "allow"}
+        model_name: str = "gpt-4o"
+        temperature: float = 0.0
+        api_key: str | None = None
+        base_url: str | None = None
+
     parser: ParserConfig = Field(
         default_factory=lambda: ParserConfig(provider="unstructured")
     )
     chunker: ChunkerConfig = Field(
         default_factory=lambda: ChunkerConfig(provider="semantic")
+    )
+    multimodal_summarizer: MultimodalSummarizerConfig = Field(
+        default_factory=MultimodalSummarizerConfig
     )
     batch_size: int = Field(default=50, ge=1, le=1000)
 

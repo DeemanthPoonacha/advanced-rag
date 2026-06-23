@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Search,
   FileText,
@@ -7,7 +7,8 @@ import {
   Check,
   Hash,
   Database,
-  AlertCircle
+  AlertCircle,
+  ArrowUp
 } from "lucide-react";
 
 interface ChunkMetadata {
@@ -38,6 +39,9 @@ export function ChunksPanel() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedChunkId, setExpandedChunkId] = useState<string | null>(null);
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showGoToTop, setShowGoToTop] = useState(false);
+
   const fetchChunks = async () => {
     setLoading(true);
     setError(null);
@@ -65,6 +69,21 @@ export function ChunksPanel() {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    setShowGoToTop(e.currentTarget.scrollTop > 300);
+  };
+
+  const scrollToTop = () => {
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const scrollToDocument = (docName: string) => {
+    const element = document.getElementById(`doc-group-${docName}`);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   };
 
   // Group chunks by document name
@@ -102,8 +121,6 @@ export function ChunksPanel() {
       setSelectedDoc(null);
     }
   }, [filteredDocs, selectedDoc]);
-
-  const selectedChunks = selectedDoc ? documentGroupMap[selectedDoc] || [] : [];
 
   return (
     <div className="flex-1 flex flex-col gap-6 overflow-hidden max-w-7xl w-full mx-auto">
@@ -184,7 +201,10 @@ export function ChunksPanel() {
                 return (
                   <button
                     key={docName}
-                    onClick={() => setSelectedDoc(docName)}
+                    onClick={() => {
+                      setSelectedDoc(docName);
+                      scrollToDocument(docName);
+                    }}
                     className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition cursor-pointer border ${
                       isActive
                         ? "bg-primary/5 dark:bg-primary/10 border-primary/20 text-slate-950 dark:text-white"
@@ -211,89 +231,119 @@ export function ChunksPanel() {
           </div>
 
           {/* Right Column: Chunks Viewer */}
-          <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 overflow-hidden">
-            {selectedDoc ? (
-              <div className="flex-1 flex flex-col overflow-hidden">
-                {/* Header info */}
-                <div className="border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 shrink-0">
-                  <h3 className="text-sm font-bold truncate text-slate-900 dark:text-white">
-                    {selectedDoc}
-                  </h3>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
-                    Viewing {selectedChunks.length} chunks ordered sequentially by index
-                  </p>
-                </div>
-
-                {/* Timeline scroll area */}
-                <div className="flex-1 overflow-y-auto pr-1 space-y-4 scrollbar-thin">
-                  {selectedChunks.map((chunk) => {
-                    const charactersCount = chunk.content.length;
-                    const isExpanded = expandedChunkId === chunk.id;
+          <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 overflow-hidden relative">
+            {filteredDocs.length > 0 ? (
+              <div className="flex-1 flex flex-col overflow-hidden relative">
+                
+                {/* Scroll container containing all files in order */}
+                <div
+                  ref={scrollContainerRef}
+                  onScroll={handleScroll}
+                  className="flex-1 overflow-y-auto pr-1 space-y-8 scrollbar-thin"
+                >
+                  {filteredDocs.map((docName) => {
+                    const docChunks = documentGroupMap[docName] || [];
                     return (
-                      <div
-                        key={chunk.id}
-                        className="group border border-slate-100 dark:border-slate-800 rounded-2xl bg-slate-50/30 dark:bg-slate-950/20 hover:border-slate-200 dark:hover:border-slate-700/80 transition-all p-4 space-y-3 relative"
-                      >
-                        {/* Action buttons (top right hover overlay) */}
-                        <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200/55 dark:border-slate-800 p-1 rounded-lg shadow-sm">
-                          <button
-                            onClick={() => handleCopy(chunk.id, chunk.content)}
-                            className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer rounded"
-                            title="Copy chunk text"
-                          >
-                            {copiedId === chunk.id ? (
-                              <Check size={13} className="text-emerald-500" />
-                            ) : (
-                              <Copy size={13} />
-                            )}
-                          </button>
+                      <div key={docName} id={`doc-group-${docName}`} className="space-y-4 scroll-mt-2">
+                        
+                        {/* Sticky File Header */}
+                        <div className="sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm pb-3 pt-2 border-b border-slate-100 dark:border-slate-800/80 z-10 flex justify-between items-center shadow-[0_4px_12px_-10px_rgba(0,0,0,0.1)]">
+                          <div>
+                            <h3 className="text-xs font-bold truncate text-slate-900 dark:text-white flex items-center gap-2">
+                              <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
+                              <span className="truncate">{docName}</span>
+                            </h3>
+                            <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 font-semibold">
+                              {docChunks.length} {docChunks.length === 1 ? "chunk" : "chunks"} ordered sequentially by index
+                            </p>
+                          </div>
                         </div>
 
-                        {/* Chunk Info Header bar */}
-                        <div className="flex flex-wrap items-center gap-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                          <span className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 rounded-lg">
-                            <Hash size={10} />
-                            Index {chunk.chunk_index}
-                          </span>
-                          <span className="bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-lg">
-                            {charactersCount} chars
-                          </span>
-                          <span className="bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-lg">
-                            {chunk.token_count} tokens
-                          </span>
-                          <span className="text-slate-400 dark:text-slate-500 font-mono text-[9px] truncate max-w-xs select-all">
-                            ID: {chunk.id}
-                          </span>
-                        </div>
+                        {/* Chunks inside this document */}
+                        <div className="space-y-4">
+                          {docChunks.map((chunk) => {
+                            const charactersCount = chunk.content.length;
+                            const isExpanded = expandedChunkId === chunk.id;
+                            return (
+                              <div
+                                key={chunk.id}
+                                className="group border border-slate-100 dark:border-slate-800/60 rounded-2xl bg-slate-50/20 dark:bg-slate-950/10 hover:border-slate-200 dark:hover:border-slate-750 transition-all p-4 space-y-3 relative"
+                              >
+                                {/* Action buttons (top right hover overlay) */}
+                                <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200/55 dark:border-slate-800 p-1 rounded-lg shadow-sm">
+                                  <button
+                                    onClick={() => handleCopy(chunk.id, chunk.content)}
+                                    className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer rounded"
+                                    title="Copy chunk text"
+                                  >
+                                    {copiedId === chunk.id ? (
+                                      <Check size={13} className="text-emerald-500" />
+                                    ) : (
+                                      <Copy size={13} />
+                                    )}
+                                  </button>
+                                </div>
 
-                        {/* Text Block content */}
-                        <div className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-sans bg-slate-50/60 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800/50 rounded-xl p-3 select-text font-medium whitespace-pre-wrap">
-                          {chunk.content}
-                        </div>
+                                {/* Chunk Info Header bar */}
+                                <div className="flex flex-wrap items-center gap-2.5 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                                  <span className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 rounded-lg">
+                                    <Hash size={10} />
+                                    Index {chunk.chunk_index}
+                                  </span>
+                                  <span className="bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-lg">
+                                    {charactersCount} chars
+                                  </span>
+                                  <span className="bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-lg">
+                                    {chunk.token_count} tokens
+                                  </span>
+                                  <span className="text-slate-400 dark:text-slate-500 font-mono text-[9px] truncate max-w-xs select-all">
+                                    ID: {chunk.id}
+                                  </span>
+                                </div>
 
-                        {/* Raw Metadata panel */}
-                        <div className="border-t border-slate-100 dark:border-slate-800/50 pt-2.5">
-                          <button
-                            onClick={() => setExpandedChunkId(isExpanded ? null : chunk.id)}
-                            className="text-[10px] font-extrabold text-slate-400 hover:text-primary dark:hover:text-primary transition cursor-pointer flex items-center gap-1 uppercase tracking-wider"
-                          >
-                            {isExpanded ? "Hide Metadata Payload" : "View Metadata Payload"}
-                          </button>
+                                {/* Text Block content */}
+                                <div className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed font-sans bg-slate-50/60 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800/50 rounded-xl p-3 select-text font-medium whitespace-pre-wrap">
+                                  {chunk.content}
+                                </div>
 
-                          {isExpanded && (
-                            <pre className="mt-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-[10px] font-mono text-slate-600 dark:text-slate-400 overflow-x-auto whitespace-pre leading-normal">
-                              {JSON.stringify(chunk.metadata, null, 2)}
-                            </pre>
-                          )}
+                                {/* Raw Metadata panel */}
+                                <div className="border-t border-slate-100 dark:border-slate-800/50 pt-2.5">
+                                  <button
+                                    onClick={() => setExpandedChunkId(isExpanded ? null : chunk.id)}
+                                    className="text-[10px] font-extrabold text-slate-400 hover:text-primary dark:hover:text-primary transition cursor-pointer flex items-center gap-1 uppercase tracking-wider"
+                                  >
+                                    {isExpanded ? "Hide Metadata Payload" : "View Metadata Payload"}
+                                  </button>
+
+                                  {isExpanded && (
+                                    <pre className="mt-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-[10px] font-mono text-slate-600 dark:text-slate-400 overflow-x-auto whitespace-pre leading-normal">
+                                      {JSON.stringify(chunk.metadata, null, 2)}
+                                    </pre>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );
                   })}
                 </div>
+
+                {/* Floating Go to Top button */}
+                {showGoToTop && (
+                  <button
+                    onClick={scrollToTop}
+                    className="absolute bottom-6 right-6 p-3 bg-primary hover:bg-primary/95 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 z-20 cursor-pointer flex items-center justify-center animate-fade-in"
+                    title="Go to Top"
+                  >
+                    <ArrowUp size={16} />
+                  </button>
+                )}
               </div>
             ) : (
               <div className="flex-1 flex items-center justify-center text-slate-400 text-xs">
-                Select a document from the left list to visualize its chunks.
+                No indexed files found.
               </div>
             )}
           </div>

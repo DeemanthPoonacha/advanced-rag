@@ -96,6 +96,7 @@ SEARCHABLE DESCRIPTION:"""
                 "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
             })
 
+        summary_text = None
         try:
             response = await self._client.chat.completions.create(
                 model=self._model_name,
@@ -103,16 +104,23 @@ SEARCHABLE DESCRIPTION:"""
                 temperature=self._temperature,
             )
             enhanced_content = response.choices[0].message.content or raw_text
+            summary_text = enhanced_content
         except Exception as e:
             logger.error("multimodal_summarization_failed", error=str(e))
             # Fallback
             enhanced_content = raw_text
 
+        chunk_metadata = document.metadata.model_copy()
+        if summary_text:
+            if not chunk_metadata.custom:
+                chunk_metadata.custom = {}
+            chunk_metadata.custom["summary_text"] = summary_text
+
         return [
             Chunk(
                 content=enhanced_content,
                 document_id=document.id,
-                metadata=document.metadata,
+                metadata=chunk_metadata,
                 chunk_index=0,
                 token_count=len(enhanced_content.split()),
             )

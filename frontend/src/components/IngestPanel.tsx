@@ -1552,6 +1552,7 @@ export function IngestPanel({
               {activeStep === 2 && (
                 <div className="flex-1 flex flex-col max-w-xl mx-auto w-full gap-6 justify-center">
                   <div className="text-center">
+                    <Loader2 className="mx-auto mb-2 text-primary w-6 h-6 animate-spin shrink-0" />
                     <h4 className="text-base font-bold text-slate-100">Layout Partitioning Details</h4>
                     <p className="text-xs text-slate-400 mt-1">Collapsible partitioning layout report for each uploaded file</p>
                   </div>

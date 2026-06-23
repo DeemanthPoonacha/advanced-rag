@@ -157,6 +157,9 @@ class UnstructuredParser(BaseParser):
             "strategy": self._strategy,
             "languages": self._languages,
             "include_page_breaks": self._include_page_breaks,
+            "infer_table_structure": True,
+            "extract_images_in_pdf": self._extract_images,
+            "extract_image_block_to_payload": self._extract_images,
         }
 
         if self._max_characters > 0:
@@ -176,16 +179,36 @@ class UnstructuredParser(BaseParser):
             from unstructured.partition.auto import partition
             return partition(**kwargs)
         except Exception as e:
-            logger.warning(
-                "unstructured_partition_failed_using_fallback",
-                source=str(source)[:100],
-                error=str(e)
-            )
+            if kwargs.get("strategy") == "hi_res":
+                logger.warning(
+                    "unstructured_hi_res_failed_falling_back_to_fast",
+                    source=str(source)[:100],
+                    error=str(e)
+                )
+                try:
+                    kwargs_fast = kwargs.copy()
+                    kwargs_fast["strategy"] = "fast"
+                    kwargs_fast["extract_images_in_pdf"] = False
+                    from unstructured.partition.auto import partition
+                    return partition(**kwargs_fast)
+                except Exception as fast_err:
+                    logger.warning(
+                        "unstructured_fast_failed_using_local_fallback",
+                        source=str(source)[:100],
+                        error=str(fast_err)
+                    )
+            else:
+                logger.warning(
+                    "unstructured_partition_failed_using_fallback",
+                    source=str(source)[:100],
+                    error=str(e)
+                )
             
             class FallbackElement:
-                def __init__(self, text: str, page_number: int | None = None) -> None:
+                def __init__(self, text: str, page_number: int | None = None, category: str = "Text") -> None:
                     self.text = text
                     self.metadata = type("ElementMetadata", (), {"page_number": page_number})()
+                    self.category = category
                 def __str__(self) -> str:
                     return self.text
 
@@ -194,10 +217,26 @@ class UnstructuredParser(BaseParser):
                 file_path = Path(source)
                 if file_path.exists():
                     suffix = file_path.suffix.lower()
-                    if suffix in [".txt", ".md", ".py", ".json", ".yaml", ".yml", ".csv", ".ini", ".conf"]:
+                    if suffix in [".txt", ".md", ".py", ".json", ".yaml", ".yml", ".ini", ".conf"]:
                         try:
                             content = file_path.read_text(encoding="utf-8", errors="ignore")
                             return [FallbackElement(content, page_number=1)]
+                        except Exception:
+                            pass
+                    elif suffix == ".csv":
+                        try:
+                            content = file_path.read_text(encoding="utf-8", errors="ignore")
+                            lines = [line.strip().split(",") for line in content.split("\n") if line.strip()]
+                            html_lines = ["<table>"]
+                            for r_idx, row in enumerate(lines):
+                                html_lines.append("  <tr>")
+                                for cell in row:
+                                    tag = "th" if r_idx == 0 else "td"
+                                    html_lines.append(f"    <{tag}>{cell}</{tag}>")
+                                html_lines.append("  </tr>")
+                            html_lines.append("</table>")
+                            html_table = "\n".join(html_lines)
+                            return [FallbackElement(html_table, page_number=1, category="Table")]
                         except Exception:
                             pass
                     elif suffix == ".pdf":
@@ -263,7 +302,7 @@ class UnstructuredParser(BaseParser):
     ) -> list[Document]:
         """Convert unstructured elements into Document objects.
 
-        Groups elements by page when page breaks are included.
+        Groups elements by page and separates tables, images, and titles.
         """
         if not elements:
             return []
@@ -274,24 +313,7 @@ class UnstructuredParser(BaseParser):
         if isinstance(source, str):
             file_type = Path(source).suffix.lstrip(".")
 
-        if self._include_page_breaks:
-            return self._group_by_page(elements, source_str, file_name, file_type, extra_meta)
-
-        # Single document from all elements
-        content = "\n\n".join(
-            str(el) for el in elements if str(el).strip()
-        )
-        if not content.strip():
-            return []
-
-        doc_meta = DocumentMetadata(
-            source=source_str,
-            file_name=file_name,
-            file_type=file_type,
-            language=self._languages[0] if self._languages else "en",
-            custom=extra_meta,
-        )
-        return [Document(content=content, metadata=doc_meta)]
+        return self._group_by_page(elements, source_str, file_name, file_type, extra_meta)
 
     def _group_by_page(
         self,
@@ -301,31 +323,110 @@ class UnstructuredParser(BaseParser):
         file_type: str,
         extra_meta: dict[str, Any],
     ) -> list[Document]:
-        """Group elements by page number, creating one Document per page."""
-        pages: dict[int, list[str]] = {}
+        """Group elements by page number, keeping tables/images/titles separate."""
+        documents: list[Document] = []
+        
+        # Determine total pages
+        page_numbers = set()
         for el in elements:
+            p_num = getattr(el.metadata, "page_number", None) if hasattr(el, "metadata") else None
+            if p_num:
+                page_numbers.add(p_num)
+        total_pages = max(page_numbers, default=1)
+        
+        text_buffer: list[str] = []
+        last_page = None
+        
+        def flush_buffer():
+            nonlocal text_buffer, last_page
+            if text_buffer and last_page is not None:
+                content = "\n\n".join(text_buffer)
+                if content.strip():
+                    meta = DocumentMetadata(
+                        source=source_str,
+                        file_name=file_name,
+                        file_type=file_type,
+                        page_number=last_page if last_page > 0 else None,
+                        total_pages=total_pages if total_pages > 1 else None,
+                        language=self._languages[0] if self._languages else "en",
+                        custom={
+                            **extra_meta,
+                            "element_type": "text"
+                        },
+                    )
+                    documents.append(Document(content=content, metadata=meta))
+                text_buffer = []
+
+        for el in elements:
+            category = getattr(el, "category", "Text")
             text = str(el).strip()
             if not text:
                 continue
+                
             page_num = getattr(el.metadata, "page_number", None) if hasattr(el, "metadata") else None
             page_key = page_num or 0
-            pages.setdefault(page_key, []).append(text)
-
-        documents: list[Document] = []
-        total_pages = max(pages.keys(), default=0) + (1 if pages else 0)
-        for page_num in sorted(pages.keys()):
-            content = "\n\n".join(pages[page_num])
-            if not content.strip():
-                continue
-            meta = DocumentMetadata(
-                source=source_str,
-                file_name=file_name,
-                file_type=file_type,
-                page_number=page_num if page_num > 0 else None,
-                total_pages=total_pages if total_pages > 1 else None,
-                language=self._languages[0] if self._languages else "en",
-                custom=extra_meta,
-            )
-            documents.append(Document(content=content, metadata=meta))
-
+            
+            if last_page is not None and page_key != last_page:
+                flush_buffer()
+            last_page = page_key
+            
+            if category == "Table":
+                flush_buffer()
+                html = getattr(el.metadata, "text_as_html", None) if hasattr(el, "metadata") else None
+                table_content = html if html else text
+                meta = DocumentMetadata(
+                    source=source_str,
+                    file_name=file_name,
+                    file_type=file_type,
+                    page_number=page_key if page_key > 0 else None,
+                    total_pages=total_pages if total_pages > 1 else None,
+                    language=self._languages[0] if self._languages else "en",
+                    custom={
+                        **extra_meta,
+                        "element_type": "table",
+                        "table_extracted": True
+                    },
+                )
+                documents.append(Document(content=table_content, metadata=meta))
+                
+            elif category in ("Image", "Picture"):
+                flush_buffer()
+                image_b64 = getattr(el.metadata, "image_base64", None) if hasattr(el, "metadata") else None
+                meta = DocumentMetadata(
+                    source=source_str,
+                    file_name=file_name,
+                    file_type="image",
+                    page_number=page_key if page_key > 0 else None,
+                    total_pages=total_pages if total_pages > 1 else None,
+                    language=self._languages[0] if self._languages else "en",
+                    custom={
+                        **extra_meta,
+                        "element_type": "image",
+                        "image_extracted": True,
+                        "image_base64": image_b64
+                    },
+                )
+                documents.append(Document(content=text, metadata=meta))
+                
+            elif category == "Title":
+                flush_buffer()
+                meta = DocumentMetadata(
+                    source=source_str,
+                    file_name=file_name,
+                    file_type=file_type,
+                    page_number=page_key if page_key > 0 else None,
+                    total_pages=total_pages if total_pages > 1 else None,
+                    language=self._languages[0] if self._languages else "en",
+                    custom={
+                        **extra_meta,
+                        "element_type": "title",
+                        "title_extracted": True
+                    },
+                )
+                documents.append(Document(content=text, metadata=meta))
+                
+            else:
+                text_buffer.append(text)
+                
+        flush_buffer()
         return documents
