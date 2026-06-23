@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from pathlib import Path
 from typing import Any, AsyncIterator
 
 import structlog
@@ -78,7 +79,40 @@ class RAGPipelineOrchestrator:
         self.output_guardrail = self.factory.create_output_guardrail()
         self.evaluator = self.factory.create_evaluator()
 
+        self.ingestion_status: dict[str, Any] = {}
         self._initialized = False
+
+    def start_ingestion(self, filenames: list[str]) -> None:
+        """Clear and initialize the ingestion status tracking for a list of filenames."""
+        self.ingestion_status.clear()
+        for filename in filenames:
+            self.ingestion_status[filename] = {
+                "step": 1,
+                "status": "uploading",
+                "details": "Saving file to server queue...",
+                "text_count": 0,
+                "table_count": 0,
+                "image_count": 0,
+                "title_count": 0,
+                "total_elements": 0,
+                "chunks_count": 0,
+                "chunks": []
+            }
+
+    def set_ingestion_failed(self, filename: str, error_message: str) -> None:
+        """Set a document's ingestion status to failed with an error message."""
+        self.ingestion_status[filename] = {
+            "step": 3,
+            "status": "failed",
+            "details": f"Failure: {error_message}",
+            "text_count": 0,
+            "table_count": 0,
+            "image_count": 0,
+            "title_count": 0,
+            "total_elements": 0,
+            "chunks_count": 0,
+            "chunks": []
+        }
 
     async def initialize(self) -> None:
         """Ensure downstream indexes and connection pools are active."""
@@ -109,45 +143,198 @@ class RAGPipelineOrchestrator:
         """
         await self.initialize()
 
-        logger.info("pipeline_ingest_parse_start", source_type=type(source).__name__)
-        documents = await self.parser.parse(source, metadata)
-        logger.info("pipeline_ingest_parse_complete", num_documents=len(documents))
+        # Resolve filename for progress status tracking
+        filename = (metadata or {}).get("filename") if metadata else None
+        if not filename:
+            if isinstance(source, (str, Path)):
+                import os
+                filename = os.path.basename(str(source))
+            else:
+                filename = "uploaded_document"
 
-        if not documents:
-            return []
+        # Update status to step 2: layout partitioning
+        self.ingestion_status[filename] = {
+            "step": 2,
+            "status": "partitioning",
+            "details": "Analyzing layout to partition text, tables, and images...",
+            "text_count": 0,
+            "table_count": 0,
+            "image_count": 0,
+            "title_count": 0,
+            "total_elements": 0,
+            "chunks_count": 0,
+            "chunks": []
+        }
 
-        logger.info("pipeline_ingest_chunk_start")
-        chunks = await self.chunker.chunk_batch(documents)
-        logger.info("pipeline_ingest_chunk_complete", num_chunks=len(chunks))
-
-        if not chunks:
-            return []
-
-        logger.info("pipeline_ingest_embed_start")
-        texts = [chunk.content for chunk in chunks]
-        embeddings = await self.embedding_model.embed(texts)
-
-        # Try generating sparse embeddings if the embedding model supports it
-        sparse_embeddings = None
         try:
-            sparse_embeddings = await self.embedding_model.embed_sparse(texts)
-        except NotImplementedError:
-            pass
+            logger.info("pipeline_ingest_parse_start", source_type=type(source).__name__)
+            documents = await self.parser.parse(source, metadata)
+            logger.info("pipeline_ingest_parse_complete", num_documents=len(documents))
 
-        # Attach embeddings to chunks
-        for i, chunk in enumerate(chunks):
-            chunk.embedding = embeddings[i]
-            if sparse_embeddings:
-                s_vec = sparse_embeddings[i]
-                chunk.sparse_embedding = dict(zip(s_vec.indices, s_vec.values))
+            if not documents:
+                self.ingestion_status[filename] = {
+                    "step": 3,
+                    "status": "completed",
+                    "details": "No elements found to parse.",
+                    "text_count": 0, "table_count": 0, "image_count": 0, "title_count": 0,
+                    "total_elements": 0, "chunks_count": 0, "chunks": []
+                }
+                return []
 
-        logger.info("pipeline_ingest_embed_complete")
+            # Extract layout element statistics
+            text_count = 0
+            table_count = 0
+            image_count = 0
+            title_count = 0
+            for doc in documents:
+                m_dict = {}
+                if doc.metadata:
+                    if hasattr(doc.metadata, "model_dump"):
+                        m_dict = doc.metadata.model_dump()
+                    elif isinstance(doc.metadata, dict):
+                        m_dict = doc.metadata
+                custom = m_dict.get("custom", {})
+                if not isinstance(custom, dict):
+                    custom = {}
+                
+                el_type = custom.get("element_type", "text")
+                if el_type == "text":
+                    text_count += 1
+                elif el_type == "table":
+                    table_count += 1
+                elif el_type == "image":
+                    image_count += 1
+                elif el_type == "title":
+                    title_count += 1
+            
+            total_elements = len(documents)
 
-        logger.info("pipeline_ingest_upsert_start")
-        chunk_ids = await self.vector_store.upsert(chunks)
-        logger.info("pipeline_ingest_upsert_complete", num_upserted=len(chunk_ids))
+            # Update status to step 3: chunking & AI summarization
+            self.ingestion_status[filename] = {
+                "step": 3,
+                "status": "chunking",
+                "details": "Segmenting document into semantic blocks and generating AI summaries...",
+                "text_count": text_count,
+                "table_count": table_count,
+                "image_count": image_count,
+                "title_count": title_count,
+                "total_elements": total_elements,
+                "chunks_count": 0,
+                "chunks": []
+            }
 
-        return chunk_ids
+            logger.info("pipeline_ingest_chunk_start")
+            chunks = await self.chunker.chunk_batch(documents)
+            logger.info("pipeline_ingest_chunk_complete", num_chunks=len(chunks))
+
+            if not chunks:
+                self.ingestion_status[filename] = {
+                    "step": 3,
+                    "status": "completed",
+                    "details": "Layout partitioned, but 0 chunks created.",
+                    "text_count": text_count, "table_count": table_count, "image_count": image_count, "title_count": title_count,
+                    "total_elements": total_elements, "chunks_count": 0, "chunks": []
+                }
+                return []
+
+            # Update status to indexing
+            self.ingestion_status[filename] = {
+                "step": 3,
+                "status": "indexing",
+                "details": "Embedding text blocks and upserting into vector DB...",
+                "text_count": text_count,
+                "table_count": table_count,
+                "image_count": image_count,
+                "title_count": title_count,
+                "total_elements": total_elements,
+                "chunks_count": len(chunks),
+                "chunks": []
+            }
+
+            logger.info("pipeline_ingest_embed_start")
+            texts = [chunk.content for chunk in chunks]
+            embeddings = await self.embedding_model.embed(texts)
+
+            # Try generating sparse embeddings if the embedding model supports it
+            sparse_embeddings = None
+            try:
+                if hasattr(self.embedding_model, "embed_sparse"):
+                    sparse_embeddings = await self.embedding_model.embed_sparse(texts)
+            except Exception:
+                pass
+
+            # Attach embeddings to chunks
+            for i, chunk in enumerate(chunks):
+                chunk.embedding = embeddings[i]
+                if sparse_embeddings:
+                    s_vec = sparse_embeddings[i]
+                    chunk.sparse_embedding = dict(zip(s_vec.indices, s_vec.values))
+
+            logger.info("pipeline_ingest_embed_complete")
+
+            logger.info("pipeline_ingest_upsert_start")
+            chunk_ids = await self.vector_store.upsert(chunks)
+            logger.info("pipeline_ingest_upsert_complete", num_upserted=len(chunk_ids))
+
+            # Format chunk details to display dynamically in UI
+            formatted_chunks = []
+            for c in chunks:
+                c_m = {}
+                if c.metadata:
+                    if hasattr(c.metadata, "model_dump"):
+                        c_m = c.metadata.model_dump()
+                    elif isinstance(c.metadata, dict):
+                        c_m = c.metadata
+                        
+                file_type = c_m.get("file_type", "")
+                custom = c_m.get("custom", {})
+                if not isinstance(custom, dict):
+                    custom = {}
+                    
+                c_type = "text"
+                if file_type == "image" or custom.get("image_extracted"):
+                    c_type = "image"
+                elif custom.get("table_extracted"):
+                    c_type = "table"
+                    
+                summary = custom.get("summary_text", "")
+                
+                formatted_chunks.append({
+                    "id": c.id,
+                    "page": c_m.get("page_number", 1),
+                    "type": c_type,
+                    "snippet": c.content[:120] + "..." if len(c.content) > 120 else c.content,
+                    "originalText": c.content,
+                    "summaryText": summary,
+                    "isRaw": not summary,
+                    "metadata": c_m
+                })
+
+            # Update status to completed
+            self.ingestion_status[filename] = {
+                "step": 3,
+                "status": "completed",
+                "details": f"Ingestion successful! Indexed {len(chunks)} chunks.",
+                "text_count": text_count,
+                "table_count": table_count,
+                "image_count": image_count,
+                "title_count": title_count,
+                "total_elements": total_elements,
+                "chunks_count": len(chunks),
+                "chunks": formatted_chunks
+            }
+
+            return chunk_ids
+
+        except Exception as file_error:
+            self.ingestion_status[filename] = {
+                "step": 3,
+                "status": "failed",
+                "details": f"Failure: {str(file_error)}",
+                "text_count": 0, "table_count": 0, "image_count": 0, "title_count": 0,
+                "total_elements": 0, "chunks_count": 0, "chunks": []
+            }
+            raise file_error
 
     @trace_operation(LifecycleStage.INGEST, "pipeline_ingest_batch")
     async def ingest_batch(

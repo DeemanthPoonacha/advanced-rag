@@ -203,6 +203,17 @@ export default function App() {
     }
   };
 
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleCancelUpload = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      showToast("Ingestion cancelled.", "warning");
+    }
+    setIsUploading(false);
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -215,10 +226,14 @@ export default function App() {
       formData.append("files", file);
     });
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const res = await fetch(`${API_BASE}/api/ingest`, {
         method: "POST",
         body: formData,
+        signal: controller.signal,
       });
       const data = await res.json();
 
@@ -240,10 +255,14 @@ export default function App() {
       } else {
         showToast(data.detail || "Ingestion failed", "error");
       }
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === "AbortError") {
+        return;
+      }
       showToast("Upload failed due to connection error", "error");
     } finally {
       setIsUploading(false);
+      abortControllerRef.current = null;
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -485,6 +504,7 @@ export default function App() {
               isUploading={isUploading}
               uploadLogs={uploadLogs}
               handleFileUpload={handleFileUpload}
+              handleCancelUpload={handleCancelUpload}
               fileInputRef={fileInputRef}
               handleDeleteFile={handleDeleteFile}
             />

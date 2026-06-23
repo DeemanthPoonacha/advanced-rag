@@ -568,6 +568,13 @@ async def query_stream_pipeline(req: QueryRequest):
             
     return EventSourceResponse(token_generator())
 
+@app.get("/api/ingest/status")
+async def get_ingestion_status():
+    global orchestrator
+    if not orchestrator:
+        return {}
+    return orchestrator.ingestion_status
+
 @app.post("/api/ingest")
 async def ingest_files(
     files: List[UploadFile] = File(...),
@@ -588,6 +595,9 @@ async def ingest_files(
         except Exception:
             pass
 
+    # Initialize ingestion status at the class level
+    orchestrator.start_ingestion([file.filename for file in files])
+
     # Create temporary directory inside workspace
     temp_dir = Path("data/temp_uploads")
     temp_dir.mkdir(parents=True, exist_ok=True)
@@ -597,32 +607,37 @@ async def ingest_files(
     
     try:
         for file in files:
-            # Generate unique temp filename to prevent conflict
-            file_extension = Path(file.filename).suffix
-            temp_file_name = f"{uuid.uuid4()}{file_extension}"
-            temp_file_path = temp_dir / temp_file_name
-            
-            # Save file to temp path
-            with open(temp_file_path, "wb") as f:
-                shutil.copyfileobj(file.file, f)
+            current_filename = file.filename
+            try:
+                # Generate unique temp filename to prevent conflict
+                file_extension = Path(current_filename).suffix
+                temp_file_name = f"{uuid.uuid4()}{file_extension}"
+                temp_file_path = temp_dir / temp_file_name
                 
-            # Run ingestion
-            file_metadata = {**metadata, "filename": file.filename}
-            
-            # Call orchestrator ingest
-            chunk_ids = await orchestrator.ingest_source(
-                source=str(temp_file_path),
-                metadata=file_metadata
-            )
-            total_chunk_ids.extend(chunk_ids)
-            ingested_files_log.append({
-                "filename": file.filename,
-                "chunks_count": len(chunk_ids)
-            })
-            
-            # Delete temporary file
-            if temp_file_path.exists():
-                temp_file_path.unlink()
+                # Save file to temp path
+                with open(temp_file_path, "wb") as f:
+                    shutil.copyfileobj(file.file, f)
+                    
+                # Run ingestion metadata
+                file_metadata = {**metadata, "filename": current_filename}
+                
+                # Call orchestrator ingest directly - status logic is now inside orchestrator!
+                chunk_ids = await orchestrator.ingest_source(
+                    source=str(temp_file_path),
+                    metadata=file_metadata
+                )
+                total_chunk_ids.extend(chunk_ids)
+                ingested_files_log.append({
+                    "filename": current_filename,
+                    "chunks_count": len(chunk_ids)
+                })
+                
+                # Delete temporary file
+                if temp_file_path.exists():
+                    temp_file_path.unlink()
+            except Exception as file_error:
+                orchestrator.set_ingestion_failed(current_filename, str(file_error))
+                raise file_error
                 
         return {
             "status": "success",

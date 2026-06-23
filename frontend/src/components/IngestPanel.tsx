@@ -21,6 +21,7 @@ interface IngestPanelProps {
   isUploading: boolean;
   uploadLogs: UploadLog[];
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleCancelUpload: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   handleDeleteFile: (filename: string) => Promise<void>;
 }
@@ -57,13 +58,41 @@ export function IngestPanel({
   isUploading,
   uploadLogs,
   handleFileUpload,
+  handleCancelUpload,
   fileInputRef,
   handleDeleteFile,
 }: IngestPanelProps) {
   const [wizardActive, setWizardActive] = useState(false);
   const [activeStep, setActiveStep] = useState<number>(1);
+  const [maxStepReached, setMaxStepReached] = useState<number>(1);
   const [selectedChunk, setSelectedChunk] = useState<ChunkData | null>(null);
   const [inspectorTab, setInspectorTab] = useState<"original" | "summary" | "metadata">("original");
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+
+  // Handle accordion toggles
+  const togglePartitionAccordion = (fileId: string) => {
+    setOpenPartitionFiles(prev => ({ ...prev, [fileId]: !prev[fileId] }));
+  };
+
+  const toggleChunkAccordion = (fileId: string) => {
+    setOpenChunkFiles(prev => ({ ...prev, [fileId]: !prev[fileId] }));
+  };
+
+  const toggleRegistryAccordion = (fileId: string) => {
+    setOpenRegistryFiles(prev => {
+      const isExpanded = !prev[fileId];
+      if (isExpanded) {
+        setSelectedFileId(fileId);
+        setSelectedChunk(null);
+      } else if (selectedFileId === fileId) {
+        setSelectedFileId(null);
+      }
+      const newState: Record<string, boolean> = {};
+      newState[fileId] = isExpanded;
+      return newState;
+    });
+  };
+
   const [searchQuery, setSearchQuery] = useState("");
 
   // Sample files that are processed during ingestion simulation
@@ -251,6 +280,31 @@ export function IngestPanel({
   const [ragSearchResults, setRagSearchResults] = useState<any | null>(null);
   const [ragSearchError, setRagSearchError] = useState<string | null>(null);
 
+  const [realIngestStatus, setRealIngestStatus] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    let intervalId: any;
+    if (isUploading) {
+      const pollStatus = async () => {
+        try {
+          const res = await fetch("http://localhost:8000/api/ingest/status");
+          if (res.ok) {
+            const data = await res.json();
+            setRealIngestStatus(data);
+          }
+        } catch (e) {
+          console.error("Failed to fetch ingest status", e);
+        }
+      };
+      
+      pollStatus();
+      intervalId = setInterval(pollStatus, 800);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isUploading]);
+
 
 
   // Unified files mapping and sorting/grouping
@@ -260,6 +314,14 @@ export function IngestPanel({
     size: file.size,
     status: file.status,
     uploadTime: file.name === "read_me.txt" ? "Jun 21, 2026, 04:20 PM" : "Jun 22, 2026, 10:30 AM",
+    textCount: file.textCount,
+    tableCount: file.tableCount,
+    imageCount: file.imageCount,
+    titleCount: file.titleCount,
+    otherCount: file.otherCount,
+    totalElements: file.totalElements,
+    totalChunks: file.totalChunks,
+    summarizedChunks: file.summarizedChunks,
     chunksCount: file.totalChunks,
     chunks: file.chunks,
     isMock: true,
@@ -271,12 +333,22 @@ export function IngestPanel({
       ...apiChunks.map(c => {
         const docName = c.metadata?.file_name || c.metadata?.source || "";
         return docName.split(/[/\\]/).pop() || "";
-      }).filter(Boolean)
+      }).filter(Boolean),
+      ...Object.keys(realIngestStatus)
     ]));
 
     return allUniqueFilenames.map((filename, idx) => {
       const log = uploadLogs.find(l => l.filename.toLowerCase() === filename.toLowerCase());
+      const activeInfo = realIngestStatus[filename];
       
+      const statusValue = activeInfo
+        ? (activeInfo.status === "completed" 
+            ? ("completed" as const) 
+            : activeInfo.status === "failed" 
+            ? ("failed" as const) 
+            : ("processing" as const))
+        : ("completed" as const);
+
       const matchedChunks = apiChunks.filter((c) => {
         const docName = (c.metadata?.file_name || c.metadata?.source || "").toLowerCase();
         const cleanDoc = docName.split(/[/\\]/).pop() || "";
@@ -298,20 +370,45 @@ export function IngestPanel({
         metadata: c.metadata || {},
       }));
 
-      const textCount = formattedChunks.filter(c => c.type === "text").length;
-      const tableCount = formattedChunks.filter(c => c.type === "table").length;
-      const imageCount = formattedChunks.filter(c => c.type === "image").length;
-      const titleCount = formattedChunks.filter(c => c.metadata?.title_extracted).length;
+      const textCount = formattedChunks.length > 0
+        ? formattedChunks.filter(c => c.type === "text").length
+        : (activeInfo?.text_count || 0);
+
+      const tableCount = formattedChunks.length > 0
+        ? formattedChunks.filter(c => c.type === "table").length
+        : (activeInfo?.table_count || 0);
+
+      const imageCount = formattedChunks.length > 0
+        ? formattedChunks.filter(c => c.type === "image").length
+        : (activeInfo?.image_count || 0);
+
+      const titleCount = formattedChunks.length > 0
+        ? formattedChunks.filter(c => c.metadata?.title_extracted).length
+        : (activeInfo?.title_count || 0);
+
       const otherCount = 0;
-      const totalChunks = formattedChunks.length || (log ? log.chunks_count : 0);
-      const totalElements = textCount + tableCount + imageCount || totalChunks || 1;
-      const summarizedChunks = formattedChunks.filter(c => !c.isRaw).length;
+      
+      const totalChunks = formattedChunks.length > 0
+        ? formattedChunks.length
+        : (activeInfo?.chunks_count || (log ? log.chunks_count : 0));
+
+      const totalElements = formattedChunks.length > 0
+        ? textCount + tableCount + imageCount
+        : (activeInfo?.total_elements || totalChunks || 1);
+
+      const summarizedChunks = formattedChunks.length > 0
+        ? formattedChunks.filter(c => !c.isRaw).length
+        : (activeInfo?.chunks ? activeInfo.chunks.filter((c: any) => !c.isRaw).length : 0);
+
+      const finalChunks = formattedChunks.length > 0
+        ? formattedChunks
+        : (activeInfo?.chunks || []);
 
       return {
         id: log ? `uploaded-${uploadLogs.indexOf(log)}-${filename}` : `db-${idx}-${filename}`,
         name: filename,
         size: "N/A",
-        status: "completed" as const,
+        status: statusValue,
         uploadTime: log ? log.date : "Database Ingested",
         textCount,
         tableCount,
@@ -321,14 +418,15 @@ export function IngestPanel({
         totalElements,
         totalChunks,
         summarizedChunks,
-        chunks: formattedChunks,
+        chunks: finalChunks,
         isMock: false,
       };
     });
-  }, [uploadLogs, apiChunks]);
+  }, [uploadLogs, apiChunks, realIngestStatus]);
 
   const isMockMode = status?.mock_mode || false;
   const allFiles = isMockMode ? [...uploadedFilesList, ...mockFilesList] : uploadedFilesList;
+  const selectedFile = allFiles.find(f => f.id === selectedFileId);
 
   const getGroupKey = (uploadTime: string) => {
     const parts = uploadTime.split(",");
@@ -529,67 +627,55 @@ export function IngestPanel({
 
   const closeWizard = () => {
     setWizardActive(false);
+    setRealIngestStatus({});
   };
 
 
 
-  // Handle accordion toggles
-  const togglePartitionAccordion = (fileId: string) => {
-    setOpenPartitionFiles(prev => ({ ...prev, [fileId]: !prev[fileId] }));
-  };
 
-  const toggleChunkAccordion = (fileId: string) => {
-    setOpenChunkFiles(prev => ({ ...prev, [fileId]: !prev[fileId] }));
-  };
 
-  const toggleRegistryAccordion = (fileId: string) => {
-    setOpenRegistryFiles(prev => ({ ...prev, [fileId]: !prev[fileId] }));
-  };
-
-  // Select active files with potential in-progress upload item appended dynamically
-  const activeUploadFiles = React.useMemo(() => {
-    const list = isMockMode ? files : (uploadedFilesList as unknown as ProcessingFile[]);
-    if (isUploading) {
-      let tempName = "Uploading document...";
-      if (fileInputRef.current && fileInputRef.current.files && fileInputRef.current.files.length > 0) {
-        tempName = Array.from(fileInputRef.current.files).map(f => f.name).join(", ");
-      }
-      
-      const alreadyPresent = list.some(f => f.name === tempName);
-      if (!alreadyPresent) {
-        return [
-          {
-            id: "temp-upload-item",
-            name: tempName,
-            size: "Calculating...",
-            status: "processing" as const,
-            textCount: 0,
-            tableCount: 0,
-            imageCount: 0,
-            titleCount: 0,
-            otherCount: 0,
-            totalElements: 0,
-            totalChunks: 0,
-            summarizedChunks: 0,
-            chunks: []
-          },
-          ...list
-        ];
-      }
+  const wizardFiles = React.useMemo(() => {
+    if (isMockMode) return files;
+    
+    const keys = Object.keys(realIngestStatus);
+    if (keys.length > 0) {
+      return keys.map((filename, idx) => {
+        const info = realIngestStatus[filename];
+        return {
+          id: `real-ingest-${idx}-${filename}`,
+          name: filename,
+          size: "N/A",
+          status: info.status === "completed" 
+            ? ("completed" as const) 
+            : info.status === "failed" 
+            ? ("failed" as const) 
+            : ("processing" as const),
+          textCount: info.text_count || 0,
+          tableCount: info.table_count || 0,
+          imageCount: info.image_count || 0,
+          titleCount: info.title_count || 0,
+          otherCount: 0,
+          totalElements: info.total_elements || 0,
+          totalChunks: info.chunks_count || 0,
+          summarizedChunks: info.chunks ? info.chunks.filter((c: any) => !c.isRaw).length : 0,
+          chunks: info.chunks || []
+        };
+      });
     }
-    return list;
-  }, [isMockMode, files, uploadedFilesList, isUploading]);
-
-  const wizardFiles = activeUploadFiles;
+    
+    // Fallback if no polling status is available
+    return uploadedFilesList as unknown as ProcessingFile[];
+  }, [isMockMode, files, realIngestStatus, uploadedFilesList]);
 
   // Launch visual wizard simulation
   const startIngestionWizard = (targetFileId?: string) => {
     setWizardActive(true);
     setActiveStep(targetFileId ? 3 : 1);
+    setMaxStepReached(targetFileId ? 3 : 1);
     
     const selectFile = targetFileId 
-      ? (activeUploadFiles.find(f => f.id === targetFileId) || activeUploadFiles[0])
-      : activeUploadFiles[0];
+      ? (wizardFiles.find(f => f.id === targetFileId) || wizardFiles[0])
+      : wizardFiles[0];
 
     if (selectFile) {
       setOpenPartitionFiles({ [selectFile.id]: true });
@@ -609,31 +695,68 @@ export function IngestPanel({
   // Automatically select the first chunk when files become available
   useEffect(() => {
     if (wizardActive && !selectedChunk) {
-      const activeFilesList = isMockMode ? files : (uploadedFilesList as unknown as ProcessingFile[]);
+      const activeFilesList = wizardFiles;
       if (activeFilesList.length > 0 && activeFilesList[0].chunks && activeFilesList[0].chunks.length > 0) {
         setSelectedChunk(activeFilesList[0].chunks[0]);
         setOpenPartitionFiles({ [activeFilesList[0].id]: true });
         setOpenChunkFiles({ [activeFilesList[0].id]: true });
       }
     }
-  }, [wizardActive, selectedChunk, isMockMode, files, uploadedFilesList]);
+  }, [wizardActive, selectedChunk, wizardFiles]);
 
-  // Auto-progress simulation logic
+  // Auto-progress simulation or real updates tracking
   useEffect(() => {
-    if (wizardActive && activeStep < 3) {
-      const stepDurations = [3500, 4500]; // Upload, Partition durations
-      const timer = setTimeout(() => {
-        setActiveStep(prev => prev + 1);
-      }, stepDurations[activeStep - 1]);
-      return () => clearTimeout(timer);
+    if (!wizardActive) return;
+
+    if (isMockMode) {
+      if (maxStepReached < 3) {
+        const stepDurations = [3500, 4500]; // Upload, Partition durations
+        const timer = setTimeout(() => {
+          setMaxStepReached(prev => {
+            const next = prev + 1;
+            setActiveStep(next); // Auto-advance user view
+            return next;
+          });
+        }, stepDurations[maxStepReached - 1]);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      // Standard mode dynamic progress mapping
+      const keys = Object.keys(realIngestStatus);
+      if (keys.length > 0) {
+        let minStep = 3;
+        keys.forEach((filename) => {
+          const info = realIngestStatus[filename];
+          if (info && typeof info.step === "number") {
+            minStep = Math.min(minStep, info.step);
+          } else if (info) {
+            if (info.status === "uploading") {
+              minStep = Math.min(minStep, 1);
+            } else if (info.status === "partitioning") {
+              minStep = Math.min(minStep, 2);
+            } else if (info.status === "chunking" || info.status === "indexing") {
+              minStep = Math.min(minStep, 3);
+            }
+          }
+        });
+        
+        setMaxStepReached(prev => {
+          if (minStep > prev) {
+            setActiveStep(minStep); // Auto-advance user view when progress step increases
+            return minStep;
+          }
+          return prev;
+        });
+      }
     }
-  }, [wizardActive, activeStep]);
+  }, [wizardActive, maxStepReached, isMockMode, realIngestStatus]);
 
   useEffect(() => {
-    if (wizardActive && !isUploading && activeStep > 1) {
+    if (wizardActive && !isUploading && maxStepReached < 3) {
       setActiveStep(3);
+      setMaxStepReached(3);
     }
-  }, [isUploading]);
+  }, [isUploading, wizardActive, maxStepReached]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -886,19 +1009,70 @@ export function IngestPanel({
                                         {file.size}
                                       </span>
                                     )}
-                                    <span className="px-2 py-0.5 text-[9px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-md capitalize">
-                                      compiled
-                                    </span>
+                                    
+                                    {/* Dynamic Ingest Status Badge */}
+                                    {(() => {
+                                      const detailedStatus = !file.isMock && realIngestStatus[file.name]
+                                        ? realIngestStatus[file.name].status
+                                        : file.status;
+
+                                      return (
+                                        <>
+                                          {detailedStatus === "uploading" && (
+                                            <span className="px-2 py-0.5 text-[9px] font-bold text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 rounded-md flex items-center gap-1">
+                                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                              Uploading
+                                            </span>
+                                          )}
+                                          {detailedStatus === "partitioning" && (
+                                            <span className="px-2 py-0.5 text-[9px] font-bold text-blue-500 bg-blue-500/10 border border-blue-500/20 rounded-md flex items-center gap-1">
+                                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                              Partitioning
+                                            </span>
+                                          )}
+                                          {detailedStatus === "chunking" && (
+                                            <span className="px-2 py-0.5 text-[9px] font-bold text-purple-500 bg-purple-500/10 border border-purple-500/20 rounded-md flex items-center gap-1">
+                                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                              Chunking
+                                            </span>
+                                          )}
+                                          {detailedStatus === "indexing" && (
+                                            <span className="px-2 py-0.5 text-[9px] font-bold text-cyan-500 bg-cyan-500/10 border border-cyan-500/20 rounded-md flex items-center gap-1">
+                                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                              Indexing
+                                            </span>
+                                          )}
+                                          {detailedStatus === "processing" && (
+                                            <span className="px-2 py-0.5 text-[9px] font-bold text-blue-500 bg-blue-500/10 border border-blue-500/20 rounded-md flex items-center gap-1">
+                                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                                              Processing
+                                            </span>
+                                          )}
+                                          {detailedStatus === "failed" && (
+                                            <span className="px-2 py-0.5 text-[9px] font-bold text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-md flex items-center gap-1">
+                                              <X className="w-2.5 h-2.5 text-rose-500" />
+                                              Failed
+                                            </span>
+                                          )}
+                                          {detailedStatus === "completed" && (
+                                            <span className="px-2 py-0.5 text-[9px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-md flex items-center gap-1">
+                                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+                                              Done
+                                            </span>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
                                     
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        startIngestionWizard(file.id);
+                                        toggleRegistryAccordion(file.id);
                                       }}
                                       className="ml-2 px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 hover:border-primary/30 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
-                                      title="Open Multi-Step Processing Pipeline Visualizer"
+                                      title="Toggle Document Details"
                                     >
-                                      Details
+                                      {isExpanded ? "Hide Details" : "Details"}
                                     </button>
 
                                     {/* Delete Button */}
@@ -915,57 +1089,61 @@ export function IngestPanel({
                                   </div>
                                 </div>
 
-                                {/* Expanded Chunks list */}
+                                {/* Expanded Ingestion details panel */}
                                 {isExpanded && (
-                                  <div className="border-t border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-950/20 p-4 space-y-3">
-                                    {file.chunks && file.chunks.length > 0 ? (
-                                      <div className="space-y-3">
-                                        {file.chunks.map((chunk) => {
-                                          const isSelected = selectedChunk?.id === chunk.id;
-                                          return (
-                                            <div
-                                              key={chunk.id}
-                                              onClick={() => setSelectedChunk(chunk)}
-                                              className={`p-3 rounded-lg border text-left cursor-pointer transition-all duration-200 ${
-                                                isSelected
-                                                  ? "bg-primary/5 border-primary/45 shadow-sm"
-                                                  : "bg-slate-50/40 dark:bg-slate-900/20 border-slate-200/60 dark:border-slate-800/40 hover:bg-slate-100/50 dark:hover:bg-slate-800/20"
-                                              }`}
-                                            >
-                                              <div className="flex justify-between items-center mb-1.5">
-                                                <div className="flex gap-1.5 items-center">
-                                                  <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[8px] font-extrabold text-slate-500 dark:text-slate-400 uppercase">
-                                                    Page {chunk.page}
-                                                  </span>
-                                                  <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800/60 text-[8px] font-bold text-slate-500 dark:text-slate-400 capitalize">
-                                                    {chunk.type}
-                                                  </span>
-                                                  {chunk.isRaw ? (
-                                                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-bold text-emerald-500">
-                                                      raw
+                                  <div className="border-t border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-950/20 p-5 space-y-4">
+                                    {/* Chunks breakdown List */}
+                                    <div className="space-y-3">
+                                      <div className="text-xs font-bold text-slate-700 dark:text-slate-300">Document Chunk Index Registry</div>
+                                      {file.chunks && file.chunks.length > 0 ? (
+                                        <div className="space-y-3">
+                                          {file.chunks.map((chunk) => {
+                                            const isSelected = selectedChunk?.id === chunk.id;
+                                            return (
+                                              <div
+                                                key={chunk.id}
+                                                onClick={() => setSelectedChunk(chunk)}
+                                                className={`p-3 rounded-lg border text-left cursor-pointer transition-all duration-200 ${
+                                                  isSelected
+                                                    ? "bg-primary/5 border-primary/45 shadow-sm"
+                                                    : "bg-slate-50/40 dark:bg-slate-900/20 border-slate-200/60 dark:border-slate-800/40 hover:bg-slate-100/50 dark:hover:bg-slate-800/20"
+                                                }`}
+                                              >
+                                                <div className="flex justify-between items-center mb-1.5">
+                                                  <div className="flex gap-1.5 items-center">
+                                                    <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[8px] font-extrabold text-slate-500 dark:text-slate-400 uppercase">
+                                                      Page {chunk.page}
                                                     </span>
-                                                  ) : (
-                                                    <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-[8px] font-bold text-yellow-600 dark:text-yellow-500">
-                                                      summarized
+                                                    <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800/60 text-[8px] font-bold text-slate-500 dark:text-slate-400 capitalize">
+                                                      {chunk.type}
                                                     </span>
-                                                  )}
+                                                    {chunk.isRaw ? (
+                                                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-[8px] font-bold text-emerald-500">
+                                                        raw
+                                                      </span>
+                                                    ) : (
+                                                      <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-[8px] font-bold text-yellow-600 dark:text-yellow-500">
+                                                        summarized
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                  <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500 truncate max-w-[120px]" title={chunk.id}>
+                                                    ID: {chunk.id}
+                                                  </span>
                                                 </div>
-                                                <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">
-                                                  ID: {chunk.id}
-                                                </span>
+                                                <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
+                                                  {chunk.originalText || chunk.snippet}
+                                                </p>
                                               </div>
-                                              <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
-                                                {chunk.originalText || chunk.snippet}
-                                              </p>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    ) : (
-                                      <div className="text-center py-4 text-xs text-slate-400 dark:text-slate-500">
-                                        No chunks generated or indexed for this document.
-                                      </div>
-                                    )}
+                                            );
+                                          })}
+                                        </div>
+                                      ) : (
+                                        <div className="text-center py-4 text-xs text-slate-400 dark:text-slate-500">
+                                          No chunks generated or indexed for this document.
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -1029,7 +1207,7 @@ export function IngestPanel({
                         <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-2 tracking-wide">
                           Original Content
                         </div>
-                        <div className="bg-slate-50 dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-800/80 rounded-xl leading-relaxed text-slate-700 dark:text-slate-300 font-mono text-[11px] whitespace-pre-wrap select-text">
+                        <div className="bg-slate-50 dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-800/80 rounded-xl leading-relaxed text-slate-700 dark:text-slate-300 font-mono text-[11px] whitespace-pre-wrap select-text overflow-auto">
                           {selectedChunk.originalText}
                         </div>
                       </div>
@@ -1108,6 +1286,83 @@ export function IngestPanel({
                       </div>
                     </div>
                   )}
+                </div>
+              </div>
+            ) : selectedFile ? (
+              // --- SELECTED FILE DETAIL INSPECTOR ---
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0 flex justify-between items-center bg-slate-50 dark:bg-slate-950/20">
+                  <div className="flex items-center gap-2">
+                    <Database className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-bold text-slate-850 dark:text-slate-100 tracking-wide uppercase">File Ingestion Metrics</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedFileId(null);
+                      if (selectedFileId) {
+                        setOpenRegistryFiles(prev => ({ ...prev, [selectedFileId]: false }));
+                      }
+                    }}
+                    className="p-1 hover:bg-slate-200 dark:hover:bg-slate-850 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-250 transition cursor-pointer"
+                    title="Close Details"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                  {/* File Overview Info */}
+                  <div className="space-y-1">
+                    <div className="text-xs font-bold text-slate-850 dark:text-slate-100 truncate">{selectedFile.name}</div>
+                    <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Uploaded: {selectedFile.uploadTime}</div>
+                  </div>
+
+                  {/* Detailed layout metrics stats block */}
+                  <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/60 rounded-xl p-4 shadow-sm space-y-4">
+                    <div className="text-[10px] font-bold text-primary uppercase tracking-wide">Ingestion Performance metrics</div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-2.5 bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800/40 rounded-lg">
+                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Partitioned Elements</div>
+                        <div className="text-sm font-extrabold text-slate-800 dark:text-slate-100 mt-0.5">{selectedFile.totalElements || 0}</div>
+                      </div>
+                      <div className="p-2.5 bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800/40 rounded-lg">
+                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Semantic Chunks</div>
+                        <div className="text-sm font-extrabold text-slate-800 dark:text-slate-100 mt-0.5">{selectedFile.totalChunks || 0}</div>
+                      </div>
+                      <div className="p-2.5 bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800/40 rounded-lg">
+                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">AI Summaries</div>
+                        <div className="text-sm font-extrabold text-yellow-600 dark:text-yellow-500 mt-0.5">{selectedFile.summarizedChunks || 0}</div>
+                      </div>
+                      <div className="p-2.5 bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800/40 rounded-lg">
+                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Raw Text Chunks</div>
+                        <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-500 mt-0.5">{(selectedFile.totalChunks || 0) - (selectedFile.summarizedChunks || 0)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Partition Breakdown statistics */}
+                  <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/60 rounded-xl p-4 shadow-sm">
+                    <div className="text-[10px] font-bold text-primary uppercase tracking-wide mb-3">Layout Partition Breakdown</div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 dark:text-slate-350">
+                      <div className="flex justify-between p-2 bg-white dark:bg-slate-950 border border-slate-200/40 dark:border-slate-800/30 rounded-lg">
+                        <span>Text Elements</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{selectedFile.textCount || 0}</span>
+                      </div>
+                      <div className="flex justify-between p-2 bg-white dark:bg-slate-950 border border-slate-200/40 dark:border-slate-800/30 rounded-lg">
+                        <span>Title Elements</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{selectedFile.titleCount || 0}</span>
+                      </div>
+                      <div className="flex justify-between p-2 bg-white dark:bg-slate-950 border border-slate-200/40 dark:border-slate-800/30 rounded-lg">
+                        <span>Table Elements</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{selectedFile.tableCount || 0}</span>
+                      </div>
+                      <div className="flex justify-between p-2 bg-white dark:bg-slate-950 border border-slate-200/40 dark:border-slate-800/30 rounded-lg">
+                        <span>Image Elements</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{selectedFile.imageCount || 0}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1203,23 +1458,21 @@ export function IngestPanel({
               { id: 2, label: "2. Layout Partitioning" },
               { id: 3, label: "3. Chunking & Summarization" },
             ].map((step) => {
-              const isStepCompleted = step.id < activeStep;
+              const isStepCompleted = step.id < maxStepReached;
               const isStepActive = step.id === activeStep;
-              const isStepAccessible = step.id <= activeStep;
+              const isStepAccessible = true;
 
               return (
                 <button
                   key={step.id}
-                  disabled={!isStepAccessible}
+                  disabled={false}
                   onClick={() => setActiveStep(step.id)}
                   className={`relative py-2.5 px-3 text-xs font-semibold whitespace-nowrap transition-all duration-300 ${
                     isStepActive 
                       ? "text-primary border-b-2 border-primary" 
                       : isStepCompleted 
                         ? "text-emerald-500 hover:text-emerald-400" 
-                        : isStepAccessible 
-                          ? "text-slate-400 hover:text-slate-200" 
-                          : "text-slate-700 cursor-not-allowed"
+                        : "text-slate-400 hover:text-slate-200"
                   }`}
                 >
                   <div className="flex items-center gap-1.5">
@@ -1236,7 +1489,7 @@ export function IngestPanel({
           </div>
 
           {/* Main Visualizer Window */}
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex overflow-hidden flex-col">
             <div className="flex-1 flex flex-col p-8 overflow-y-auto bg-[#0a0d16] items-center justify-start">
               
               {/* STEP 1: UPLOAD STATUS */}
@@ -1471,18 +1724,40 @@ export function IngestPanel({
                     })}
                   </div>
 
-                  {/* Finish Button */}
-                  <div className="flex justify-end mt-4">
-                    <button
-                      onClick={closeWizard}
-                      className="px-6 py-2.5 bg-primary hover:bg-primary/95 text-white rounded-xl text-xs font-bold transition shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-2"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Finish & Close Pipeline</span>
-                    </button>
-                  </div>
                 </div>
               )}
+            </div>
+
+            {/* Persistent Modal Footer */}
+            <div className="shrink-0 w-full px-8 py-4 border-t border-slate-900 bg-[#0c111e] flex justify-end items-center gap-3">
+              {isUploading && (
+                <button
+                  onClick={() => {
+                    handleCancelUpload();
+                    closeWizard();
+                  }}
+                  className="px-4 py-2 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Cancel Ingestion
+                </button>
+              )}
+              <button
+                onClick={closeWizard}
+                className="px-6 py-2 bg-primary hover:bg-primary/95 text-white rounded-xl text-xs font-bold transition shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-2"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Close & Run in Background</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Finish & Close</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
