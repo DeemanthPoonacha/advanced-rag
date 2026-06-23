@@ -350,12 +350,32 @@ class QdrantVectorStore(BaseVectorStore):
         payload = hit.payload or {}
         from ..core.types import DocumentMetadata
 
-        metadata = DocumentMetadata(
-            source=payload.get("source", ""),
-            file_name=payload.get("file_name", ""),
-            file_type=payload.get("file_type", ""),
-            language=payload.get("language", "en"),
-        )
+        # De-serialize all extra payload fields back into custom or standard fields
+        meta_dict = {
+            "source": payload.get("source", ""),
+            "file_name": payload.get("file_name", ""),
+            "file_type": payload.get("file_type", ""),
+            "language": payload.get("language", "en"),
+        }
+        if "page_number" in payload:
+            meta_dict["page_number"] = payload["page_number"]
+        if "total_pages" in payload:
+            meta_dict["total_pages"] = payload["total_pages"]
+        if "created_at" in payload:
+            try:
+                from datetime import datetime
+                meta_dict["created_at"] = datetime.fromisoformat(payload["created_at"])
+            except Exception:
+                pass
+
+        custom = {}
+        core_keys = {"content", "document_id", "chunk_index", "source", "file_name", "file_type", "language", "parent_id", "token_count", "page_number", "total_pages", "created_at"}
+        for k, v in payload.items():
+            if k not in core_keys:
+                custom[k] = v
+        meta_dict["custom"] = custom
+
+        metadata = DocumentMetadata(**meta_dict)
 
         chunk = Chunk(
             id=str(hit.id),

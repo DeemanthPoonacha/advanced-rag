@@ -63,7 +63,10 @@ class LocalEmbeddingModel(BaseEmbeddingModel):
                 self._model_name, device=self._device
             )
             # Probe dimensionality
-            self._dimensions_val = self._model.get_sentence_embedding_dimension()
+            if hasattr(self._model, "get_embedding_dimension"):
+                self._dimensions_val = self._model.get_embedding_dimension()
+            else:
+                self._dimensions_val = self._model.get_sentence_embedding_dimension()
             logger.info(
                 "local_model_loaded",
                 model=self._model_name,

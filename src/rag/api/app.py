@@ -399,16 +399,31 @@ async def get_all_chunks(limit: int = 10000):
         storage = getattr(db, "storage", [])
         chunks_list = []
         for c in storage[:limit]:
+            meta_dict = {}
+            if c.metadata:
+                if hasattr(c.metadata, "model_dump"):
+                    meta_dict = c.metadata.model_dump()
+                elif isinstance(c.metadata, dict):
+                    meta_dict = c.metadata
+
+            custom = meta_dict.get("custom", {}) or {}
+            if not isinstance(custom, dict):
+                custom = {}
+
             chunks_list.append({
                 "id": c.id,
                 "content": c.content,
                 "document_id": c.document_id,
                 "chunk_index": c.chunk_index,
                 "metadata": {
-                    "source": getattr(c.metadata, "source", ""),
-                    "file_name": getattr(c.metadata, "file_name", "") or getattr(c.metadata, "source", ""),
-                    "file_type": getattr(c.metadata, "file_type", ""),
-                    "language": getattr(c.metadata, "language", "en"),
+                    "source": meta_dict.get("source", ""),
+                    "file_name": meta_dict.get("file_name", "") or meta_dict.get("source", ""),
+                    "file_type": meta_dict.get("file_type", ""),
+                    "language": meta_dict.get("language", "en"),
+                    "page_number": meta_dict.get("page_number"),
+                    "total_pages": meta_dict.get("total_pages"),
+                    **{k: v for k, v in meta_dict.items() if k not in ["source", "file_name", "file_type", "language", "page_number", "total_pages", "custom"]},
+                    **custom
                 },
                 "token_count": c.token_count
             })
@@ -442,17 +457,27 @@ async def get_all_chunks(limit: int = 10000):
             
             for record in records:
                 payload = record.payload or {}
+                meta_dict = {
+                    "source": payload.get("source", payload.get("file_name", "")),
+                    "file_name": payload.get("filename") or payload.get("file_name", ""),
+                    "file_type": payload.get("file_type", ""),
+                    "language": payload.get("language", "en"),
+                    "page_number": payload.get("page_number"),
+                    "total_pages": payload.get("total_pages"),
+                }
+                
+                # Unpack everything else except the core chunk fields
+                core_keys = {"content", "document_id", "chunk_index", "source", "file_name", "filename", "file_type", "language", "page_number", "total_pages", "parent_id", "token_count"}
+                for k, v in payload.items():
+                    if k not in core_keys:
+                        meta_dict[k] = v
+
                 chunks_list.append({
                     "id": str(record.id),
                     "content": payload.get("content", ""),
                     "document_id": payload.get("document_id", ""),
                     "chunk_index": payload.get("chunk_index", 0),
-                    "metadata": {
-                        "source": payload.get("source", payload.get("file_name", "")),
-                        "file_name": payload.get("filename") or payload.get("file_name", ""),
-                        "file_type": payload.get("file_type", ""),
-                        "language": payload.get("language", "en"),
-                    },
+                    "metadata": meta_dict,
                     "token_count": payload.get("token_count", 0)
                 })
                 

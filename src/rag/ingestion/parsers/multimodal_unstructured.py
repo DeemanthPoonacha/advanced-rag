@@ -57,10 +57,29 @@ class MultimodalUnstructuredParser(BaseParser):
             combine_text_under_n_chars=500
         )
 
+        # Collect page numbers to compute total pages
+        page_numbers = set()
+        for el in elements:
+            p_num = getattr(el.metadata, "page_number", None) if hasattr(el, "metadata") else None
+            if p_num is not None and type(p_num) in (int, float):
+                page_numbers.add(p_num)
+        total_pages = max(page_numbers, default=1)
+
         documents: list[Document] = []
         for i, chunk in enumerate(chunks):
             content_data = self._separate_content_types(chunk)
             
+            # Find page number for this chunk
+            chunk_page = getattr(chunk.metadata, "page_number", None)
+            if chunk_page is None and hasattr(chunk.metadata, "orig_elements"):
+                for el in chunk.metadata.orig_elements:
+                    p_num = getattr(el.metadata, "page_number", None) if hasattr(el, "metadata") else None
+                    if p_num is not None and type(p_num) in (int, float):
+                        chunk_page = p_num
+                        break
+            if chunk_page is not None and type(chunk_page) not in (int, float):
+                chunk_page = None
+
             custom_metadata = {
                 "raw_text": content_data["text"],
                 "tables_html": content_data["tables"],
@@ -72,6 +91,8 @@ class MultimodalUnstructuredParser(BaseParser):
                 source=str(source),
                 file_name=(metadata or {}).get("filename") or Path(source).name,
                 file_type=Path(source).suffix.lstrip("."),
+                page_number=chunk_page,
+                total_pages=total_pages if total_pages > 1 else None,
                 language=self._languages[0] if self._languages else "en",
                 custom=custom_metadata,
             )

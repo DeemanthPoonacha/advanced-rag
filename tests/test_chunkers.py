@@ -162,7 +162,8 @@ async def test_multimodal_summarizer_chunker():
     mock_response.choices = [MagicMock()]
     mock_response.choices[0].message.content = "AI Enhanced Search Description."
     
-    chunker._client.chat.completions.create = AsyncMock(return_value=mock_response)
+    chunker._llm._client = MagicMock()
+    chunker._llm._client.chat.completions.create = AsyncMock(return_value=mock_response)
     
     chunks_mm = await chunker.chunk(doc_mm)
     assert len(chunks_mm) == 1

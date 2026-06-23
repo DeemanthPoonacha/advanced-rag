@@ -123,6 +123,7 @@ async def test_cohere_embedding_model():
 async def test_local_embedding_model():
     mock_model = MagicMock()
     mock_model.get_sentence_embedding_dimension = MagicMock(return_value=768)
+    mock_model.get_embedding_dimension = MagicMock(return_value=768)
     mock_model.encode = MagicMock(return_value=MagicMock(tolist=lambda: [[0.1, 0.2]]))
 
     mock_sentence_transformers.SentenceTransformer.return_value = mock_model
@@ -135,7 +136,7 @@ async def test_local_embedding_model():
     
     # Test lazy load & dimension check
     assert embedder.dimensions == 768
-    mock_model.get_sentence_embedding_dimension.assert_called_once()
+    assert mock_model.get_embedding_dimension.called or mock_model.get_sentence_embedding_dimension.called
     
     # Test document embedding
     embeddings = await embedder.embed(["hello"])
