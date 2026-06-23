@@ -90,12 +90,15 @@ class AnthropicLLM(BaseLLM):
         """
         client = self._get_client()
 
+        images = kwargs.pop("images", None)
+        messages = self._build_messages(prompt, images=images)
+
         params: dict[str, Any] = {
             "model": kwargs.get("model", self._model),
             "max_tokens": kwargs.get("max_tokens", self._max_tokens),
             "temperature": kwargs.get("temperature", self._temperature),
             "top_p": kwargs.get("top_p", self._top_p),
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
         }
         if self._system_message:
             params["system"] = self._system_message
@@ -128,11 +131,14 @@ class AnthropicLLM(BaseLLM):
         """
         client = self._get_client()
 
+        images = kwargs.pop("images", None)
+        messages = self._build_messages(prompt, images=images)
+
         params: dict[str, Any] = {
             "model": kwargs.get("model", self._model),
             "max_tokens": kwargs.get("max_tokens", self._max_tokens),
             "temperature": kwargs.get("temperature", self._temperature),
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
         }
         if self._system_message:
             params["system"] = self._system_message
@@ -191,3 +197,22 @@ class AnthropicLLM(BaseLLM):
         if self._client is not None:
             await self._client.close()
             self._client = None
+
+    # ── Internal ─────────────────────────────────────────────────────
+
+    def _build_messages(self, prompt: str, images: list[str] | None = None) -> list[dict[str, Any]]:
+        """Build the messages array with base64 images for Anthropic."""
+        if not images:
+            return [{"role": "user", "content": prompt}]
+        
+        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+        for img in images:
+            content.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/jpeg",
+                    "data": img,
+                }
+            })
+        return [{"role": "user", "content": content}]

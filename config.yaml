@@ -21,6 +21,7 @@ ingestion:
     config: {}
     provider: unstructured
   multimodal_summarizer:
+    provider: primary
     model_name: "gpt-4o"
     temperature: 0.0
     api_key: null

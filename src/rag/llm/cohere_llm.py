@@ -85,11 +85,8 @@ class CohereLLM(BaseLLM):
             The generated text.
         """
         client = self._get_client()
-
-        messages: list[dict[str, str]] = []
-        if self._preamble:
-            messages.append({"role": "system", "content": self._preamble})
-        messages.append({"role": "user", "content": prompt})
+        images = kwargs.pop("images", None)
+        messages = self._build_messages(prompt, images=images)
 
         response = await client.chat(
             model=kwargs.get("model", self._model),
@@ -124,11 +121,8 @@ class CohereLLM(BaseLLM):
             Token strings.
         """
         client = self._get_client()
-
-        messages: list[dict[str, str]] = []
-        if self._preamble:
-            messages.append({"role": "system", "content": self._preamble})
-        messages.append({"role": "user", "content": prompt})
+        images = kwargs.pop("images", None)
+        messages = self._build_messages(prompt, images=images)
 
         stream = client.chat_stream(
             model=kwargs.get("model", self._model),
@@ -190,3 +184,26 @@ class CohereLLM(BaseLLM):
         if self._client is not None:
             await self._client.close()
             self._client = None
+
+    # ── Internal ─────────────────────────────────────────────────────
+
+    def _build_messages(self, prompt: str, images: list[str] | None = None) -> list[dict[str, Any]]:
+        """Build the messages array with optional preamble and base64 images."""
+        messages: list[dict[str, Any]] = []
+        if self._preamble:
+            messages.append({"role": "system", "content": self._preamble})
+        
+        if not images:
+            messages.append({"role": "user", "content": prompt})
+        else:
+            content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+            for img in images:
+                content.append({
+                    "type": "image",
+                    "image": {
+                        "media_type": "image/jpeg",
+                        "data": img,
+                    }
+                })
+            messages.append({"role": "user", "content": content})
+        return messages

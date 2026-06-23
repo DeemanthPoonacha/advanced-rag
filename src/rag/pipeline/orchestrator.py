@@ -364,7 +364,23 @@ class RAGPipelineOrchestrator:
             try:
                 from ..ingestion.chunkers.multimodal_summarizer import MultimodalSummarizerChunker
                 cfg = self.config.ingestion.multimodal_summarizer
+                
+                summarizer_llm = None
+                if cfg.provider == "primary":
+                    summarizer_llm = self.llm
+                else:
+                    llm_config = {
+                        "model": cfg.model_name,
+                        "temperature": cfg.temperature,
+                    }
+                    if cfg.api_key:
+                        llm_config["api_key"] = cfg.api_key
+                    if cfg.base_url:
+                        llm_config["base_url"] = cfg.base_url
+                    summarizer_llm = self.factory._build("llm", cfg.provider, llm_config)
+
                 summarizer = MultimodalSummarizerChunker(
+                    llm=summarizer_llm,
                     model_name=cfg.model_name,
                     temperature=cfg.temperature,
                     api_key=cfg.api_key,

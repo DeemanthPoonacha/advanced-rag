@@ -101,6 +101,7 @@ class IngestionConfig(BaseModel):
     class MultimodalSummarizerConfig(BaseModel):
         """Configuration for the multimodal summarizer."""
         model_config = {"extra": "allow"}
+        provider: Literal["primary", "openai", "anthropic", "cohere", "local"] = "primary"
         model_name: str = "gpt-4o"
         temperature: float = 0.0
         api_key: str | None = None

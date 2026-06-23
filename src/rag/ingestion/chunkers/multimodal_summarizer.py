@@ -10,9 +10,8 @@ import os
 from typing import Any
 
 import structlog
-from openai import AsyncOpenAI
 
-from ...core.interfaces import BaseChunker
+from ...core.interfaces import BaseChunker, BaseLLM
 from ...core.registry import ComponentRegistry
 from ...core.types import Chunk, Document
 from ...observability.tracing import trace_operation
@@ -27,6 +26,7 @@ class MultimodalSummarizerChunker(BaseChunker):
 
     def __init__(
         self,
+        llm: BaseLLM | None = None,
         model_name: str = "gpt-4o",
         temperature: float = 0.0,
         api_key: str | None = None,
@@ -36,14 +36,18 @@ class MultimodalSummarizerChunker(BaseChunker):
         self._model_name = model_name
         self._temperature = temperature
         
-        # Instantiate AsyncOpenAI client
-        client_kwargs: dict[str, Any] = {}
-        api_key = api_key or os.environ.get("OPENAI_API_KEY")
-        if api_key:
-            client_kwargs["api_key"] = api_key
-        if base_url:
-            client_kwargs["base_url"] = base_url
-        self._client = AsyncOpenAI(**client_kwargs)
+        if llm is not None:
+            self._llm = llm
+        else:
+            # Fallback to direct OpenAILLM client if no BaseLLM is passed
+            # to preserve compatibility with existing unit tests.
+            from ...llm.openai_llm import OpenAILLM
+            self._llm = OpenAILLM(
+                model=model_name,
+                temperature=temperature,
+                api_key=api_key,
+                base_url=base_url
+            )
 
     @trace_operation(LifecycleStage.CHUNK, "multimodal_summarizer_chunk")
     async def chunk(self, document: Document) -> list[Chunk]:
@@ -89,22 +93,14 @@ Make it detailed and searchable - prioritize findability over brevity.
 
 SEARCHABLE DESCRIPTION:"""
 
-        message_content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
-        for base64_image in images:
-            message_content.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
-            })
-
         summary_text = None
         try:
-            response = await self._client.chat.completions.create(
-                model=self._model_name,
-                messages=[{"role": "user", "content": message_content}],
-                temperature=self._temperature,
+            summary_text = await self._llm.generate(
+                prompt,
+                images=images,
+                temperature=self._temperature
             )
-            enhanced_content = response.choices[0].message.content or raw_text
-            summary_text = enhanced_content
+            enhanced_content = summary_text or raw_text
         except Exception as e:
             logger.error("multimodal_summarization_failed", error=str(e))
             # Fallback

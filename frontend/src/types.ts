@@ -50,6 +50,7 @@ export interface ParserSettings {
 }
 
 export interface MultimodalSummarizerConfig {
+  provider: "primary" | "openai" | "anthropic" | "cohere" | "local";
   model_name: string;
   temperature: number;
   api_key?: string | null;

@@ -747,16 +747,36 @@ export function ConfigPanel({
 
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-semibold flex items-center">
-                            LLM Model Name
-                            <InfoTooltip text="Vision Model identifier used to summarize tables and images (e.g. gpt-4o, gpt-4o-mini)." />
+                            LLM Provider
+                            <InfoTooltip text="LLM client provider for the vision summarizer. Select 'Use Primary LLM' to reuse the main completions model config." />
                           </label>
-                          <input
-                            type="text"
-                            value={configData.ingestion?.multimodal_summarizer?.model_name || "gpt-4o"}
-                            onChange={(e) => handleUpdateConfigValue(["ingestion", "multimodal_summarizer", "model_name"], e.target.value)}
+                          <select
+                            value={configData.ingestion?.multimodal_summarizer?.provider || "primary"}
+                            onChange={(e) => handleUpdateConfigValue(["ingestion", "multimodal_summarizer", "provider"], e.target.value)}
                             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
-                          />
+                          >
+                            <option value="primary">Use Primary LLM</option>
+                            <option value="openai">OpenAI GPT</option>
+                            <option value="anthropic">Anthropic Claude</option>
+                            <option value="cohere">Cohere Command</option>
+                            <option value="local">Local LLM / Ollama</option>
+                          </select>
                         </div>
+
+                        {configData.ingestion?.multimodal_summarizer?.provider !== "primary" && (
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-semibold flex items-center">
+                              LLM Model Name
+                              <InfoTooltip text="Vision Model identifier used to summarize tables and images (e.g. gpt-4o, gpt-4o-mini)." />
+                            </label>
+                            <input
+                              type="text"
+                              value={configData.ingestion?.multimodal_summarizer?.model_name || "gpt-4o"}
+                              onChange={(e) => handleUpdateConfigValue(["ingestion", "multimodal_summarizer", "model_name"], e.target.value)}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
+                            />
+                          </div>
+                        )}
 
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-semibold flex items-center justify-between">
@@ -784,33 +804,37 @@ export function ConfigPanel({
                           />
                         </div>
 
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[11px] font-semibold flex items-center">
-                            API authorization Key (optional)
-                            <InfoTooltip text="Vision Model authorization API Key. Overrides global keys." />
-                          </label>
-                          <input
-                            type="password"
-                            placeholder="••••••••••••••••"
-                            value={configData.ingestion?.multimodal_summarizer?.api_key || ""}
-                            onChange={(e) => handleUpdateConfigValue(["ingestion", "multimodal_summarizer", "api_key"], e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
-                          />
-                        </div>
+                        {configData.ingestion?.multimodal_summarizer?.provider !== "primary" && (
+                          <>
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-[11px] font-semibold flex items-center">
+                                API authorization Key (optional)
+                                <InfoTooltip text="Vision Model authorization API Key. Overrides global keys." />
+                              </label>
+                              <input
+                                type="password"
+                                placeholder="••••••••••••••••"
+                                value={configData.ingestion?.multimodal_summarizer?.api_key || ""}
+                                onChange={(e) => handleUpdateConfigValue(["ingestion", "multimodal_summarizer", "api_key"], e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
+                              />
+                            </div>
 
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[11px] font-semibold flex items-center">
-                            API Base URL (optional)
-                            <InfoTooltip text="Vision Model connection endpoint URL base." />
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="https://api.openai.com/v1"
-                            value={configData.ingestion?.multimodal_summarizer?.base_url || ""}
-                            onChange={(e) => handleUpdateConfigValue(["ingestion", "multimodal_summarizer", "base_url"], e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
-                          />
-                        </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-[11px] font-semibold flex items-center">
+                                API Base URL (optional)
+                                <InfoTooltip text="Vision Model connection endpoint URL base." />
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="https://api.openai.com/v1"
+                                value={configData.ingestion?.multimodal_summarizer?.base_url || ""}
+                                onChange={(e) => handleUpdateConfigValue(["ingestion", "multimodal_summarizer", "base_url"], e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
+                              />
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
