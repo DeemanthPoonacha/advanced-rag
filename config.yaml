@@ -20,6 +20,11 @@ ingestion:
   parser:
     config: {}
     provider: unstructured
+  multimodal_summarizer:
+    model_name: "gpt-4o"
+    temperature: 0.0
+    api_key: null
+    base_url: null
 llm:
   provider: local
   config:

@@ -60,6 +60,7 @@ class ComponentFactory:
         Returns:
             An instance of the registered implementation class.
         """
+        import inspect
         klass = ComponentRegistry.get(component_type, provider)
         logger.info(
             "Building %s with provider '%s' -> %s",
@@ -67,7 +68,23 @@ class ComponentFactory:
             provider,
             klass.__name__,
         )
-        return klass(**config)
+        try:
+            sig = inspect.signature(klass)
+            has_var_keyword = any(
+                p.kind == inspect.Parameter.VAR_KEYWORD
+                for p in sig.parameters.values()
+            )
+            if not has_var_keyword:
+                filtered_config = {
+                    k: v for k, v in config.items()
+                    if k in sig.parameters
+                }
+            else:
+                filtered_config = config
+        except Exception:
+            filtered_config = config
+
+        return klass(**filtered_config)
 
     # ── Typed Builders ───────────────────────────────────────────────
 

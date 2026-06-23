@@ -49,10 +49,19 @@ export interface ParserSettings {
   config: Record<string, any>;
 }
 
+export interface MultimodalSummarizerConfig {
+  model_name: string;
+  temperature: number;
+  api_key?: string | null;
+  base_url?: string | null;
+  [key: string]: any;
+}
+
 export interface IngestionSettings {
   batch_size?: number;
   chunker?: ChunkerSettings;
   parser?: ParserSettings;
+  multimodal_summarizer?: MultimodalSummarizerConfig;
 }
 
 export interface ProjectSettings {

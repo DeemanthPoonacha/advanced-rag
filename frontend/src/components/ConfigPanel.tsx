@@ -168,7 +168,7 @@ export function ConfigPanel({
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[11px] font-semibold flex items-center">
                           Document Parser Provider
-                          <InfoTooltip text="Raw file parser algorithm (unstructured handles local; llamaparse is cloud-based)." />
+                          <InfoTooltip text="Raw file parser algorithm (unstructured handles local; llamaparse is cloud-based; multimodal_unstructured extracts layout elements/tables/images)." />
                         </label>
                         <select
                           value={configData.ingestion?.parser?.provider || "unstructured"}
@@ -177,8 +177,114 @@ export function ConfigPanel({
                         >
                           <option value="unstructured">Unstructured.io Parser</option>
                           <option value="llamaparse">LlamaParse Cloud API</option>
+                          <option value="multimodal_unstructured">Multimodal Unstructured Parser</option>
                         </select>
                       </div>
+
+                      {/* Conditional Parser Config */}
+                      {(configData.ingestion?.parser?.provider === "unstructured" ||
+                        configData.ingestion?.parser?.provider === "multimodal_unstructured") && (
+                        <div className="space-y-3 mt-3 pt-3 border-t border-dashed border-slate-100 dark:border-slate-800/50">
+                          <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Parser Config</h4>
+                          
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-semibold flex items-center">
+                              Parsing Strategy
+                              <InfoTooltip text="Parsing strategy. hi_res parses structures like tables/images; fast is simple text; ocr_only runs OCR." />
+                            </label>
+                            <select
+                              value={configData.ingestion?.parser?.config?.strategy || "hi_res"}
+                              onChange={(e) => handleUpdateConfigValue(["ingestion", "parser", "config", "strategy"], e.target.value)}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
+                            >
+                              <option value="hi_res">Hi-Res Structure Extract</option>
+                              <option value="fast">Fast Raw Text</option>
+                              <option value="ocr_only">OCR Only (Scans)</option>
+                            </select>
+                          </div>
+
+                          <div className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-950/40 border border-slate-200/50 dark:border-slate-800/50">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-semibold">Extract Images</span>
+                              <span className="text-[8px] text-slate-400 dark:text-slate-500">Attempt to partition and extract inline images</span>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={configData.ingestion?.parser?.config?.extract_images ?? (configData.ingestion?.parser?.provider === "multimodal_unstructured")}
+                                onChange={(e) => handleUpdateConfigValue(["ingestion", "parser", "config", "extract_images"], e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-8 h-4 bg-slate-300 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-semibold flex items-center">
+                              Languages (ISO codes, comma-separated)
+                              <InfoTooltip text="Languages to use for OCR text extraction (e.g. en,de)." />
+                            </label>
+                            <input
+                              type="text"
+                              value={(configData.ingestion?.parser?.config?.languages || ["en"]).join(", ")}
+                              onChange={(e) => {
+                                const list = e.target.value.split(",").map(x => x.trim()).filter(Boolean);
+                                handleUpdateConfigValue(["ingestion", "parser", "config", "languages"], list);
+                              }}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {configData.ingestion?.parser?.provider === "llamaparse" && (
+                        <div className="space-y-3 mt-3 pt-3 border-t border-dashed border-slate-100 dark:border-slate-800/50">
+                          <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">LlamaParse Config</h4>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-semibold flex items-center">
+                              Llama Cloud API Key
+                              <InfoTooltip text="Your personal Llama Cloud/LlamaParse token key." />
+                            </label>
+                            <input
+                              type="password"
+                              placeholder="••••••••••••••••"
+                              value={configData.ingestion?.parser?.config?.api_key || ""}
+                              onChange={(e) => handleUpdateConfigValue(["ingestion", "parser", "config", "api_key"], e.target.value)}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-950/40 border border-slate-200/50 dark:border-slate-800/50">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-semibold">Premium Mode</span>
+                              <span className="text-[8px] text-slate-400 dark:text-slate-500">Run premium parsing algorithms for highest quality</span>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={configData.ingestion?.parser?.config?.premium_mode ?? false}
+                                onChange={(e) => handleUpdateConfigValue(["ingestion", "parser", "config", "premium_mode"], e.target.checked)}
+                                className="sr-only peer"
+                              />
+                              <div className="w-8 h-4 bg-slate-300 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-semibold flex items-center">
+                              Natural Language Instructions
+                              <InfoTooltip text="Custom instructions directing the LLM parser on formatting or specific element extraction." />
+                            </label>
+                            <textarea
+                              rows={2}
+                              value={configData.ingestion?.parser?.config?.parsing_instruction || ""}
+                              onChange={(e) => handleUpdateConfigValue(["ingestion", "parser", "config", "parsing_instruction"], e.target.value)}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 resize-none font-sans"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -311,7 +417,7 @@ export function ConfigPanel({
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-semibold flex items-center">
                         Splitting Strategy
-                        <InfoTooltip text="Splitting algorithm. Semantic uses sentence differences; Recursive uses character counters." />
+                        <InfoTooltip text="Splitting algorithm. Semantic uses sentence differences; Recursive uses character counters; Multimodal Summarizer uses vision models." />
                       </label>
                       <select
                         value={configData.ingestion?.chunker?.provider || "semantic"}
@@ -321,35 +427,184 @@ export function ConfigPanel({
                         <option value="semantic">Semantic Chunker</option>
                         <option value="recursive">Recursive Character</option>
                         <option value="hierarchical">Hierarchical Parent-Child</option>
-                        <option value="fixed_size">Fixed Size Splitter</option>
+                        <option value="multimodal_summarizer">Multimodal Summarizer Chunker</option>
                       </select>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold flex items-center justify-between">
-                        <span className="flex items-center">
-                          Target Chunk Size (Chars)
-                          <InfoTooltip text="Maximum number of characters per document vector chunk." />
-                        </span>
-                        <span className="font-mono text-[11px] font-bold text-primary">
-                          {configData.ingestion?.chunker?.config?.target_chunk_size || 500}
-                        </span>
-                      </label>
-                      <input
-                        type="range"
-                        min="100"
-                        max="1500"
-                        step="50"
-                        value={configData.ingestion?.chunker?.config?.target_chunk_size || 500}
-                        onChange={(e) =>
-                          handleUpdateConfigValue(
-                            ["ingestion", "chunker", "config", "target_chunk_size"],
-                            parseInt(e.target.value)
-                          )
-                        }
-                        className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
-                      />
-                    </div>
+                    {/* Conditional Chunker Config (Main Controls) */}
+                    {configData.ingestion?.chunker?.provider === "semantic" && (
+                      <>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold flex items-center justify-between">
+                            <span className="flex items-center">
+                              Max Chunk Size (Chars)
+                              <InfoTooltip text="Maximum character size limit for a single semantic chunk." />
+                            </span>
+                            <span className="font-mono text-[11px] font-bold text-primary">
+                              {configData.ingestion?.chunker?.config?.max_chunk_size ?? 1024}
+                            </span>
+                          </label>
+                          <input
+                            type="range"
+                            min="100"
+                            max="2048"
+                            step="64"
+                            value={configData.ingestion?.chunker?.config?.max_chunk_size ?? 1024}
+                            onChange={(e) =>
+                              handleUpdateConfigValue(
+                                ["ingestion", "chunker", "config", "max_chunk_size"],
+                                parseInt(e.target.value)
+                              )
+                            }
+                            className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold flex items-center justify-between">
+                            <span className="flex items-center">
+                              Breakpoint Threshold
+                              <InfoTooltip text="Distance threshold for semantic splits (higher = more chunks)." />
+                            </span>
+                            <span className="font-mono text-[11px] font-bold text-primary">
+                              {(configData.ingestion?.chunker?.config?.breakpoint_threshold ?? 0.7).toFixed(2)}
+                            </span>
+                          </label>
+                          <input
+                            type="range"
+                            min="0.1"
+                            max="1.0"
+                            step="0.05"
+                            value={configData.ingestion?.chunker?.config?.breakpoint_threshold ?? 0.7}
+                            onChange={(e) =>
+                              handleUpdateConfigValue(
+                                ["ingestion", "chunker", "config", "breakpoint_threshold"],
+                                parseFloat(e.target.value)
+                              )
+                            }
+                            className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {configData.ingestion?.chunker?.provider === "recursive" && (
+                      <>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold flex items-center justify-between">
+                            <span className="flex items-center">
+                              Max Chunk Size (Chars)
+                              <InfoTooltip text="Maximum characters per chunk." />
+                            </span>
+                            <span className="font-mono text-[11px] font-bold text-primary">
+                              {configData.ingestion?.chunker?.config?.max_chunk_size ?? 1024}
+                            </span>
+                          </label>
+                          <input
+                            type="range"
+                            min="100"
+                            max="2048"
+                            step="64"
+                            value={configData.ingestion?.chunker?.config?.max_chunk_size ?? 1024}
+                            onChange={(e) =>
+                              handleUpdateConfigValue(
+                                ["ingestion", "chunker", "config", "max_chunk_size"],
+                                parseInt(e.target.value)
+                              )
+                            }
+                            className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold flex items-center justify-between">
+                            <span className="flex items-center">
+                              Chunk Overlap (Chars)
+                              <InfoTooltip text="Overlap characters between successive chunks to keep context." />
+                            </span>
+                            <span className="font-mono text-[11px] font-bold text-primary">
+                              {configData.ingestion?.chunker?.config?.chunk_overlap ?? 200}
+                            </span>
+                          </label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1000"
+                            step="20"
+                            value={configData.ingestion?.chunker?.config?.chunk_overlap ?? 200}
+                            onChange={(e) =>
+                              handleUpdateConfigValue(
+                                ["ingestion", "chunker", "config", "chunk_overlap"],
+                                parseInt(e.target.value)
+                              )
+                            }
+                            className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {configData.ingestion?.chunker?.provider === "hierarchical" && (
+                      <>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold flex items-center justify-between">
+                            <span className="flex items-center">
+                              Parent Chunk Size
+                              <InfoTooltip text="Maximum character size of parent chunks." />
+                            </span>
+                            <span className="font-mono text-[11px] font-bold text-primary">
+                              {configData.ingestion?.chunker?.config?.parent_chunk_size ?? 2048}
+                            </span>
+                          </label>
+                          <input
+                            type="range"
+                            min="200"
+                            max="4096"
+                            step="128"
+                            value={configData.ingestion?.chunker?.config?.parent_chunk_size ?? 2048}
+                            onChange={(e) =>
+                              handleUpdateConfigValue(
+                                ["ingestion", "chunker", "config", "parent_chunk_size"],
+                                parseInt(e.target.value)
+                              )
+                            }
+                            className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold flex items-center justify-between">
+                            <span className="flex items-center">
+                              Child Chunk Size
+                              <InfoTooltip text="Maximum character size of child chunks." />
+                            </span>
+                            <span className="font-mono text-[11px] font-bold text-primary">
+                              {configData.ingestion?.chunker?.config?.child_chunk_size ?? 512}
+                            </span>
+                          </label>
+                          <input
+                            type="range"
+                            min="50"
+                            max="1024"
+                            step="32"
+                            value={configData.ingestion?.chunker?.config?.child_chunk_size ?? 512}
+                            onChange={(e) =>
+                              handleUpdateConfigValue(
+                                ["ingestion", "chunker", "config", "child_chunk_size"],
+                                parseInt(e.target.value)
+                              )
+                            }
+                            className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {configData.ingestion?.chunker?.provider === "multimodal_summarizer" && (
+                      <p className="text-xs text-slate-500 leading-normal border border-dashed border-slate-200 dark:border-slate-800 p-2.5 rounded-lg">
+                        You have selected the Multimodal Summarizer directly. This chunker will summarize all document elements using vision language models. Configure parameters in the multimodal section below.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -360,42 +615,203 @@ export function ConfigPanel({
                     onClick={() => toggleSection("chunker-advanced")}
                     className="flex items-center justify-between w-full text-xs font-bold text-slate-400 dark:text-slate-500 hover:text-primary dark:hover:text-primary transition cursor-pointer"
                   >
-                    <span>Advanced Settings</span>
+                    <span>Advanced & Multimodal Chunker Settings</span>
                     {expandedSections["chunker-advanced"] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
 
                   {expandedSections["chunker-advanced"] && (
-                    <div className="space-y-3 mt-3 pt-3 border-t border-dashed border-slate-100 dark:border-slate-800/50">
+                    <div className="space-y-4 mt-3 pt-3 border-t border-dashed border-slate-100 dark:border-slate-800/50">
+                      {/* Chunker-specific advanced fields */}
                       {configData.ingestion?.chunker?.provider === "semantic" && (
+                        <div className="space-y-3">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-semibold flex items-center justify-between">
+                              <span className="flex items-center">
+                                Min Chunk Size (Chars)
+                                <InfoTooltip text="Minimum character size of a semantic chunk." />
+                              </span>
+                              <span className="font-mono text-[11px] font-bold text-primary">
+                                {configData.ingestion?.chunker?.config?.min_chunk_size ?? 128}
+                              </span>
+                            </label>
+                            <input
+                              type="range"
+                              min="10"
+                              max="512"
+                              step="10"
+                              value={configData.ingestion?.chunker?.config?.min_chunk_size ?? 128}
+                              onChange={(e) =>
+                                handleUpdateConfigValue(
+                                  ["ingestion", "chunker", "config", "min_chunk_size"],
+                                  parseInt(e.target.value)
+                                )
+                              }
+                              className="w-full accent-primary h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-semibold flex items-center justify-between">
+                              <span className="flex items-center">
+                                Semantic Buffer Size
+                                <InfoTooltip text="Number of sentence lookaheads to evaluate semantic boundary splits." />
+                              </span>
+                              <span className="font-mono text-[11px] font-bold text-primary">
+                                {configData.ingestion?.chunker?.config?.buffer_size ?? 1}
+                              </span>
+                            </label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="5"
+                              step="1"
+                              value={configData.ingestion?.chunker?.config?.buffer_size ?? 1}
+                              onChange={(e) =>
+                                handleUpdateConfigValue(
+                                  ["ingestion", "chunker", "config", "buffer_size"],
+                                  parseInt(e.target.value)
+                                )
+                              }
+                              className="w-full accent-primary h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {configData.ingestion?.chunker?.provider === "recursive" && (
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal">
+                          Recursive character chunker recursively splits using a hierarchy of separators (paragraphs, sentences, words, etc.) to keep semantic blocks together.
+                        </p>
+                      )}
+
+                      {configData.ingestion?.chunker?.provider === "hierarchical" && (
+                        <div className="space-y-3">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-semibold flex items-center justify-between">
+                              <span className="flex items-center">
+                                Parent Overlap
+                              </span>
+                              <span className="font-mono text-[10px] font-bold text-primary">
+                                {configData.ingestion?.chunker?.config?.parent_overlap ?? 256}
+                              </span>
+                            </label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="1024"
+                              step="32"
+                              value={configData.ingestion?.chunker?.config?.parent_overlap ?? 256}
+                              onChange={(e) =>
+                                handleUpdateConfigValue(
+                                  ["ingestion", "chunker", "config", "parent_overlap"],
+                                  parseInt(e.target.value)
+                                )
+                              }
+                              className="w-full accent-primary h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                            />
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-semibold flex items-center justify-between">
+                              <span className="flex items-center">
+                                Child Overlap
+                              </span>
+                              <span className="font-mono text-[10px] font-bold text-primary">
+                                {configData.ingestion?.chunker?.config?.child_overlap ?? 64}
+                              </span>
+                            </label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="256"
+                              step="8"
+                              value={configData.ingestion?.chunker?.config?.child_overlap ?? 64}
+                              onChange={(e) =>
+                                handleUpdateConfigValue(
+                                  ["ingestion", "chunker", "config", "child_overlap"],
+                                  parseInt(e.target.value)
+                                )
+                              }
+                              className="w-full accent-primary h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Multimodal Vision Summarizer Global Section */}
+                      <div className="space-y-3 pt-3 border-t border-dashed border-slate-100 dark:border-slate-800/50">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Multimodal Summarizer Config</h4>
+                          <span className="text-[8px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-extrabold tracking-widest uppercase">Vision</span>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-semibold flex items-center">
+                            LLM Model Name
+                            <InfoTooltip text="Vision Model identifier used to summarize tables and images (e.g. gpt-4o, gpt-4o-mini)." />
+                          </label>
+                          <input
+                            type="text"
+                            value={configData.ingestion?.multimodal_summarizer?.model_name || "gpt-4o"}
+                            onChange={(e) => handleUpdateConfigValue(["ingestion", "multimodal_summarizer", "model_name"], e.target.value)}
+                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
+                          />
+                        </div>
+
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-semibold flex items-center justify-between">
                             <span className="flex items-center">
-                              Semantic Buffer Size
-                              <InfoTooltip text="Number of sentence lookaheads to evaluate semantic boundary splits." />
+                              Temperature
+                              <InfoTooltip text="Generation temperature settings for Vision summaries." />
                             </span>
-                            <span className="font-mono text-[11px] font-bold text-primary">
-                              {configData.ingestion?.chunker?.config?.buffer_size ?? 1}
+                            <span className="font-mono text-[10px] font-bold text-primary">
+                              {(configData.ingestion?.multimodal_summarizer?.temperature ?? 0.0).toFixed(2)}
                             </span>
                           </label>
                           <input
                             type="range"
-                            min="0"
-                            max="5"
-                            step="1"
-                            value={configData.ingestion?.chunker?.config?.buffer_size ?? 1}
+                            min="0.0"
+                            max="1.0"
+                            step="0.05"
+                            value={configData.ingestion?.multimodal_summarizer?.temperature ?? 0.0}
                             onChange={(e) =>
                               handleUpdateConfigValue(
-                                ["ingestion", "chunker", "config", "buffer_size"],
-                                parseInt(e.target.value)
+                                ["ingestion", "multimodal_summarizer", "temperature"],
+                                parseFloat(e.target.value)
                               )
                             }
                             className="w-full accent-primary h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
                           />
                         </div>
-                      )}
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal">
-                        Ingestion settings regulate how long documents are sliced into dense contextual snippets prior to database storage.
-                      </p>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-semibold flex items-center">
+                            API authorization Key (optional)
+                            <InfoTooltip text="Vision Model authorization API Key. Overrides global keys." />
+                          </label>
+                          <input
+                            type="password"
+                            placeholder="••••••••••••••••"
+                            value={configData.ingestion?.multimodal_summarizer?.api_key || ""}
+                            onChange={(e) => handleUpdateConfigValue(["ingestion", "multimodal_summarizer", "api_key"], e.target.value)}
+                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-semibold flex items-center">
+                            API Base URL (optional)
+                            <InfoTooltip text="Vision Model connection endpoint URL base." />
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="https://api.openai.com/v1"
+                            value={configData.ingestion?.multimodal_summarizer?.base_url || ""}
+                            onChange={(e) => handleUpdateConfigValue(["ingestion", "multimodal_summarizer", "base_url"], e.target.value)}
+                            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100"
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
