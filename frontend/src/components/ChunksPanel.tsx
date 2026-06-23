@@ -42,7 +42,7 @@ export function ChunksPanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/chunks?limit=250`);
+      const res = await fetch(`${API_BASE}/api/chunks?limit=10000`);
       if (res.ok) {
         const data = await res.json();
         setChunks(data.chunks || []);

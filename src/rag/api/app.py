@@ -378,12 +378,20 @@ async def parse_config_yaml(req: ConfigUpdateRequest):
         raise HTTPException(status_code=500, detail=f"Failed to parse yaml: {str(e)}")
 
 @app.get("/api/chunks")
-async def get_all_chunks(limit: int = 100):
+async def get_all_chunks(limit: int = 10000):
     global orchestrator, use_mock_mode
     if not orchestrator:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Orchestrator not initialized. Error: {init_error}"
+        )
+    
+    try:
+        await orchestrator.initialize()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to initialize pipeline: {str(e)}"
         )
     
     if use_mock_mode:
@@ -414,30 +422,43 @@ async def get_all_chunks(limit: int = 100):
         client = db._get_client()
         collection_name = db._collection_name
         
-        # Scroll points from Qdrant collection
-        records, _ = await client.scroll(
-            collection_name=collection_name,
-            limit=limit,
-            with_payload=True,
-            with_vectors=False
-        )
-        
         chunks_list = []
-        for record in records:
-            payload = record.payload or {}
-            chunks_list.append({
-                "id": str(record.id),
-                "content": payload.get("content", ""),
-                "document_id": payload.get("document_id", ""),
-                "chunk_index": payload.get("chunk_index", 0),
-                "metadata": {
-                    "source": payload.get("source", payload.get("file_name", "")),
-                    "file_name": payload.get("filename") or payload.get("file_name", ""),
-                    "file_type": payload.get("file_type", ""),
-                    "language": payload.get("language", "en"),
-                },
-                "token_count": payload.get("token_count", 0)
-            })
+        offset = None
+        has_more = True
+        
+        while has_more:
+            # Fetch in batches of up to 1000 to keep it efficient
+            scroll_limit = min(limit - len(chunks_list), 1000) if limit else 1000
+            if scroll_limit <= 0:
+                break
+                
+            records, offset = await client.scroll(
+                collection_name=collection_name,
+                limit=scroll_limit,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False
+            )
+            
+            for record in records:
+                payload = record.payload or {}
+                chunks_list.append({
+                    "id": str(record.id),
+                    "content": payload.get("content", ""),
+                    "document_id": payload.get("document_id", ""),
+                    "chunk_index": payload.get("chunk_index", 0),
+                    "metadata": {
+                        "source": payload.get("source", payload.get("file_name", "")),
+                        "file_name": payload.get("filename") or payload.get("file_name", ""),
+                        "file_type": payload.get("file_type", ""),
+                        "language": payload.get("language", "en"),
+                    },
+                    "token_count": payload.get("token_count", 0)
+                })
+                
+            if not offset or len(records) < scroll_limit or (limit and len(chunks_list) >= limit):
+                has_more = False
+                
         return {
             "status": "success",
             "chunks": chunks_list
@@ -620,3 +641,62 @@ async def ingest_files(
                     f.unlink()
                 except Exception:
                     pass
+
+@app.delete("/api/documents/{filename}")
+async def delete_document(filename: str):
+    global orchestrator, use_mock_mode
+    if not orchestrator:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Orchestrator not initialized."
+        )
+
+    if use_mock_mode:
+        db = orchestrator.vector_store
+        storage = getattr(db, "storage", [])
+        new_storage = []
+        deleted_count = 0
+        for c in storage:
+            c_source = getattr(c.metadata, "source", "")
+            c_file_name = getattr(c.metadata, "file_name", "")
+            c_custom = getattr(c.metadata, "custom", {}) or {}
+            c_filename = c_custom.get("filename", "")
+            
+            if filename in [c_source, c_file_name, c_filename]:
+                deleted_count += 1
+                continue
+            new_storage.append(c)
+        db.storage = new_storage
+        return {
+            "status": "success",
+            "message": f"Successfully deleted mock document '{filename}' ({deleted_count} chunks removed)."
+        }
+
+    try:
+        db = orchestrator.vector_store
+        client = db._get_client()
+        collection_name = db._collection_name
+        
+        from qdrant_client.models import FilterSelector, Filter, FieldCondition, MatchValue
+        
+        for key in ["filename", "file_name"]:
+            await client.delete(
+                collection_name=collection_name,
+                points_selector=FilterSelector(
+                    filter=Filter(
+                        must=[
+                            FieldCondition(
+                                key=key,
+                                match=MatchValue(value=filename)
+                            )
+                        ]
+                    )
+                )
+            )
+            
+        return {
+            "status": "success",
+            "message": f"Successfully deleted document '{filename}' from vector store."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")

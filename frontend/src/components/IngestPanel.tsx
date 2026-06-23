@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   X,
   UploadCloud, 
@@ -11,7 +11,8 @@ import {
   Eye,
   Info,
   Sparkle,
-  Search
+  Search,
+  Trash2
 } from "lucide-react";
 import { RAGStatus, UploadLog } from "../types";
 
@@ -21,6 +22,7 @@ interface IngestPanelProps {
   uploadLogs: UploadLog[];
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
+  handleDeleteFile: (filename: string) => Promise<void>;
 }
 
 interface ChunkData {
@@ -56,6 +58,7 @@ export function IngestPanel({
   uploadLogs,
   handleFileUpload,
   fileInputRef,
+  handleDeleteFile,
 }: IngestPanelProps) {
   const [wizardActive, setWizardActive] = useState(false);
   const [activeStep, setActiveStep] = useState<number>(1);
@@ -64,7 +67,7 @@ export function IngestPanel({
   const [searchQuery, setSearchQuery] = useState("");
 
   // Sample files that are processed during ingestion simulation
-  const [files] = useState<ProcessingFile[]>([
+  const [files, setFiles] = useState<ProcessingFile[]>([
     {
       id: "f1",
       name: "attention-is-all-you-need.pdf",
@@ -227,18 +230,19 @@ export function IngestPanel({
 
   const [apiChunks, setApiChunks] = useState<any[]>([]);
 
-  useEffect(() => {
-    const fetchChunks = async () => {
-      try {
-        const res = await fetch("http://localhost:8000/api/chunks?limit=250");
-        if (res.ok) {
-          const data = await res.json();
-          setApiChunks(data.chunks || []);
-        }
-      } catch (e) {
-        console.error("Failed to fetch API chunks", e);
+  const fetchChunks = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/api/chunks?limit=10000");
+      if (res.ok) {
+        const data = await res.json();
+        setApiChunks(data.chunks || []);
       }
-    };
+    } catch (e) {
+      console.error("Failed to fetch API chunks", e);
+    }
+  };
+
+  useEffect(() => {
     fetchChunks();
   }, [uploadLogs, status]);
 
@@ -261,61 +265,67 @@ export function IngestPanel({
     isMock: true,
   }));
 
-  const uploadedFilesList = uploadLogs.map((log, idx) => {
-    const matchedChunks = apiChunks.filter((c) => {
-      const docName = (c.metadata?.file_name || c.metadata?.source || "").toLowerCase();
-      const logName = log.filename.toLowerCase();
-      const cleanDoc = docName.split("/").pop() || "";
-      const cleanLog = logName.split("/").pop() || "";
-      return (
-        cleanDoc === cleanLog ||
-        cleanDoc.endsWith(cleanLog) ||
-        cleanLog.endsWith(cleanDoc)
-      );
+  const uploadedFilesList = useMemo(() => {
+    const allUniqueFilenames = Array.from(new Set([
+      ...uploadLogs.map(l => l.filename),
+      ...apiChunks.map(c => {
+        const docName = c.metadata?.file_name || c.metadata?.source || "";
+        return docName.split(/[/\\]/).pop() || "";
+      }).filter(Boolean)
+    ]));
+
+    return allUniqueFilenames.map((filename, idx) => {
+      const log = uploadLogs.find(l => l.filename.toLowerCase() === filename.toLowerCase());
+      
+      const matchedChunks = apiChunks.filter((c) => {
+        const docName = (c.metadata?.file_name || c.metadata?.source || "").toLowerCase();
+        const cleanDoc = docName.split(/[/\\]/).pop() || "";
+        return cleanDoc === filename.toLowerCase();
+      });
+
+      const formattedChunks = matchedChunks.map((c, cIdx) => ({
+        id: c.id || `${filename}-chunk-${cIdx}`,
+        page: c.metadata?.page_number || 1,
+        type: (c.metadata?.file_type === "image" || c.metadata?.image_extracted)
+          ? ("image" as const)
+          : c.metadata?.table_extracted
+          ? ("table" as const)
+          : ("text" as const),
+        snippet: c.content ? (c.content.length > 120 ? c.content.substring(0, 120) + "..." : c.content) : "",
+        originalText: c.content || "",
+        summaryText: c.metadata?.summary_text || "",
+        isRaw: !c.metadata?.summary_text,
+        metadata: c.metadata || {},
+      }));
+
+      const textCount = formattedChunks.filter(c => c.type === "text").length;
+      const tableCount = formattedChunks.filter(c => c.type === "table").length;
+      const imageCount = formattedChunks.filter(c => c.type === "image").length;
+      const titleCount = formattedChunks.filter(c => c.metadata?.title_extracted).length;
+      const otherCount = 0;
+      const totalChunks = formattedChunks.length || (log ? log.chunks_count : 0);
+      const totalElements = textCount + tableCount + imageCount || totalChunks || 1;
+      const summarizedChunks = formattedChunks.filter(c => !c.isRaw).length;
+
+      return {
+        id: log ? `uploaded-${uploadLogs.indexOf(log)}-${filename}` : `db-${idx}-${filename}`,
+        name: filename,
+        size: "N/A",
+        status: "completed" as const,
+        uploadTime: log ? log.date : "Database Ingested",
+        textCount,
+        tableCount,
+        imageCount,
+        titleCount,
+        otherCount,
+        totalElements,
+        totalChunks,
+        summarizedChunks,
+        chunks: formattedChunks,
+        isMock: false,
+      };
     });
-
-    const formattedChunks = matchedChunks.map((c, cIdx) => ({
-      id: c.id || `${log.filename}-chunk-${cIdx}`,
-      page: c.metadata?.page_number || 1,
-      type: (c.metadata?.file_type === "image" || c.metadata?.image_extracted)
-        ? ("image" as const)
-        : c.metadata?.table_extracted
-        ? ("table" as const)
-        : ("text" as const),
-      snippet: c.content ? (c.content.length > 120 ? c.content.substring(0, 120) + "..." : c.content) : "",
-      originalText: c.content || "",
-      summaryText: c.metadata?.summary_text || "",
-      isRaw: !c.metadata?.summary_text,
-      metadata: c.metadata || {},
-    }));
-
-    const textCount = formattedChunks.filter(c => c.type === "text").length;
-    const tableCount = formattedChunks.filter(c => c.type === "table").length;
-    const imageCount = formattedChunks.filter(c => c.type === "image").length;
-    const titleCount = formattedChunks.filter(c => c.metadata?.title_extracted).length;
-    const otherCount = 0;
-    const totalChunks = formattedChunks.length || log.chunks_count || 0;
-    const totalElements = textCount + tableCount + imageCount || totalChunks || 1;
-    const summarizedChunks = formattedChunks.filter(c => !c.isRaw).length;
-
-    return {
-      id: `uploaded-${idx}-${log.filename}`,
-      name: log.filename,
-      size: "N/A",
-      status: "completed" as const,
-      uploadTime: log.date,
-      textCount,
-      tableCount,
-      imageCount,
-      titleCount,
-      otherCount,
-      totalElements,
-      totalChunks,
-      summarizedChunks,
-      chunks: formattedChunks,
-      isMock: false,
-    };
-  });
+  }, [uploadLogs, apiChunks]);
 
   const isMockMode = status?.mock_mode || false;
   const allFiles = isMockMode ? [...uploadedFilesList, ...mockFilesList] : uploadedFilesList;
@@ -494,14 +504,28 @@ export function IngestPanel({
     setRagSearchQuery("");
     setRagSearchResults(null);
     setRagSearchError(null);
+    fetchChunks();
   };
 
   useEffect(() => {
     if (!ragSearchQuery.trim()) {
       setRagSearchResults(null);
       setRagSearchError(null);
+      fetchChunks();
     }
   }, [ragSearchQuery]);
+
+  const onDeleteFileClick = async (filename: string, isMockFile: boolean) => {
+    if (isMockFile) {
+      if (window.confirm(`Are you sure you want to permanently delete mock document "${filename}"?`)) {
+        setFiles(prev => prev.filter(f => f.name !== filename));
+      }
+    } else {
+      if (window.confirm(`Are you sure you want to permanently delete document "${filename}" and all its vector chunks?`)) {
+        await handleDeleteFile(filename);
+      }
+    }
+  };
 
   const closeWizard = () => {
     setWizardActive(false);
@@ -875,6 +899,18 @@ export function IngestPanel({
                                       title="Open Multi-Step Processing Pipeline Visualizer"
                                     >
                                       Details
+                                    </button>
+
+                                    {/* Delete Button */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onDeleteFileClick(file.name, !!file.isMock);
+                                      }}
+                                      className="ml-1.5 p-1.5 hover:bg-rose-500/10 dark:hover:bg-rose-500/20 text-slate-400 hover:text-rose-500 rounded-lg transition-all cursor-pointer flex items-center justify-center shrink-0"
+                                      title="Delete document and all its chunks"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                   </div>
                                 </div>

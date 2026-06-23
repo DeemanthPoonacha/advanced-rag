@@ -70,7 +70,10 @@ export default function App() {
   const [configData, setConfigData] = useState<PipelineConfig | null>(null);
   const [editMode, setEditMode] = useState<"visual" | "yaml">("visual");
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadLogs, setUploadLogs] = useState<UploadLog[]>([]);
+  const [uploadLogs, setUploadLogs] = useState<UploadLog[]>(() => {
+    const saved = localStorage.getItem("rag_upload_logs");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [toast, setToast] = useState<ToastState | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [streamResponse, setStreamResponse] = useState(true);
@@ -90,6 +93,10 @@ export default function App() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isGenerating]);
+
+  useEffect(() => {
+    localStorage.setItem("rag_upload_logs", JSON.stringify(uploadLogs));
+  }, [uploadLogs]);
 
   useEffect(() => {
     if (toast) {
@@ -238,6 +245,24 @@ export default function App() {
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteFile = async (filename: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/documents/${encodeURIComponent(filename)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(data.message || `Deleted successfully!`, "success");
+        setUploadLogs((prev) => prev.filter((log) => log.filename !== filename));
+        fetchStatus(); // Refresh vector count
+      } else {
+        showToast(data.detail || "Delete failed", "error");
+      }
+    } catch (e) {
+      showToast("Delete failed due to connection error", "error");
     }
   };
 
@@ -461,6 +486,7 @@ export default function App() {
               uploadLogs={uploadLogs}
               handleFileUpload={handleFileUpload}
               fileInputRef={fileInputRef}
+              handleDeleteFile={handleDeleteFile}
             />
           )}
 
