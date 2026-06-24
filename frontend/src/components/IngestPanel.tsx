@@ -252,6 +252,8 @@ export function IngestPanel({
       const res = await fetch("http://localhost:8000/api/chunks?limit=10000");
       if (res.ok) {
         const data = await res.json();
+        console.log("CHUNKS::",data.chunks);
+        
         setApiChunks(data.chunks || []);
       }
     } catch (e) {

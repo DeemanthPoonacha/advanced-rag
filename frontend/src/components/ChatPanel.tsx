@@ -192,8 +192,9 @@ export function ChatPanel({
   
   const cleanAiResponse=(text:string)=>{
     return text
-      .replace(/\s+\*\s+\*\*/g, "\n\n- **")
+      .replace(/\s+\*\s+\*\*/g, "\n\n-  **")
       .replace(/ \* /g, "\n- ")
+      .replace(/\s\*\*\s/g, "**")
       .trim();
   }
 

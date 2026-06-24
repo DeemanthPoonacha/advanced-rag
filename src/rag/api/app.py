@@ -423,11 +423,19 @@ async def get_all_chunks(limit: int = 10000):
                     "language": meta_dict.get("language", "en"),
                     "page_number": meta_dict.get("page_number"),
                     "total_pages": meta_dict.get("total_pages"),
-                    **{k: v for k, v in meta_dict.items() if k not in ["source", "file_name", "file_type", "language", "page_number", "total_pages", "custom"]},
+                    "chunk_index": c.chunk_index,
+                    **{k: v for k, v in meta_dict.items() if k not in ["source", "file_name", "file_type", "language", "page_number", "total_pages", "chunk_index", "custom"]},
                     **custom
                 },
                 "token_count": c.token_count
             })
+        chunks_list.sort(
+            key=lambda c: (
+                c["metadata"].get("file_name") or "",
+                c["metadata"].get("page_number") or 0,
+                c.get("chunk_index") or 0
+            )
+        )
         return {
             "status": "success",
             "chunks": chunks_list
@@ -465,6 +473,7 @@ async def get_all_chunks(limit: int = 10000):
                     "language": payload.get("language", "en"),
                     "page_number": payload.get("page_number"),
                     "total_pages": payload.get("total_pages"),
+                    "chunk_index": payload.get("chunk_index", 0),
                 }
                 
                 # Unpack everything else except the core chunk fields
@@ -485,6 +494,13 @@ async def get_all_chunks(limit: int = 10000):
             if not offset or len(records) < scroll_limit or (limit and len(chunks_list) >= limit):
                 has_more = False
                 
+        chunks_list.sort(
+            key=lambda c: (
+                c["metadata"].get("file_name") or "",
+                c["metadata"].get("page_number") or 0,
+                c.get("chunk_index") or 0
+            )
+        )
         return {
             "status": "success",
             "chunks": chunks_list
