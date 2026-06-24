@@ -7,10 +7,8 @@ evaluation: null
 generation:
   include_sources: true
   max_context_chunks: 5
-  prompt_template: 'Context: {context}
-
-    Question: {query}'
-  system_prompt: You are a helpful assistant.
+  prompt_template: "Context:\n{context}\n\nQuestion: {query}\n\nAnswer (in well-structured Markdown):"
+  system_prompt: You are a helpful, professional assistant. Always structure your responses using clean, readable valid GitHub-flavored Markdown (headings, lists, bold text, tables, and code blocks) where appropriate.
 guardrails:
   enabled: true
   input: null

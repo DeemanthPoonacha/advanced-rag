@@ -8,9 +8,15 @@ import {
   Zap,
   ChevronLeft,
   ChevronRight,
-  Database
+  Database,
+  Plus,
+  MessageSquare,
+  Trash2,
+  Edit2,
+  Check,
+  X
 } from "lucide-react";
-import { RAGStatus } from "../types";
+import { RAGStatus, Conversation } from "../types";
 
 interface SidebarProps {
   activePage: "chat" | "ingest" | "config";
@@ -19,6 +25,12 @@ interface SidebarProps {
   handleToggleMock: (checked: boolean) => void;
   isDarkMode: boolean;
   toggleTheme: () => void;
+  conversations: Conversation[];
+  activeConversationId: string;
+  setActiveConversationId: (id: string) => void;
+  onNewConversation: () => void;
+  onDeleteConversation: (id: string) => void;
+  onRenameConversation: (id: string, title: string) => void;
 }
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
@@ -32,6 +44,12 @@ export function Sidebar({
   handleToggleMock,
   isDarkMode,
   toggleTheme,
+  conversations,
+  activeConversationId,
+  setActiveConversationId,
+  onNewConversation,
+  onDeleteConversation,
+  onRenameConversation,
 }: SidebarProps) {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem("sidebar_width");
@@ -114,7 +132,7 @@ export function Sidebar({
       {/* Navigation Tabs */}
       <nav
         className={cn(
-          "flex-1 py-4 flex flex-col gap-1.5",
+          "shrink-0 py-4 flex flex-col gap-1.5 border-b border-slate-200/50 dark:border-slate-800/60",
           sidebarCollapsed ? "px-2 items-center" : "px-3"
         )}
       >
@@ -169,6 +187,53 @@ export function Sidebar({
           {!sidebarCollapsed && <span>Pipeline Config</span>}
         </button>
       </nav>
+
+      {/* Conversations List */}
+      {activePage === "chat" && !sidebarCollapsed && (
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden py-3">
+          <div className="px-4 mb-2 flex items-center justify-between shrink-0">
+            <span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 tracking-wider">
+              Recent Chats
+            </span>
+            <button
+              onClick={onNewConversation}
+              className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-primary hover:text-primary-hover transition-colors cursor-pointer"
+              title="New Chat"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin">
+            {conversations.map((conv) => (
+              <ConversationItem
+                key={conv.id}
+                conversation={conv}
+                isActive={conv.id === activeConversationId}
+                onClick={() => setActiveConversationId(conv.id)}
+                onDelete={() => onDeleteConversation(conv.id)}
+                onRename={(title) => onRenameConversation(conv.id, title)}
+              />
+            ))}
+            {conversations.length === 0 && (
+              <div className="text-center py-8 text-[11px] text-slate-400 dark:text-slate-500">
+                No recent chats
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activePage === "chat" && sidebarCollapsed && (
+        <div className="py-2 flex flex-col items-center shrink-0 border-b border-slate-200/50 dark:border-slate-800/60">
+          <button
+            onClick={onNewConversation}
+            className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-805 flex items-center justify-center text-primary hover:text-primary-hover shadow-sm transition-all cursor-pointer"
+            title="New Chat"
+          >
+            <Plus size={16} />
+          </button>
+        </div>
+      )}
 
       {/* Telemetry/Status Footer */}
       <div
@@ -264,6 +329,126 @@ export function Sidebar({
           <ChevronLeft size={10} />
         )}
       </button>
+    </div>
+  );
+}
+
+interface ConversationItemProps {
+  conversation: Conversation;
+  isActive: boolean;
+  onClick: () => void;
+  onDelete: () => void;
+  onRename: (title: string) => void;
+}
+
+function ConversationItem({
+  conversation,
+  isActive,
+  onClick,
+  onDelete,
+  onRename,
+}: ConversationItemProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(conversation.title);
+
+  useEffect(() => {
+    setEditTitle(conversation.title);
+  }, [conversation.title]);
+
+  const handleSaveRename = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (editTitle.trim()) {
+      onRename(editTitle.trim());
+      setIsEditing(false);
+    }
+  };
+
+  const handleCancelRename = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditTitle(conversation.title);
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      if (editTitle.trim()) {
+        onRename(editTitle.trim());
+        setIsEditing(false);
+      }
+    } else if (e.key === "Escape") {
+      setEditTitle(conversation.title);
+      setIsEditing(false);
+    }
+  };
+
+  return (
+    <div
+      onClick={isEditing ? undefined : onClick}
+      className={cn(
+        "group flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium cursor-pointer transition-all duration-150 border border-transparent select-none",
+        isActive
+          ? "bg-slate-100 dark:bg-slate-800/80 text-slate-900 dark:text-white font-semibold"
+          : "text-slate-650 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-850/50"
+      )}
+    >
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <MessageSquare size={13} className={isActive ? "text-primary animate-pulse" : "text-slate-400"} />
+        {isEditing ? (
+          <input
+            type="text"
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            className="flex-1 bg-white dark:bg-slate-950 border border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary rounded px-1.5 py-0.5 text-[11px] text-slate-900 dark:text-slate-100"
+            autoFocus
+          />
+        ) : (
+          <span className="truncate pr-1 text-[11px]">{conversation.title}</span>
+        )}
+      </div>
+      
+      {!isEditing && (
+        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity shrink-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsEditing(true);
+            }}
+            className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+            title="Rename Chat"
+          >
+            <Edit2 size={11} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="p-0.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/30 text-slate-400 hover:text-rose-500"
+            title="Delete Chat"
+          >
+            <Trash2 size={11} />
+          </button>
+        </div>
+      )}
+
+      {isEditing && (
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            onClick={handleSaveRename}
+            className="p-0.5 rounded hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-500"
+          >
+            <Check size={11} />
+          </button>
+          <button
+            onClick={handleCancelRename}
+            className="p-0.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-500"
+          >
+            <X size={11} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

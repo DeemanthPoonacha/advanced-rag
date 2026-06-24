@@ -511,6 +511,7 @@ class RAGPipelineOrchestrator:
         user_query: str,
         ground_truth: str | None = None,
         metadata: dict[str, Any] | None = None,
+        attachments: list[dict[str, Any]] | None = None,
     ) -> GenerationResult:
         """Run the end-to-end query, retrieval, generation, and validation pipeline.
 
@@ -518,6 +519,7 @@ class RAGPipelineOrchestrator:
             user_query: User query question text.
             ground_truth: Optional reference answer (used for evaluation).
             metadata: Custom metadata passed to the query context.
+            attachments: Optional context-specific file or image attachments.
 
         Returns:
             The complete validation-tested GenerationResult.
@@ -595,6 +597,29 @@ class RAGPipelineOrchestrator:
             
         context_str = "\n\n".join(context_parts)
 
+        # Process conversation-level attachments
+        attachment_text_parts = []
+        if attachments:
+            for att in attachments:
+                att_name = att.get("filename", "attached_file")
+                att_content = att.get("content", "")
+                att_type = att.get("file_type", "")
+                att_base64 = att.get("base64")
+                extracted_imgs = att.get("extracted_images", [])
+
+                if att_content:
+                    attachment_text_parts.append(f"Attached File: {att_name}\nContent:\n{att_content}")
+                
+                if att_base64 and (att_type.startswith("image/") or "image" in att_type.lower()):
+                    images.append(att_base64)
+                
+                if extracted_imgs:
+                    images.extend(extracted_imgs)
+
+        if attachment_text_parts:
+            attachment_context = "\n\n=== User Attached Files ===\n" + "\n\n".join(attachment_text_parts)
+            context_str = (context_str + attachment_context) if context_str else attachment_context
+
         prompt = self.config.generation.prompt_template.format(
             context=context_str,
             query=user_query,
@@ -671,6 +696,7 @@ class RAGPipelineOrchestrator:
         self,
         user_query: str,
         metadata: dict[str, Any] | None = None,
+        attachments: list[dict[str, Any]] | None = None,
     ) -> AsyncIterator[str]:
         """Stream generated response tokens.
 
@@ -723,6 +749,29 @@ class RAGPipelineOrchestrator:
             images.extend(images_base64)
             
         context_str = "\n\n".join(context_parts)
+
+        # Process conversation-level attachments
+        attachment_text_parts = []
+        if attachments:
+            for att in attachments:
+                att_name = att.get("filename", "attached_file")
+                att_content = att.get("content", "")
+                att_type = att.get("file_type", "")
+                att_base64 = att.get("base64")
+                extracted_imgs = att.get("extracted_images", [])
+
+                if att_content:
+                    attachment_text_parts.append(f"Attached File: {att_name}\nContent:\n{att_content}")
+                
+                if att_base64 and (att_type.startswith("image/") or "image" in att_type.lower()):
+                    images.append(att_base64)
+                
+                if extracted_imgs:
+                    images.extend(extracted_imgs)
+
+        if attachment_text_parts:
+            attachment_context = "\n\n=== User Attached Files ===\n" + "\n\n".join(attachment_text_parts)
+            context_str = (context_str + attachment_context) if context_str else attachment_context
 
         prompt = self.config.generation.prompt_template.format(
             context=context_str,

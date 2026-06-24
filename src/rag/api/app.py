@@ -220,6 +220,7 @@ class QueryRequest(BaseModel):
     query: str
     ground_truth: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    attachments: Optional[List[Dict[str, Any]]] = None
 
 class ConfigUpdateRequest(BaseModel):
     yaml_content: str
@@ -507,7 +508,8 @@ async def query_pipeline(req: QueryRequest):
         result = await orchestrator.query(
             user_query=req.query,
             ground_truth=req.ground_truth,
-            metadata=req.metadata
+            metadata=req.metadata,
+            attachments=req.attachments
         )
         
         # Format sources list
@@ -584,7 +586,7 @@ async def query_stream_pipeline(req: QueryRequest):
         
     async def token_generator():
         try:
-            async for token in orchestrator.query_stream(req.query, req.metadata):
+            async for token in orchestrator.query_stream(req.query, req.metadata, req.attachments):
                 yield {"data": token}
         except asyncio.CancelledError:
             print("Streaming request cancelled by client.")
@@ -740,3 +742,95 @@ async def delete_document(filename: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
+
+@app.post("/api/parse-attachment")
+async def parse_attachment(file: UploadFile = File(...)):
+    global orchestrator, use_mock_mode
+    if not orchestrator:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Orchestrator not initialized."
+        )
+    
+    # Create temp attachments directory inside workspace
+    temp_dir = Path("data/temp_attachments")
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate safe temp filename
+    file_extension = Path(file.filename).suffix
+    temp_file_name = f"{uuid.uuid4()}{file_extension}"
+    temp_file_path = temp_dir / temp_file_name
+    
+    try:
+        # Save file to disk
+        with open(temp_file_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+            
+        is_image = (
+            (file.content_type and file.content_type.startswith("image/")) or
+            file_extension.lower() in [".png", ".jpg", ".jpeg", ".webp", ".gif"]
+        )
+        
+        extracted_text = ""
+        images_base64 = []
+        
+        if is_image:
+            # For images, read raw bytes and encode to base64
+            import base64
+            with open(temp_file_path, "rb") as img_f:
+                base64_str = base64.b64encode(img_f.read()).decode("utf-8")
+            # Run layout parse on image to extract text if layout parser supports OCR
+            try:
+                documents = await orchestrator.parser.parse(str(temp_file_path), {"filename": file.filename})
+                extracted_text = "\n\n".join([doc.content for doc in documents])
+            except Exception:
+                extracted_text = f"[Image Attached: {file.filename}]"
+        else:
+            base64_str = None
+            # For non-images, run document parser
+            documents = await orchestrator.parser.parse(str(temp_file_path), {"filename": file.filename})
+            extracted_text = "\n\n".join([doc.content for doc in documents])
+            
+            # Extract any embedded images
+            for doc in documents:
+                custom = doc.metadata.custom if (doc.metadata and hasattr(doc.metadata, "custom")) else {}
+                if isinstance(custom, dict):
+                    img_b64 = custom.get("image_base64")
+                    if img_b64:
+                        images_base64.append(img_b64)
+                    imgs = custom.get("images_base64", [])
+                    if isinstance(imgs, list):
+                        images_base64.extend(imgs)
+        
+        return {
+            "filename": file.filename,
+            "content": extracted_text,
+            "file_type": "image" if is_image else file.content_type or "application/octet-stream",
+            "base64": base64_str,
+            "extracted_images": list(set(images_base64))
+        }
+        
+    except Exception as e:
+        # Fallback to plain text read if parsing fails
+        try:
+            if temp_file_path.exists():
+                with open(temp_file_path, "r", encoding="utf-8", errors="ignore") as fallback_f:
+                    text_content = fallback_f.read()
+                return {
+                    "filename": file.filename,
+                    "content": text_content,
+                    "file_type": "text/plain",
+                    "base64": None,
+                    "extracted_images": []
+                }
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"Failed to parse attachment: {str(e)}")
+        
+    finally:
+        # Clean up temp file
+        if temp_file_path.exists():
+            try:
+                temp_file_path.unlink()
+            except Exception:
+                pass

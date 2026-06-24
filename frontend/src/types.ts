@@ -13,6 +13,17 @@ export interface Evaluation {
   error?: string;
 }
 
+export interface Attachment {
+  id: string;
+  filename: string;
+  file_type: string;
+  content?: string;
+  base64?: string;
+  extracted_images?: string[];
+  status: "processing" | "ready" | "error";
+  error?: string;
+}
+
 export interface Message {
   sender: "user" | "assistant";
   text: string;
@@ -20,6 +31,14 @@ export interface Message {
   sources?: Source[] | null;
   evaluation?: Evaluation | null;
   latency?: number;
+  attachments?: Attachment[] | null;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  messages: Message[];
+  created_at: string;
 }
 
 export interface RAGStatus {
