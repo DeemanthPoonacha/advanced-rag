@@ -92,7 +92,7 @@ class ParserConfig(ProviderConfig):
 class ChunkerConfig(ProviderConfig):
     """Chunking strategy selection."""
 
-    provider: Literal["semantic", "recursive", "hierarchical", "fixed_size", "multimodal_summarizer"] = "semantic"
+    provider: Literal["semantic", "recursive", "hierarchical", "by_title", "fixed_size", "multimodal_summarizer"] = "semantic"
 
 
 class IngestionConfig(BaseModel):

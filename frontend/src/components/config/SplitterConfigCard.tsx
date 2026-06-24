@@ -43,6 +43,7 @@ export function SplitterConfigCard({
               <option value="semantic">Semantic Chunker</option>
               <option value="recursive">Recursive Character</option>
               <option value="hierarchical">Hierarchical Parent-Child</option>
+              <option value="by_title">By Title Chunker</option>
               <option value="multimodal_summarizer">Multimodal Summarizer Chunker</option>
             </select>
           </div>
@@ -207,6 +208,66 @@ export function SplitterConfigCard({
                   onChange={(e) =>
                     handleUpdateConfigValue(
                       ["ingestion", "chunker", "config", "child_chunk_size"],
+                      parseInt(e.target.value)
+                    )
+                  }
+                  className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+            </div>
+          )}
+
+          {provider === "by_title" && (
+            <div className="space-y-3 animate-fade-in">
+              <p className="text-xs text-slate-505 dark:text-slate-400 leading-normal border border-dashed border-slate-200 dark:border-slate-800 p-2.5 rounded-lg bg-slate-50/50 dark:bg-slate-950/20">
+                Splits documents semantically under layout-parsed titles and headers. Sub-chunks exceeding limits will split recursively, prepending the section name.
+              </p>
+              
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    Max Section Size (Chars)
+                    <InfoTooltip text="Maximum characters allowed in a single chunk for layout sections." />
+                  </span>
+                  <span className="font-mono text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
+                    {configData.ingestion?.chunker?.config?.max_chunk_size ?? 1024}
+                  </span>
+                </label>
+                <input
+                  type="range"
+                  min="100"
+                  max="2048"
+                  step="64"
+                  value={configData.ingestion?.chunker?.config?.max_chunk_size ?? 1024}
+                  onChange={(e) =>
+                    handleUpdateConfigValue(
+                      ["ingestion", "chunker", "config", "max_chunk_size"],
+                      parseInt(e.target.value)
+                    )
+                  }
+                  className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    Chunk Overlap (Chars)
+                    <InfoTooltip text="Character overlap between successive splits of the same section." />
+                  </span>
+                  <span className="font-mono text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
+                    {configData.ingestion?.chunker?.config?.chunk_overlap ?? 200}
+                  </span>
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1000"
+                  step="20"
+                  value={configData.ingestion?.chunker?.config?.chunk_overlap ?? 200}
+                  onChange={(e) =>
+                    handleUpdateConfigValue(
+                      ["ingestion", "chunker", "config", "chunk_overlap"],
                       parseInt(e.target.value)
                     )
                   }
