@@ -276,6 +276,75 @@ class PineconeVectorStore(BaseVectorStore):
         ns_stats = stats.namespaces.get(self._namespace or "", None)
         return ns_stats.vector_count if ns_stats else stats.total_vector_count
 
+    @trace_operation(LifecycleStage.UPSERT, "pinecone_delete_by_metadata")
+    async def delete_by_metadata(self, key: str, value: Any) -> None:
+        """Delete vectors matching a specific metadata key/value filter."""
+        import asyncio
+        index = self._get_index()
+        await asyncio.get_running_loop().run_in_executor(
+            None, lambda: index.delete(filter={key: value}, namespace=self._namespace)
+        )
+        logger.info("pinecone_delete_by_metadata_complete", key=key, value=value)
+
+    @trace_operation(LifecycleStage.RETRIEVE, "pinecone_list_chunks")
+    async def list_chunks(self, limit: int = 10000) -> list[Chunk]:
+        """List chunks stored in the vector store collection up to a limit."""
+        import asyncio
+        index = self._get_index()
+        
+        try:
+            loop = asyncio.get_running_loop()
+            # list returns a generator of IDs in the namespace
+            results = await loop.run_in_executor(
+                None,
+                lambda: list(index.list(namespace=self._namespace, limit=min(limit, 100)))
+            )
+            
+            if not results:
+                return []
+                
+            fetch_res = await loop.run_in_executor(
+                None,
+                lambda: index.fetch(ids=results, namespace=self._namespace)
+            )
+            
+            chunks = []
+            for match_id, match in fetch_res.vectors.items():
+                # match_to_result expects a class with id, score, metadata
+                class DummyMatch:
+                    id = match.id
+                    score = 0.0
+                    metadata = match.metadata
+                res = self._match_to_result(DummyMatch(), "list")
+                chunks.append(res.chunk)
+            return chunks
+        except Exception as exc:
+            logger.warning("pinecone_list_chunks_not_supported_or_failed", error=str(exc))
+            return []
+
+    @trace_operation(LifecycleStage.RETRIEVE, "pinecone_get_by_id")
+    async def get_by_id(self, id: str) -> Chunk | None:
+        """Retrieve a single chunk by its unique ID."""
+        import asyncio
+        index = self._get_index()
+        try:
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: index.fetch(ids=[id], namespace=self._namespace)
+            )
+            if response and response.vectors and id in response.vectors:
+                match = response.vectors[id]
+                class DummyMatch:
+                    id = match.id
+                    score = 0.0
+                    metadata = match.metadata
+                res = self._match_to_result(DummyMatch(), "fetch")
+                return res.chunk
+        except Exception as exc:
+            logger.debug("pinecone_get_by_id_failed", id=id, error=str(exc))
+        return None
+
     async def close(self) -> None:
         """Release resources."""
         self._index = None

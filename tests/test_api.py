@@ -109,6 +109,37 @@ project:
     assert "chunks" in res.json()
     assert isinstance(res.json()["chunks"], list)
 
+    # 11. Test GET /api/documents
+    print("\nTesting GET /api/documents:")
+    res = client.get("/api/documents")
+    print(f"Status Code: {res.status_code}")
+    print(f"Response: {res.json()}")
+    assert res.status_code == 200
+    assert res.json()["status"] == "success"
+    assert len(res.json()["documents"]) > 0
+    assert any(doc["name"] == "test_doc.txt" for doc in res.json()["documents"])
+
+    # 12. Test GET /api/documents/{filename}/chunks
+    print("\nTesting GET /api/documents/test_doc.txt/chunks:")
+    res = client.get("/api/documents/test_doc.txt/chunks")
+    print(f"Status Code: {res.status_code}")
+    print(f"Response: {res.json()}")
+    assert res.status_code == 200
+    assert res.json()["status"] == "success"
+    assert len(res.json()["chunks"]) > 0
+
+    # 13. Test DELETE /api/documents/{filename}
+    print("\nTesting DELETE /api/documents/test_doc.txt:")
+    res = client.delete("/api/documents/test_doc.txt")
+    print(f"Status Code: {res.status_code}")
+    print(f"Response: {res.json()}")
+    assert res.status_code == 200
+    assert res.json()["status"] == "success"
+
+    # Verify document is gone
+    res = client.get("/api/documents")
+    assert not any(doc["name"] == "test_doc.txt" for doc in res.json()["documents"])
+
     print("\n--- All API Integration Tests Passed! ---")
 
 if __name__ == "__main__":

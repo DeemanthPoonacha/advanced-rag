@@ -81,6 +81,13 @@ class MockVectorStore(BaseVectorStore):
         pass
     async def count(self):
         return len(self.chunks)
+    async def delete_by_metadata(self, key: str, value: Any) -> None:
+        self.chunks = [c for c in self.chunks if getattr(c.metadata, key, None) != value]
+    async def list_chunks(self, limit: int = 10000):
+        return self.chunks[:limit]
+    async def get_by_id(self, id: str):
+        found = [c for c in self.chunks if c.id == id]
+        return found[0] if found else None
     async def close(self):
         pass
 

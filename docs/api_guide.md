@@ -170,3 +170,81 @@ async def process_data(data: str):
         parsed = data.lower().split()
         return parsed
 ```
+
+---
+
+## 🌐 FastAPI REST API Endpoints
+
+The FastAPI backend exposes the following endpoints for swappable database-driven document management, optimized for dynamic frontends:
+
+### 1. Ingest Documents
+* **URL**: `/api/ingest`
+* **Method**: `POST`
+* **Payload**: Multipart Form-data (`files` containing one or more files)
+* **Response**:
+```json
+{
+  "status": "success",
+  "message": "Successfully ingested 1 files.",
+  "files": [{"filename": "sample.pdf", "chunks_count": 12}],
+  "total_chunks_ingested": 12,
+  "chunk_ids": ["c1", "c2", ...]
+}
+```
+
+### 2. List Ingested Documents
+* **URL**: `/api/documents`
+* **Method**: `GET`
+* **Description**: Aggregates chunks from the vector database to dynamically list distinct uploaded documents, their chunk counts, token sizes, file types, and upload times.
+* **Response**:
+```json
+{
+  "status": "success",
+  "documents": [
+    {
+      "name": "sample.pdf",
+      "chunksCount": 12,
+      "totalTokens": 3840,
+      "file_type": "pdf",
+      "uploadTime": "Jun 24, 2026, 12:45 PM",
+      "status": "completed",
+      "isMock": false
+    }
+  ]
+}
+```
+
+### 3. Fetch Document Chunks (Lazy Loading)
+* **URL**: `/api/documents/{filename}/chunks`
+* **Method**: `GET`
+* **Description**: Fetches individual chunk payloads (original text snippet, layout metadata, page numbers) for a specific document on-demand to optimize client rendering performance.
+* **Response**:
+```json
+{
+  "status": "success",
+  "chunks": [
+    {
+      "id": "c1",
+      "page": 1,
+      "type": "text",
+      "snippet": "Text segment...",
+      "originalText": "Full text segment...",
+      "summaryText": "",
+      "isRaw": true,
+      "metadata": { ... }
+    }
+  ]
+}
+```
+
+### 4. Delete Ingested Document
+* **URL**: `/api/documents/{filename}`
+* **Method**: `DELETE`
+* **Description**: Removes the document and all associated vector chunks from the active vector store dynamically.
+* **Response**:
+```json
+{
+  "status": "success",
+  "message": "Successfully deleted document 'sample.pdf' from vector store."
+}
+```

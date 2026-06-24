@@ -161,28 +161,12 @@ class AutoMergingRetriever(BaseRetriever):
     ) -> RetrievalResult | None:
         """Attempt to retrieve a parent chunk by ID.
 
-        Uses a filtered search for the specific parent ID.
+        Directly fetches the parent chunk using get_by_id.
         """
         try:
-            results = await self._vector_store.search(
-                query_embedding=query_embedding,
-                top_k=1,
-                filters={"id": parent_id},
-            )
-            if results:
-                return results[0]
-        except Exception:
-            pass
-
-        # Fallback: search by parent_id field
-        try:
-            all_results = await self._vector_store.search(
-                query_embedding=query_embedding,
-                top_k=50,
-            )
-            for r in all_results:
-                if r.chunk.id == parent_id:
-                    return r
+            chunk = await self._vector_store.get_by_id(parent_id)
+            if chunk:
+                return RetrievalResult(chunk=chunk, score=0.0)
         except Exception as exc:
             logger.debug("parent_fetch_failed", parent_id=parent_id, error=str(exc))
 

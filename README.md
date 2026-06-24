@@ -11,9 +11,10 @@ An enterprise-ready, async-first, and completely configuration-driven Generic Re
 
 *   **100% Configuration-Driven:** Load a single `config.yaml` to dynamically build, connect, and instantiate all components using Pydantic v2 schemas and factory patterns.
 *   **Decoupled & Modular Design:** Decouples Ingestion, Chunking, Vector Storage, Inference, Retrieval, Reranking, Guardrails, and Evaluations into strict, pluggable interfaces.
+*   **Database-Driven Document Registry:** Unified swappable document lifecycle management (`list_chunks`, `get_by_id`, `delete_by_metadata`) across Qdrant, Pinecone, Milvus, pgvector, and SandboxDB backends, enabling stateless REST APIs and optimized frontend lazy loading.
 *   **Production-Grade Ingestion:** Support for unstructured.io and LlamaParse parser models with recursive, semantic, and hierarchical chunkers.
 *   **Multi-Engine Vector DBs:** Native support for Qdrant, Pinecone, Milvus, and PGVector with hybrid dense + sparse search and metadata filtering.
-*   **Advanced Retrieval Strategies:** Built-in strategies for Multi-Query Expansion, Contextual Compression, and Hierarchical Auto-Merging.
+*   **Optimized Hierarchical Auto-Merging:** Stabilized parent-lookup strategy using native primary key index lookups (`get_by_id`) instead of fragile metadata string match filtering.
 *   **Production Safety & Evaluation:** Integrated input/output safety guardrails (Llama Guard and NeMo Guardrails) and automated evaluations (Ragas and TruLens feedback loops).
 *   **Enterprise Observability:** Async-first implementation equipped with structured JSON logging, OpenTelemetry distributed tracing, and Prometheus metrics.
 

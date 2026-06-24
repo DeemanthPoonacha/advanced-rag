@@ -287,6 +287,92 @@ class MilvusVectorStore(BaseVectorStore):
         )
         return stats.get("row_count", 0)
 
+    @trace_operation(LifecycleStage.UPSERT, "milvus_delete_by_metadata")
+    async def delete_by_metadata(self, key: str, value: Any) -> None:
+        """Delete vectors matching a specific metadata key/value filter."""
+        loop = asyncio.get_running_loop()
+        client = self._get_client()
+        if isinstance(value, str):
+            filter_expr = f'{key} == "{value}"'
+        else:
+            filter_expr = f'{key} == {value}'
+        await loop.run_in_executor(
+            None,
+            lambda: client.delete(
+                collection_name=self._collection_name, filter=filter_expr
+            ),
+        )
+        logger.info("milvus_delete_by_metadata_complete", key=key, value=value)
+
+    @trace_operation(LifecycleStage.RETRIEVE, "milvus_list_chunks")
+    async def list_chunks(self, limit: int = 10000) -> list[Chunk]:
+        """List chunks stored in the vector store collection up to a limit."""
+        loop = asyncio.get_running_loop()
+        client = self._get_client()
+        
+        results = await loop.run_in_executor(
+            None,
+            lambda: client.query(
+                collection_name=self._collection_name,
+                filter="",
+                limit=limit,
+                output_fields=["id", "content", "document_id", "source", "file_name",
+                               "chunk_index", "parent_id", "token_count"],
+            )
+        )
+        
+        chunks_list = []
+        for hit in results:
+            entity = hit
+            chunk = Chunk(
+                id=str(hit.get("id", "")),
+                content=entity.get("content", ""),
+                document_id=entity.get("document_id", ""),
+                metadata=DocumentMetadata(
+                    source=entity.get("source", ""),
+                    file_name=entity.get("file_name", ""),
+                ),
+                parent_id=entity.get("parent_id") or None,
+                chunk_index=entity.get("chunk_index", 0),
+                token_count=entity.get("token_count", 0),
+            )
+            chunks_list.append(chunk)
+        return chunks_list
+
+    @trace_operation(LifecycleStage.RETRIEVE, "milvus_get_by_id")
+    async def get_by_id(self, id: str) -> Chunk | None:
+        """Retrieve a single chunk by its unique ID."""
+        loop = asyncio.get_running_loop()
+        client = self._get_client()
+        try:
+            results = await loop.run_in_executor(
+                None,
+                lambda: client.get(
+                    collection_name=self._collection_name,
+                    ids=[id],
+                    output_fields=["id", "content", "document_id", "source", "file_name",
+                                   "chunk_index", "parent_id", "token_count"],
+                )
+            )
+            if results:
+                hit = results[0]
+                entity = hit
+                return Chunk(
+                    id=str(hit.get("id", "")),
+                    content=entity.get("content", ""),
+                    document_id=entity.get("document_id", ""),
+                    metadata=DocumentMetadata(
+                        source=entity.get("source", ""),
+                        file_name=entity.get("file_name", ""),
+                    ),
+                    parent_id=entity.get("parent_id") or None,
+                    chunk_index=entity.get("chunk_index", 0),
+                    token_count=entity.get("token_count", 0),
+                )
+        except Exception as exc:
+            logger.debug("milvus_get_by_id_failed", id=id, error=str(exc))
+        return None
+
     async def close(self) -> None:
         """Close the Milvus client."""
         if self._client is not None:

@@ -72,23 +72,10 @@ export function IngestPanel({
     setOpenChunkFiles(prev => ({ ...prev, [fileId]: !prev[fileId] }));
   };
 
-  const toggleRegistryAccordion = (fileId: string) => {
-    setOpenRegistryFiles(prev => {
-      const isExpanded = !prev[fileId];
-      if (isExpanded) {
-        setSelectedFileId(fileId);
-      } else if (selectedFileId === fileId) {
-        setSelectedFileId(null);
-      }
-      setSelectedChunk(null);
-      const newState: Record<string, boolean> = {};
-      newState[fileId] = isExpanded;
-      return newState;
-    });
-  };
+  // toggleRegistryAccordion is defined below selectedFile to avoid reference errors
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [apiChunks, setApiChunks] = useState<any[]>([]);
+  const [documentChunks, setDocumentChunks] = useState<Record<string, ChunkData[]>>({});
 
   // Simulation files
   const [files, setFiles] = useState<ProcessingFile[]>([
@@ -247,22 +234,24 @@ export function IngestPanel({
     }
   ]);
 
-  const fetchChunks = async () => {
+  const fetchDocumentChunks = async (filename: string, fileId: string) => {
     try {
-      const res = await fetch("http://localhost:8000/api/chunks?limit=10000");
+      const res = await fetch(`http://localhost:8000/api/documents/${encodeURIComponent(filename)}/chunks`);
       if (res.ok) {
         const data = await res.json();
-        console.log("CHUNKS::",data.chunks);
-        
-        setApiChunks(data.chunks || []);
+        setDocumentChunks(prev => ({
+          ...prev,
+          [fileId]: data.chunks || []
+        }));
       }
     } catch (e) {
-      console.error("Failed to fetch API chunks", e);
+      console.error("Failed to fetch chunks for document " + filename, e);
     }
   };
 
   useEffect(() => {
-    fetchChunks();
+    // Clear chunks cache on uploadLogs/status change to prevent staleness
+    setDocumentChunks({});
   }, [uploadLogs, status]);
 
   const [ragSearchQuery, setRagSearchQuery] = useState("");
@@ -318,10 +307,6 @@ export function IngestPanel({
   const uploadedFilesList = useMemo(() => {
     const allUniqueFilenames = Array.from(new Set([
       ...uploadLogs.map(l => l.filename),
-      ...apiChunks.map(c => {
-        const docName = c.metadata?.file_name || c.metadata?.source || "";
-        return docName.split(/[/\\]/).pop() || "";
-      }).filter(Boolean),
       ...Object.keys(realIngestStatus)
     ]));
 
@@ -337,71 +322,45 @@ export function IngestPanel({
             : ("processing" as const))
         : ("completed" as const);
 
-      const matchedChunks = apiChunks.filter((c) => {
-        const docName = (c.metadata?.file_name || c.metadata?.source || "").toLowerCase();
-        const cleanDoc = docName.split(/[/\\]/).pop() || "";
-        return cleanDoc === filename.toLowerCase();
-      });
+      const fileId = log ? `uploaded-${uploadLogs.indexOf(log)}-${filename}` : `db-${idx}-${filename}`;
+      const fileChunks = documentChunks[fileId] || [];
 
-      const formattedChunks = matchedChunks.map((c, cIdx) => ({
-        id: c.id || `${filename}-chunk-${cIdx}`,
-        page: c.metadata?.page_number || 1,
-        type: (
-          c.metadata?.file_type === "image" || 
-          c.metadata?.image_extracted || 
-          c.metadata?.image_base64 ||
-          (Array.isArray(c.metadata?.images_base64) && c.metadata.images_base64.length > 0)
-        )
-          ? ("image" as const)
-          : (
-            c.metadata?.table_extracted || 
-            (Array.isArray(c.metadata?.tables_html) && c.metadata.tables_html.length > 0)
-          )
-          ? ("table" as const)
-          : ("text" as const),
-        snippet: c.content ? (c.content.length > 120 ? c.content.substring(0, 120) + "..." : c.content) : "",
-        originalText: c.content || "",
-        summaryText: c.metadata?.summary_text || "",
-        isRaw: !c.metadata?.summary_text,
-        metadata: c.metadata || {},
-      }));
-
-      const textCount = formattedChunks.length > 0
-        ? formattedChunks.filter(c => c.type === "text").length
+      const textCount = fileChunks.length > 0
+        ? fileChunks.filter(c => c.type === "text").length
         : (activeInfo?.text_count || 0);
 
-      const tableCount = formattedChunks.length > 0
-        ? formattedChunks.filter(c => c.type === "table").length
+      const tableCount = fileChunks.length > 0
+        ? fileChunks.filter(c => c.type === "table").length
         : (activeInfo?.table_count || 0);
 
-      const imageCount = formattedChunks.length > 0
-        ? formattedChunks.filter(c => c.type === "image").length
+      const imageCount = fileChunks.length > 0
+        ? fileChunks.filter(c => c.type === "image").length
         : (activeInfo?.image_count || 0);
 
-      const titleCount = formattedChunks.length > 0
-        ? formattedChunks.filter(c => c.metadata?.title_extracted).length
+      const titleCount = fileChunks.length > 0
+        ? fileChunks.filter(c => c.metadata?.title_extracted).length
         : (activeInfo?.title_count || 0);
 
       const otherCount = 0;
       
-      const totalChunks = formattedChunks.length > 0
-        ? formattedChunks.length
+      const totalChunks = fileChunks.length > 0
+        ? fileChunks.length
         : (activeInfo?.chunks_count || (log ? log.chunks_count : 0));
 
-      const totalElements = formattedChunks.length > 0
+      const totalElements = fileChunks.length > 0
         ? textCount + tableCount + imageCount
         : (activeInfo?.total_elements || totalChunks || 1);
 
-      const summarizedChunks = formattedChunks.length > 0
-        ? formattedChunks.filter(c => !c.isRaw).length
+      const summarizedChunks = fileChunks.length > 0
+        ? fileChunks.filter(c => !c.isRaw).length
         : (activeInfo?.chunks ? activeInfo.chunks.filter((c: any) => !c.isRaw).length : 0);
 
-      const finalChunks = formattedChunks.length > 0
-        ? formattedChunks
+      const finalChunks = fileChunks.length > 0
+        ? fileChunks
         : (activeInfo?.chunks || []);
 
       return {
-        id: log ? `uploaded-${uploadLogs.indexOf(log)}-${filename}` : `db-${idx}-${filename}`,
+        id: fileId,
         name: filename,
         size: "N/A",
         status: statusValue,
@@ -418,11 +377,30 @@ export function IngestPanel({
         isMock: false,
       };
     });
-  }, [uploadLogs, apiChunks, realIngestStatus]);
+  }, [uploadLogs, documentChunks, realIngestStatus]);
 
   const isMockMode = status?.mock_mode || false;
   const allFiles = isMockMode ? [...uploadedFilesList, ...mockFilesList] : uploadedFilesList;
   const selectedFile = allFiles.find(f => f.id === selectedFileId) || null;
+
+  const toggleRegistryAccordion = (fileId: string) => {
+    setOpenRegistryFiles(prev => {
+      const isExpanded = !prev[fileId];
+      if (isExpanded) {
+        setSelectedFileId(fileId);
+        const fileObj = allFiles.find(f => f.id === fileId);
+        if (fileObj && !fileObj.isMock && !documentChunks[fileId]) {
+          fetchDocumentChunks(fileObj.name, fileId);
+        }
+      } else if (selectedFileId === fileId) {
+        setSelectedFileId(null);
+      }
+      setSelectedChunk(null);
+      const newState: Record<string, boolean> = {};
+      newState[fileId] = isExpanded;
+      return newState;
+    });
+  };
 
   const getGroupKey = (uploadTime: string) => {
     const parts = uploadTime.split(",");
@@ -598,14 +576,12 @@ export function IngestPanel({
     setRagSearchQuery("");
     setRagSearchResults(null);
     setRagSearchError(null);
-    fetchChunks();
   };
 
   useEffect(() => {
     if (!ragSearchQuery.trim()) {
       setRagSearchResults(null);
       setRagSearchError(null);
-      fetchChunks();
     }
   }, [ragSearchQuery]);
 

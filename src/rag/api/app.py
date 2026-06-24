@@ -51,7 +51,7 @@ class SandboxChunker(BaseChunker):
         sentences = [s.strip() for s in document.content.split(".") if s.strip()]
         chunks = []
         for i, sent in enumerate(sentences):
-            chunks.append(Chunk(content=sent + ".", document_id=document.id, chunk_index=i))
+            chunks.append(Chunk(content=sent + ".", document_id=document.id, chunk_index=i, metadata=document.metadata))
         return chunks if chunks else [Chunk(content=document.content, document_id=document.id, chunk_index=0)]
     async def chunk_batch(self, documents):
         chunks = []
@@ -86,6 +86,26 @@ class SandboxDB(BaseVectorStore):
     async def hybrid_search(self, q_emb, s_vec, top_k=10, alpha=0.5, filters=None):
         return []
     async def delete(self, ids): pass
+    async def delete_by_metadata(self, key, value):
+        new_storage = []
+        for c in self.storage:
+            val_in_c = None
+            if c.metadata:
+                if hasattr(c.metadata, key):
+                    val_in_c = getattr(c.metadata, key)
+                elif hasattr(c.metadata, "custom") and isinstance(c.metadata.custom, dict):
+                    val_in_c = c.metadata.custom.get(key)
+            if val_in_c == value:
+                continue
+            new_storage.append(c)
+        self.storage = new_storage
+    async def list_chunks(self, limit=10000):
+        return self.storage[:limit]
+    async def get_by_id(self, id):
+        for c in self.storage:
+            if c.id == id:
+                return c
+        return None
     async def count(self): return len(self.storage)
     async def close(self): pass
 
@@ -380,7 +400,7 @@ async def parse_config_yaml(req: ConfigUpdateRequest):
 
 @app.get("/api/chunks")
 async def get_all_chunks(limit: int = 10000):
-    global orchestrator, use_mock_mode
+    global orchestrator
     if not orchestrator:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -389,28 +409,15 @@ async def get_all_chunks(limit: int = 10000):
     
     try:
         await orchestrator.initialize()
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to initialize pipeline: {str(e)}"
-        )
-    
-    if use_mock_mode:
         db = orchestrator.vector_store
-        storage = getattr(db, "storage", [])
+        
+        chunks = await db.list_chunks(limit=limit)
+        
         chunks_list = []
-        for c in storage[:limit]:
-            meta_dict = {}
-            if c.metadata:
-                if hasattr(c.metadata, "model_dump"):
-                    meta_dict = c.metadata.model_dump()
-                elif isinstance(c.metadata, dict):
-                    meta_dict = c.metadata
-
+        for c in chunks:
+            meta_dict = c.metadata.model_dump() if hasattr(c.metadata, "model_dump") else c.metadata
             custom = meta_dict.get("custom", {}) or {}
-            if not isinstance(custom, dict):
-                custom = {}
-
+            
             chunks_list.append({
                 "id": c.id,
                 "content": c.content,
@@ -429,71 +436,7 @@ async def get_all_chunks(limit: int = 10000):
                 },
                 "token_count": c.token_count
             })
-        chunks_list.sort(
-            key=lambda c: (
-                c["metadata"].get("file_name") or "",
-                c["metadata"].get("page_number") or 0,
-                c.get("chunk_index") or 0
-            )
-        )
-        return {
-            "status": "success",
-            "chunks": chunks_list
-        }
-    
-    try:
-        db = orchestrator.vector_store
-        client = db._get_client()
-        collection_name = db._collection_name
-        
-        chunks_list = []
-        offset = None
-        has_more = True
-        
-        while has_more:
-            # Fetch in batches of up to 1000 to keep it efficient
-            scroll_limit = min(limit - len(chunks_list), 1000) if limit else 1000
-            if scroll_limit <= 0:
-                break
-                
-            records, offset = await client.scroll(
-                collection_name=collection_name,
-                limit=scroll_limit,
-                offset=offset,
-                with_payload=True,
-                with_vectors=False
-            )
             
-            for record in records:
-                payload = record.payload or {}
-                meta_dict = {
-                    "source": payload.get("source", payload.get("file_name", "")),
-                    "file_name": payload.get("filename") or payload.get("file_name", ""),
-                    "file_type": payload.get("file_type", ""),
-                    "language": payload.get("language", "en"),
-                    "page_number": payload.get("page_number"),
-                    "total_pages": payload.get("total_pages"),
-                    "chunk_index": payload.get("chunk_index", 0),
-                }
-                
-                # Unpack everything else except the core chunk fields
-                core_keys = {"content", "document_id", "chunk_index", "source", "file_name", "filename", "file_type", "language", "page_number", "total_pages", "parent_id", "token_count"}
-                for k, v in payload.items():
-                    if k not in core_keys:
-                        meta_dict[k] = v
-
-                chunks_list.append({
-                    "id": str(record.id),
-                    "content": payload.get("content", ""),
-                    "document_id": payload.get("document_id", ""),
-                    "chunk_index": payload.get("chunk_index", 0),
-                    "metadata": meta_dict,
-                    "token_count": payload.get("token_count", 0)
-                })
-                
-            if not offset or len(records) < scroll_limit or (limit and len(chunks_list) >= limit):
-                has_more = False
-                
         chunks_list.sort(
             key=lambda c: (
                 c["metadata"].get("file_name") or "",
@@ -662,7 +605,7 @@ async def ingest_files(
                     shutil.copyfileobj(file.file, f)
                     
                 # Run ingestion metadata
-                file_metadata = {**metadata, "filename": current_filename}
+                file_metadata = {**metadata, "filename": current_filename, "file_name": current_filename}
                 
                 # Call orchestrator ingest directly - status logic is now inside orchestrator!
                 chunk_ids = await orchestrator.ingest_source(
@@ -702,62 +645,140 @@ async def ingest_files(
 
 @app.delete("/api/documents/{filename}")
 async def delete_document(filename: str):
-    global orchestrator, use_mock_mode
+    global orchestrator
     if not orchestrator:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Orchestrator not initialized."
         )
 
-    if use_mock_mode:
-        db = orchestrator.vector_store
-        storage = getattr(db, "storage", [])
-        new_storage = []
-        deleted_count = 0
-        for c in storage:
-            c_source = getattr(c.metadata, "source", "")
-            c_file_name = getattr(c.metadata, "file_name", "")
-            c_custom = getattr(c.metadata, "custom", {}) or {}
-            c_filename = c_custom.get("filename", "")
-            
-            if filename in [c_source, c_file_name, c_filename]:
-                deleted_count += 1
-                continue
-            new_storage.append(c)
-        db.storage = new_storage
-        return {
-            "status": "success",
-            "message": f"Successfully deleted mock document '{filename}' ({deleted_count} chunks removed)."
-        }
-
     try:
+        await orchestrator.initialize()
         db = orchestrator.vector_store
-        client = db._get_client()
-        collection_name = db._collection_name
         
-        from qdrant_client.models import FilterSelector, Filter, FieldCondition, MatchValue
+        # Clean swappable deletion across any provider
+        await db.delete_by_metadata("file_name", filename)
         
-        for key in ["filename", "file_name"]:
-            await client.delete(
-                collection_name=collection_name,
-                points_selector=FilterSelector(
-                    filter=Filter(
-                        must=[
-                            FieldCondition(
-                                key=key,
-                                match=MatchValue(value=filename)
-                            )
-                        ]
-                    )
-                )
-            )
-            
         return {
             "status": "success",
             "message": f"Successfully deleted document '{filename}' from vector store."
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
+
+@app.get("/api/documents")
+async def get_documents():
+    global orchestrator
+    if not orchestrator:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Orchestrator not initialized."
+        )
+    
+    try:
+        await orchestrator.initialize()
+        db = orchestrator.vector_store
+        
+        chunks = await db.list_chunks(limit=10000)
+        
+        from collections import defaultdict
+        grouped = defaultdict(list)
+        for chunk in chunks:
+            fname = chunk.metadata.file_name or chunk.metadata.source or "unknown"
+            filename_clean = os.path.basename(fname)
+            grouped[filename_clean].append(chunk)
+            
+        docs_list = []
+        for filename_clean, file_chunks in grouped.items():
+            first_chunk = file_chunks[0]
+            file_type = first_chunk.metadata.file_type
+            if not file_type and "." in filename_clean:
+                file_type = filename_clean.split(".")[-1]
+            
+            created_at = first_chunk.metadata.created_at
+            created_str = "Database Ingested"
+            if created_at:
+                created_str = created_at.strftime("%b %d, %Y, %I:%M %p")
+                
+            total_tokens = sum(c.token_count for c in file_chunks)
+            
+            docs_list.append({
+                "name": filename_clean,
+                "chunksCount": len(file_chunks),
+                "totalTokens": total_tokens,
+                "file_type": file_type,
+                "uploadTime": created_str,
+                "status": "completed",
+                "isMock": False
+            })
+            
+        return {
+            "status": "success",
+            "documents": docs_list
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch documents: {str(e)}")
+
+@app.get("/api/documents/{filename}/chunks")
+async def get_document_chunks(filename: str):
+    global orchestrator
+    if not orchestrator:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Orchestrator not initialized."
+        )
+        
+    try:
+        await orchestrator.initialize()
+        db = orchestrator.vector_store
+        
+        chunks = await db.list_chunks(limit=10000)
+        
+        filtered = []
+        for c in chunks:
+            c_fname = c.metadata.file_name or c.metadata.source or ""
+            c_clean = os.path.basename(c_fname)
+            
+            if c_clean.lower() == filename.lower():
+                meta_dict = c.metadata.model_dump() if hasattr(c.metadata, "model_dump") else c.metadata
+                custom = meta_dict.get("custom", {}) or {}
+                
+                c_type = "text"
+                file_type = meta_dict.get("file_type", "")
+                if (
+                    file_type == "image" 
+                    or custom.get("image_extracted") 
+                    or custom.get("image_base64")
+                    or (isinstance(custom.get("images_base64"), list) and len(custom["images_base64"]) > 0)
+                ):
+                    c_type = "image"
+                elif (
+                    custom.get("table_extracted")
+                    or (isinstance(custom.get("tables_html"), list) and len(custom["tables_html"]) > 0)
+                ):
+                    c_type = "table"
+                    
+                summary = custom.get("summary_text", "")
+                
+                filtered.append({
+                    "id": c.id,
+                    "page": meta_dict.get("page_number", 1) or 1,
+                    "type": c_type,
+                    "snippet": c.content[:120] + "..." if len(c.content) > 120 else c.content,
+                    "originalText": c.content,
+                    "summaryText": summary,
+                    "isRaw": not summary,
+                    "metadata": meta_dict
+                })
+                
+        filtered.sort(key=lambda x: (x.get("page") or 1, x.get("id")))
+        
+        return {
+            "status": "success",
+            "chunks": filtered
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch document chunks: {str(e)}")
 
 @app.post("/api/parse-attachment")
 async def parse_attachment(file: UploadFile = File(...)):

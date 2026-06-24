@@ -297,6 +297,55 @@ class PgvectorStore(BaseVectorStore):
             )
             return row["cnt"] if row else 0
 
+    @trace_operation(LifecycleStage.UPSERT, "pgvector_delete_by_metadata")
+    async def delete_by_metadata(self, key: str, value: Any) -> None:
+        """Delete vectors matching a specific metadata key/value filter."""
+        pool = await self._get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(
+                f"DELETE FROM {self._table_name} WHERE metadata->>'{key}' = $1", str(value)
+            )
+        logger.info("pgvector_delete_by_metadata_complete", key=key, value=value)
+
+    @trace_operation(LifecycleStage.RETRIEVE, "pgvector_list_chunks")
+    async def list_chunks(self, limit: int = 10000) -> list[Chunk]:
+        """List chunks stored in the vector store collection up to a limit."""
+        pool = await self._get_pool()
+        query = f"""
+            SELECT id, content, document_id, metadata, parent_id,
+                   chunk_index, token_count
+            FROM {self._table_name}
+            LIMIT $1
+        """
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(query, limit)
+            
+        chunks_list = []
+        for row in rows:
+            res = self._row_to_result(row, "list")
+            chunks_list.append(res.chunk)
+        return chunks_list
+
+    @trace_operation(LifecycleStage.RETRIEVE, "pgvector_get_by_id")
+    async def get_by_id(self, id: str) -> Chunk | None:
+        """Retrieve a single chunk by its unique ID."""
+        pool = await self._get_pool()
+        query = f"""
+            SELECT id, content, document_id, metadata, parent_id,
+                   chunk_index, token_count
+            FROM {self._table_name}
+            WHERE id = $1
+        """
+        try:
+            async with pool.acquire() as conn:
+                row = await conn.fetchrow(query, id)
+                if row:
+                    res = self._row_to_result(row, "fetch")
+                    return res.chunk
+        except Exception as exc:
+            logger.debug("pgvector_get_by_id_failed", id=id, error=str(exc))
+        return None
+
     async def close(self) -> None:
         """Close the connection pool."""
         if self._pool is not None:

@@ -56,6 +56,9 @@ class MockVectorStore(BaseVectorStore):
     async def hybrid_search(self, query_embedding, sparse_vector, top_k=10, alpha=0.5, filters=None): return []
     async def delete(self, ids): pass
     async def count(self): return 0
+    async def delete_by_metadata(self, key: str, value: Any) -> None: pass
+    async def list_chunks(self, limit: int = 10000): return []
+    async def get_by_id(self, id: str): return None
     async def close(self): pass
 
 class MockRetriever(BaseRetriever):

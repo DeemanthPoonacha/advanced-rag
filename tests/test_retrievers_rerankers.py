@@ -113,8 +113,9 @@ async def test_auto_merging_retriever(setup_retrieval_data):
     
     mock_store = MagicMock()
     # First search gets the child candidate list
-    # Second search is parent lookup (filters={"id": "parent-1"})
-    mock_store.search = AsyncMock(side_effect=[[res1, res2], [res_parent]])
+    mock_store.search = AsyncMock(return_value=[res1, res2])
+    # Parent lookup uses get_by_id
+    mock_store.get_by_id = AsyncMock(return_value=res_parent.chunk)
     
     mock_embed = MagicMock()
     mock_embed.embed_query = AsyncMock(return_value=[0.1])

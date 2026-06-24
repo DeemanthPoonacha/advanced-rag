@@ -48,11 +48,11 @@ export function ChunkInspector({
 
   const getImages = () => {
     const imgs: string[] = [];
-    if (selectedChunk.metadata?.image_base64) {
-      imgs.push(selectedChunk.metadata.image_base64);
-    }
-    if (Array.isArray(selectedChunk.metadata?.images_base64)) {
-      imgs.push(...selectedChunk.metadata.images_base64);
+    // if (selectedChunk.metadata?.custom?.image_base64) {
+    //   imgs.push(selectedChunk.metadata.custom.image_base64);
+    // }
+    if (Array.isArray(selectedChunk.metadata?.custom?.images_base64)) {
+      imgs.push(...selectedChunk.metadata.custom.images_base64);
     }
     return imgs.filter(Boolean);
   };
@@ -63,8 +63,8 @@ export function ChunkInspector({
     if (selectedChunk.type === "table" && selectedChunk.originalText.includes("<table")) {
       tbls.push(selectedChunk.originalText);
     }
-    if (Array.isArray(selectedChunk.metadata?.tables_html)) {
-      tbls.push(...selectedChunk.metadata.tables_html);
+    if (Array.isArray(selectedChunk.metadata?.custom?.tables_html)) {
+      tbls.push(...selectedChunk.metadata.custom.tables_html);
     }
     if (tbls.length === 0 && selectedChunk.type === "table") {
       const mdTable = parseMarkdownTable(selectedChunk.originalText);
@@ -259,7 +259,7 @@ export function ChunkInspector({
             <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 rounded-xl overflow-hidden shadow-inner">
               <table className="w-full text-left text-[11px] border-collapse">
                 <tbody>
-                  {Object.entries(selectedChunk.metadata).map(([key, value]) => (
+                  {Object.entries(selectedChunk.metadata).filter(([k,])=>k!=="custom").map(([key, value]) => (
                     <tr key={key} className="border-b border-slate-200 dark:border-slate-800/40 hover:bg-slate-100/30 dark:hover:bg-slate-900/40 transition-colors">
                       <td className="p-2.5 font-bold text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-[#0d1220] select-none capitalize">
                         {key.replace(/_/g, " ")}
@@ -272,6 +272,50 @@ export function ChunkInspector({
                 </tbody>
               </table>
             </div>
+
+            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 rounded-xl overflow-hidden shadow-inner">
+              <table className="w-full text-left text-[11px] border-collapse">
+                <tbody>
+                  {Object.entries(selectedChunk.metadata.custom ||{}).filter(([k,])=>k!=="image_base64" && k!=="tables_html").map(([key, value]) => (
+                    <tr key={key} className="border-b border-slate-200 dark:border-slate-800/40 hover:bg-slate-100/30 dark:hover:bg-slate-900/40 transition-colors">
+                      <td className="p-2.5 font-bold text-slate-500 dark:text-slate-400 border-r border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-[#0d1220] select-none capitalize">
+                        {key.replace(/_/g, " ")}
+                      </td>
+                      <td className="p-2.5 text-slate-700 dark:text-slate-200 break-all select-text font-mono">
+                        {key==="images_base64" ? 
+                        (value as string[]).map(img=> <img 
+                        src={formatImageSrc(img)} 
+                        alt={`Extracted Layout Image ${key}`}
+                        className="max-w-full max-h-[350px] object-contain rounded-lg border border-slate-100 dark:border-slate-900 shadow-sm"
+                      />)
+                      : typeof value === "object" ? JSON.stringify(value) : String(value)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+           
+            {selectedChunk.metadata.custom?.tables_html?.length &&
+            
+             <div className="animate-fade-in space-y-2">
+                <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                  Tables ({selectedChunk.metadata.custom?.tables_html.length})
+                </div>
+                <div className="space-y-3">
+                  {(selectedChunk.metadata.custom?.tables_html as string[]).map((tableHtml, idx) => (
+                    <div 
+                      key={idx}
+                      className="bg-white dark:bg-[#0c111e] p-4 border border-slate-200 dark:border-slate-800 rounded-xl overflow-auto max-w-full text-slate-800 dark:text-slate-200 shadow-sm table-render-container"
+                    >
+                      <div 
+                        dangerouslySetInnerHTML={{ __html: tableHtml }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            }
           </div>
         )}
       </div>

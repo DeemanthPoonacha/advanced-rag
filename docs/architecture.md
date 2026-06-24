@@ -121,3 +121,33 @@ The framework defines 9 core interfaces, declared as Python Abstract Base Classe
 | `BaseReranker`       | Reranks candidate vectors using Cross-Encoders.         | `CohereReranker`, `CrossEncoderReranker`                                                  |
 | `BaseGuardrail`      | Performs input/output content moderation checks.        | `LlamaGuard`, `NeMoGuardrails`                                                            |
 | `BaseEvaluator`      | Runs automated RAG loop quality evaluations.            | `RagasEvaluator`, `TruLensEvaluator`                                                      |
+
+---
+
+## 🗄️ Swappable Document Registry Database Contract
+
+To support database-driven document management (listing documents, filtering chunks, deleting files) across all vector store backends without leaking provider-specific client internals, the `BaseVectorStore` contract specifies three unified lifecycle methods:
+
+1. **`list_chunks(limit: int = 10000) -> list[Chunk]`**
+   * Scrolls/queries the vector index up to a limit and returns raw `Chunk` objects. Used by the API to dynamically compile the ingested document registry.
+2. **`get_by_id(id: str) -> Chunk | None`**
+   * Performs a point-lookup for a chunk by its primary key ID. Used to fetch parent chunks during Hierarchical Auto-Merging.
+3. **`delete_by_metadata(key: str, value: Any) -> None`**
+   * Deletes all vectors matching a specific metadata filter (such as `file_name = "report.pdf"`). Used to securely delete entire documents from the database.
+
+These methods are fully implemented across all native storage providers:
+* **Qdrant**: Employs `AsyncQdrantClient.scroll()`, `retrieve()`, and `delete()` filtering.
+* **Pinecone**: Performs namespace-aware point lookups and metadata deletes.
+* **Milvus**: Uses `query()` and `delete()` filters.
+* **pgvector**: Executes native parameterized SQL queries on PostgreSQL tables.
+* **SandboxDB**: Executes local sandbox scans inside FastAPI memory (Mock Mode).
+
+---
+
+## 🌲 Optimized Hierarchical Auto-Merging Retrieval
+
+### The Parent Lookup Bug & Refactoring
+In hierarchical chunking pipelines, child chunks represent small semantic windows while their parent chunks contain the broader paragraph context. When child hits exceed a set threshold, the retriever merges them into the parent chunk.
+
+* **Before**: The retriever attempted to query parent chunks via a metadata filter (`filters={"id": parent_id}`). This failed on Qdrant, Pinecone, and pgvector because vector/row IDs are index-level primary keys and are not stored in payload dictionaries.
+* **After**: The retriever utilizes the swappable `get_by_id(parent_id)` method. This executes a fast, index-native point-lookup by primary key across any active database provider, ensuring parent lookup succeeds reliably and quickly.

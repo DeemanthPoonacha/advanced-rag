@@ -326,6 +326,83 @@ class QdrantVectorStore(BaseVectorStore):
         info = await client.get_collection(self._collection_name)
         return info.points_count or 0
 
+    @trace_operation(LifecycleStage.UPSERT, "qdrant_delete_by_metadata")
+    async def delete_by_metadata(self, key: str, value: Any) -> None:
+        """Delete vectors matching a specific metadata key/value filter."""
+        from qdrant_client.models import FilterSelector, Filter, FieldCondition, MatchValue
+        client = self._get_client()
+        await client.delete(
+            collection_name=self._collection_name,
+            points_selector=FilterSelector(
+                filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key=key,
+                            match=MatchValue(value=value)
+                        )
+                    ]
+                )
+            )
+        )
+        logger.info("qdrant_delete_by_metadata_complete", key=key, value=value)
+
+    @trace_operation(LifecycleStage.RETRIEVE, "qdrant_list_chunks")
+    async def list_chunks(self, limit: int = 10000) -> list[Chunk]:
+        """List chunks stored in the vector store collection up to a limit."""
+        client = self._get_client()
+        chunks_list = []
+        offset = None
+        has_more = True
+        
+        while has_more:
+            scroll_limit = min(limit - len(chunks_list), 1000) if limit else 1000
+            if scroll_limit <= 0:
+                break
+                
+            records, offset = await client.scroll(
+                collection_name=self._collection_name,
+                limit=scroll_limit,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False
+            )
+            
+            for record in records:
+                class DummyHit:
+                    id = record.id
+                    payload = record.payload
+                    score = 0.0
+                
+                res = self._point_to_result(DummyHit(), "scroll")
+                chunks_list.append(res.chunk)
+                
+            if not offset or len(records) < scroll_limit or (limit and len(chunks_list) >= limit):
+                has_more = False
+                
+        return chunks_list
+
+    @trace_operation(LifecycleStage.RETRIEVE, "qdrant_get_by_id")
+    async def get_by_id(self, id: str) -> Chunk | None:
+        """Retrieve a single chunk by its unique ID."""
+        client = self._get_client()
+        try:
+            records = await client.retrieve(
+                collection_name=self._collection_name,
+                ids=[id],
+                with_payload=True,
+                with_vectors=False,
+            )
+            if records:
+                class DummyHit:
+                    id = records[0].id
+                    payload = records[0].payload
+                    score = 0.0
+                res = self._point_to_result(DummyHit(), "retrieve")
+                return res.chunk
+        except Exception as exc:
+            logger.debug("qdrant_get_by_id_failed", id=id, error=str(exc))
+        return None
+
     async def close(self) -> None:
         """Close the Qdrant client."""
         if self._client is not None:

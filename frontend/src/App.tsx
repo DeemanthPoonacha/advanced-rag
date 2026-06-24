@@ -95,10 +95,7 @@ export default function App() {
   const [configData, setConfigData] = useState<PipelineConfig | null>(null);
   const [editMode, setEditMode] = useState<"visual" | "yaml">("visual");
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadLogs, setUploadLogs] = useState<UploadLog[]>(() => {
-    const saved = localStorage.getItem("rag_upload_logs");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [uploadLogs, setUploadLogs] = useState<UploadLog[]>([]);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [streamResponse, setStreamResponse] = useState(true);
@@ -150,6 +147,7 @@ export default function App() {
   useEffect(() => {
     fetchStatus();
     fetchConfig();
+    fetchDocuments();
     document.documentElement.classList.add("dark");
     document.documentElement.setAttribute("data-theme", "dark");
   }, []);
@@ -157,10 +155,6 @@ export default function App() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isGenerating]);
-
-  useEffect(() => {
-    localStorage.setItem("rag_upload_logs", JSON.stringify(uploadLogs));
-  }, [uploadLogs]);
 
   useEffect(() => {
     if (toast) {
@@ -182,6 +176,25 @@ export default function App() {
       }
     } catch (e) {
       console.error("Failed to fetch API status", e);
+    }
+  };
+
+  const fetchDocuments = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/documents`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === "success" && data.documents) {
+          const parsed: UploadLog[] = data.documents.map((d: any) => ({
+            filename: d.name,
+            chunks_count: d.chunksCount,
+            date: d.uploadTime,
+          }));
+          setUploadLogs(parsed);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch documents", e);
     }
   };
 
@@ -303,18 +316,7 @@ export default function App() {
 
       if (res.ok) {
         showToast(`Ingested successfully! Created ${data.total_chunks_ingested} chunks.`, "success");
-        const parsedFiles: UploadLog[] = data.files.map((f: any) => ({
-          filename: f.filename,
-          chunks_count: f.chunks_count,
-          date: new Date().toLocaleString(undefined, {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        }));
-        setUploadLogs((prev) => [...parsedFiles, ...prev]);
+        await fetchDocuments();
         fetchStatus();
       } else {
         showToast(data.detail || "Ingestion failed", "error");
@@ -339,7 +341,7 @@ export default function App() {
       const data = await res.json();
       if (res.ok) {
         showToast(data.message || `Deleted successfully!`, "success");
-        setUploadLogs((prev) => prev.filter((log) => log.filename !== filename));
+        await fetchDocuments();
         fetchStatus(); // Refresh vector count
       } else {
         showToast(data.detail || "Delete failed", "error");

@@ -276,9 +276,44 @@ class BaseVectorStore(ABC):
         ...
 
     @abstractmethod
+    async def delete_by_metadata(self, key: str, value: Any) -> None:
+        """Delete vectors matching a specific metadata key/value filter.
+
+        Args:
+            key: The metadata field key.
+            value: The metadata field value to match.
+        """
+        ...
+
+    @abstractmethod
+    async def list_chunks(self, limit: int = 10000) -> list[Chunk]:
+        """List chunks stored in the vector store collection up to a limit.
+
+        Args:
+            limit: Maximum number of chunks to return.
+
+        Returns:
+            A list of Chunk objects.
+        """
+        ...
+
+    @abstractmethod
+    async def get_by_id(self, id: str) -> Chunk | None:
+        """Retrieve a single chunk by its unique ID.
+
+        Args:
+            id: The unique chunk ID string.
+
+        Returns:
+            The Chunk object if found, otherwise None.
+        """
+        ...
+
+    @abstractmethod
     async def close(self) -> None:
         """Release connections and resources."""
         ...
+
 
 
 class BaseRetriever(ABC):
