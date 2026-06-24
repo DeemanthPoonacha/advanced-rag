@@ -1,65 +1,77 @@
-project:
-  name: "multimodal-layout-pipeline"
-  environment: "development"
-  version: "1.0.0"
-
-ingestion:
-  parser:
-    provider: "unstructured"
-    config:
-      strategy: "hi_res"
-      extract_images: true
-      extract_tables: true
-  chunker:
-    provider: "semantic"
-    config:
-      target_chunk_size: 1000
-  multimodal_summarizer:
-    provider: "primary"
-    model_name: "gpt-4o"
-    temperature: 0.0
-    api_key: "${OPENAI_API_KEY}"
-  batch_size: 20
-
 embeddings:
-  provider: "openai"
   config:
-    model: "text-embedding-3-small"
-    api_key: "${OPENAI_API_KEY}"
-
-llm:
-  provider: "openai"
-  config:
-    model: "gpt-4o"
-    temperature: 0.1
-    api_key: "${OPENAI_API_KEY}"
-
-vector_store:
-  provider: "qdrant"
-  config:
-    url: "http://localhost:6333"
-    collection_name: "multimodal_kb"
-    vector_size: 1536
-
-retrieval:
-  strategy: "simple"
-  top_k: 6
-  similarity_threshold: 0.4
-
+    device: cuda
+    model_name: sentence-transformers/all-MiniLM-L6-v2
+  provider: local
+evaluation: null
 generation:
-  system_prompt: "You are an assistant trained to interpret structured pages containing tables, charts, and descriptions. Answer the question using the layout information provided in the context."
-  prompt_template: "Layout & Text Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
-  max_context_chunks: 4
   include_sources: true
+  max_context_chunks: 3
+  prompt_template: 'Context:
 
+    {context}
+
+
+    Question: {query}
+
+
+    Answer:'
+  system_prompt: You are a helpful assistant. Keep your responses concise and accurate.
 guardrails:
   enabled: false
-
+  input: null
+  output: null
+ingestion:
+  batch_size: 10
+  chunker:
+    config:
+      target_chunk_size: 500
+    provider: by_title
+  multimodal_summarizer:
+    api_key: null
+    base_url: null
+    model_name: gpt-4o
+    provider: primary
+    temperature: 0
+  parser:
+    config: {}
+    provider: unstructured
+llm:
+  config:
+    base_url: http://localhost:11434/v1
+    model: gemma4:31b-cloud
+    temperature: 0.1
+  provider: local
 observability:
   logging:
-    level: "INFO"
-    format: "json"
+    file_path: null
+    format: json
+    level: INFO
+    output: stdout
   metrics:
-    enabled: true
-  tracing:
     enabled: false
+    port: 9090
+    provider: prometheus
+  tracing:
+    api_key: null
+    enabled: false
+    endpoint: http://localhost:4317
+    provider: opentelemetry
+    sample_rate: 1
+    service_name: rag-pipeline
+project:
+  environment: development
+  name: local-sandbox-pipeline
+  version: 1.0.0
+retrieval:
+  config: {}
+  reranker: null
+  similarity_threshold: 0
+  strategy: simple
+  top_k: 3
+vector_store:
+  config:
+    collection_name: documents
+    url: data/qdrant_db
+    vector_size: 384
+  provider: qdrant

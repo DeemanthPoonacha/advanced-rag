@@ -8,7 +8,7 @@ import {
   Hash,
   Database,
   AlertCircle,
-  ArrowUp
+  ArrowUp,
 } from "lucide-react";
 
 interface ChunkMetadata {
@@ -89,7 +89,8 @@ export function ChunksPanel() {
   // Group chunks by document name
   const documentGroupMap: Record<string, Chunk[]> = {};
   chunks.forEach((chunk) => {
-    const docName = chunk.metadata.file_name || chunk.metadata.source || "Unnamed Document";
+    const docName =
+      chunk.metadata.file_name || chunk.metadata.source || "Unnamed Document";
     if (!documentGroupMap[docName]) {
       documentGroupMap[docName] = [];
     }
@@ -106,16 +107,21 @@ export function ChunksPanel() {
   // Filter documents based on query (by document name or content search)
   const filteredDocs = uniqueDocs.filter((docName) => {
     if (!searchQuery) return true;
-    const matchesDocName = docName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesDocName = docName
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
     const matchesContent = documentGroupMap[docName].some((chunk) =>
-      chunk.content.toLowerCase().includes(searchQuery.toLowerCase())
+      chunk.content.toLowerCase().includes(searchQuery.toLowerCase()),
     );
     return matchesDocName || matchesContent;
   });
 
   // Automatically select the first visible document if none is selected
   useEffect(() => {
-    if (filteredDocs.length > 0 && (!selectedDoc || !filteredDocs.includes(selectedDoc))) {
+    if (
+      filteredDocs.length > 0 &&
+      (!selectedDoc || !filteredDocs.includes(selectedDoc))
+    ) {
       setSelectedDoc(filteredDocs[0]);
     } else if (filteredDocs.length === 0) {
       setSelectedDoc(null);
@@ -132,7 +138,8 @@ export function ChunksPanel() {
             Vector Chunk Visualizer
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Browse and inspect segmented paragraphs stored in the active vector index
+            Browse and inspect segmented paragraphs stored in the active vector
+            index
           </p>
         </div>
         <button
@@ -154,7 +161,9 @@ export function ChunksPanel() {
         <div className="flex-1 flex items-center justify-center p-6 border border-rose-200/50 dark:border-rose-900/30 bg-rose-50/20 dark:bg-rose-950/10 rounded-2xl">
           <div className="flex flex-col items-center max-w-md text-center gap-3">
             <AlertCircle size={32} className="text-rose-500" />
-            <h4 className="font-bold text-sm">Failed to connect to Vector Store</h4>
+            <h4 className="font-bold text-sm">
+              Failed to connect to Vector Store
+            </h4>
             <p className="text-xs text-slate-500 leading-relaxed">{error}</p>
             <button
               onClick={fetchChunks}
@@ -167,16 +176,19 @@ export function ChunksPanel() {
       ) : chunks.length === 0 ? (
         <div className="flex-1 flex items-center justify-center p-6 border border-slate-200 dark:border-slate-800 border-dashed rounded-2xl">
           <div className="flex flex-col items-center max-w-sm text-center gap-3">
-            <Database size={36} className="text-slate-300 dark:text-slate-700" />
+            <Database
+              size={36}
+              className="text-slate-300 dark:text-slate-700"
+            />
             <h4 className="font-bold text-sm">Vector Collection Empty</h4>
             <p className="text-xs text-slate-500 leading-relaxed">
-              No document chunks have been indexed yet. Head to the **Document Ingest** tab to upload and segment source files.
+              No document chunks have been indexed yet. Head to the **Document
+              Ingest** tab to upload and segment source files.
             </p>
           </div>
         </div>
       ) : (
         <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
-          
           {/* Left Column: Documents Selector */}
           <div className="w-full md:w-80 flex flex-col gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 overflow-hidden shrink-0">
             <div className="relative shrink-0">
@@ -194,7 +206,7 @@ export function ChunksPanel() {
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2.5 mb-2">
                 Active Sources ({filteredDocs.length})
               </div>
-              
+
               {filteredDocs.map((docName) => {
                 const isActive = docName === selectedDoc;
                 const docChunks = documentGroupMap[docName] || [];
@@ -211,11 +223,16 @@ export function ChunksPanel() {
                         : "border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40"
                     }`}
                   >
-                    <FileText className={`w-4 h-4 shrink-0 ${isActive ? "text-primary" : "text-slate-400"}`} />
+                    <FileText
+                      className={`w-4 h-4 shrink-0 ${isActive ? "text-primary" : "text-slate-400"}`}
+                    />
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-bold truncate leading-tight">{docName}</div>
+                      <div className="text-xs font-bold truncate leading-tight">
+                        {docName}
+                      </div>
                       <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
-                        {docChunks.length} {docChunks.length === 1 ? "chunk" : "chunks"}
+                        {docChunks.length}{" "}
+                        {docChunks.length === 1 ? "chunk" : "chunks"}
                       </div>
                     </div>
                   </button>
@@ -234,7 +251,6 @@ export function ChunksPanel() {
           <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 overflow-hidden relative">
             {filteredDocs.length > 0 ? (
               <div className="flex-1 flex flex-col overflow-hidden relative">
-                
                 {/* Scroll container containing all files in order */}
                 <div
                   ref={scrollContainerRef}
@@ -244,8 +260,11 @@ export function ChunksPanel() {
                   {filteredDocs.map((docName) => {
                     const docChunks = documentGroupMap[docName] || [];
                     return (
-                      <div key={docName} id={`doc-group-${docName}`} className="space-y-4 scroll-mt-2">
-                        
+                      <div
+                        key={docName}
+                        id={`doc-group-${docName}`}
+                        className="space-y-4 scroll-mt-2"
+                      >
                         {/* Sticky File Header */}
                         <div className="sticky top-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm pb-3 pt-2 border-b border-slate-100 dark:border-slate-800/80 z-10 flex justify-between items-center shadow-[0_4px_12px_-10px_rgba(0,0,0,0.1)]">
                           <div>
@@ -254,7 +273,9 @@ export function ChunksPanel() {
                               <span className="truncate">{docName}</span>
                             </h3>
                             <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 font-semibold">
-                              {docChunks.length} {docChunks.length === 1 ? "chunk" : "chunks"} ordered sequentially by index
+                              {docChunks.length}{" "}
+                              {docChunks.length === 1 ? "chunk" : "chunks"}{" "}
+                              ordered sequentially by index
                             </p>
                           </div>
                         </div>
@@ -272,12 +293,17 @@ export function ChunksPanel() {
                                 {/* Action buttons (top right hover overlay) */}
                                 <div className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-slate-200/55 dark:border-slate-800 p-1 rounded-lg shadow-sm">
                                   <button
-                                    onClick={() => handleCopy(chunk.id, chunk.content)}
+                                    onClick={() =>
+                                      handleCopy(chunk.id, chunk.content)
+                                    }
                                     className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer rounded"
                                     title="Copy chunk text"
                                   >
                                     {copiedId === chunk.id ? (
-                                      <Check size={13} className="text-emerald-500" />
+                                      <Check
+                                        size={13}
+                                        className="text-emerald-500"
+                                      />
                                     ) : (
                                       <Copy size={13} />
                                     )}
@@ -309,10 +335,16 @@ export function ChunksPanel() {
                                 {/* Raw Metadata panel */}
                                 <div className="border-t border-slate-100 dark:border-slate-800/50 pt-2.5">
                                   <button
-                                    onClick={() => setExpandedChunkId(isExpanded ? null : chunk.id)}
+                                    onClick={() =>
+                                      setExpandedChunkId(
+                                        isExpanded ? null : chunk.id,
+                                      )
+                                    }
                                     className="text-[10px] font-extrabold text-slate-400 hover:text-primary dark:hover:text-primary transition cursor-pointer flex items-center gap-1 uppercase tracking-wider"
                                   >
-                                    {isExpanded ? "Hide Metadata Payload" : "View Metadata Payload"}
+                                    {isExpanded
+                                      ? "Hide Metadata Payload"
+                                      : "View Metadata Payload"}
                                   </button>
 
                                   {isExpanded && (
@@ -347,7 +379,6 @@ export function ChunksPanel() {
               </div>
             )}
           </div>
-
         </div>
       )}
     </div>

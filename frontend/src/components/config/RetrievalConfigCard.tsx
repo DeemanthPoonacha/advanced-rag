@@ -21,14 +21,16 @@ export function RetrievalConfigCard({
   const similarityThreshold = configData.retrieval?.similarity_threshold || 0.0;
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:shadow-md">
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <h3 className="font-bold text-sm font-display flex items-center gap-2">
             <Sliders size={16} className="text-primary" />
             Search & Retrieval
           </h3>
-          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">Retrieval</span>
+          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">
+            Retrieval
+          </span>
         </div>
 
         <div className="space-y-3">
@@ -39,12 +41,19 @@ export function RetrievalConfigCard({
             </label>
             <select
               value={strategy}
-              onChange={(e) => handleUpdateConfigValue(["retrieval", "strategy"], e.target.value)}
+              onChange={(e) =>
+                handleUpdateConfigValue(
+                  ["retrieval", "strategy"],
+                  e.target.value,
+                )
+              }
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
             >
               <option value="simple">Simple Dense Search</option>
               <option value="multi_query">Multi-Query Expansion</option>
-              <option value="contextual_compression">Contextual Compression</option>
+              <option value="contextual_compression">
+                Contextual Compression
+              </option>
               <option value="auto_merging">Auto-Merging Retrieval</option>
             </select>
           </div>
@@ -65,7 +74,12 @@ export function RetrievalConfigCard({
               max="20"
               step="1"
               value={topK}
-              onChange={(e) => handleUpdateConfigValue(["retrieval", "top_k"], parseInt(e.target.value))}
+              onChange={(e) =>
+                handleUpdateConfigValue(
+                  ["retrieval", "top_k"],
+                  parseInt(e.target.value),
+                )
+              }
               className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
             />
           </div>
@@ -102,7 +116,10 @@ export function RetrievalConfigCard({
                 step="0.05"
                 value={similarityThreshold}
                 onChange={(e) =>
-                  handleUpdateConfigValue(["retrieval", "similarity_threshold"], parseFloat(e.target.value))
+                  handleUpdateConfigValue(
+                    ["retrieval", "similarity_threshold"],
+                    parseFloat(e.target.value),
+                  )
                 }
                 className="w-full accent-primary h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
               />

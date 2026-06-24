@@ -43,8 +43,10 @@ export function ConfigPanel({
   fetchConfig,
 }: ConfigPanelProps) {
   // State to track expanded sections for advanced config keys
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
-  
+  const [expandedSections, setExpandedSections] = useState<
+    Record<string, boolean>
+  >({});
+
   // Preset management states
   const [presets, setPresets] = useState<any[]>([]);
   const [activePreset, setActivePreset] = useState<string | null>(null);
@@ -73,9 +75,12 @@ export function ConfigPanel({
   const handleActivatePreset = async (name: string) => {
     setIsActivating(name);
     try {
-      const res = await fetch(`http://localhost:8000/api/presets/${name}/activate`, {
-        method: "POST"
-      });
+      const res = await fetch(
+        `http://localhost:8000/api/presets/${name}/activate`,
+        {
+          method: "POST",
+        },
+      );
       if (res.ok) {
         await fetchConfig();
         await fetchPresets();
@@ -95,7 +100,10 @@ export function ConfigPanel({
       alert("Please enter a valid preset name.");
       return;
     }
-    const cleanName = newPresetName.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
+    const cleanName = newPresetName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, "_");
     setIsSavingPreset(true);
     try {
       let res;
@@ -103,14 +111,17 @@ export function ConfigPanel({
         res = await fetch(`http://localhost:8000/api/presets/${cleanName}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ yaml_content: rawYaml })
+          body: JSON.stringify({ yaml_content: rawYaml }),
         });
       } else {
-        res = await fetch(`http://localhost:8000/api/presets/${cleanName}/json`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(configData)
-        });
+        res = await fetch(
+          `http://localhost:8000/api/presets/${cleanName}/json`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(configData),
+          },
+        );
       }
       if (res.ok) {
         setNewPresetName("");
@@ -134,7 +145,7 @@ export function ConfigPanel({
     }
     try {
       const res = await fetch(`http://localhost:8000/api/presets/${name}`, {
-        method: "DELETE"
+        method: "DELETE",
       });
       if (res.ok) {
         await fetchPresets();
@@ -234,7 +245,9 @@ export function ConfigPanel({
             return (
               <div
                 key={preset.name}
-                onClick={() => !isActive && !isPending && handleActivatePreset(preset.name)}
+                onClick={() =>
+                  !isActive && !isPending && handleActivatePreset(preset.name)
+                }
                 className={`p-4 rounded-xl border transition-all duration-300 flex flex-col justify-between text-left cursor-pointer group hover:scale-[1.01] relative overflow-hidden ${
                   isActive
                     ? "bg-primary/5 border-primary/50 shadow-sm"
@@ -245,7 +258,7 @@ export function ConfigPanel({
                 {isActive && (
                   <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
                 )}
-                
+
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
@@ -278,7 +291,11 @@ export function ConfigPanel({
                 </div>
 
                 <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-900/60 flex items-center justify-between text-[9px] font-bold text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">
-                  <span>{preset.is_predefined ? "Predefined Preset" : "Custom Settings"}</span>
+                  <span>
+                    {preset.is_predefined
+                      ? "Predefined Preset"
+                      : "Custom Settings"}
+                  </span>
                   {!isActive && (
                     <span className="text-primary opacity-0 group-hover:opacity-100 transition duration-200">
                       {isPending ? "Activating..." : "Use Preset →"}
@@ -296,7 +313,6 @@ export function ConfigPanel({
         {editMode === "visual" ? (
           configData ? (
             <div className="h-full overflow-y-auto pr-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-6 scrollbar-thin">
-              
               <GeneralSettingsCard
                 configData={configData}
                 expandedSections={expandedSections}
@@ -359,7 +375,6 @@ export function ConfigPanel({
                 toggleSection={toggleSection}
                 handleUpdateConfigValue={handleUpdateConfigValue}
               />
-
             </div>
           ) : (
             <div className="h-full flex items-center justify-center text-slate-400 text-sm">
@@ -383,11 +398,14 @@ export function ConfigPanel({
           <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl w-96 p-6 shadow-xl space-y-4 text-left">
             <div className="flex items-center gap-2 text-slate-850 dark:text-slate-100">
               <BookmarkPlus className="w-5 h-5 text-primary" />
-              <h3 className="text-sm font-bold font-display">Save Custom Settings Configuration</h3>
+              <h3 className="text-sm font-bold font-display">
+                Save Custom Settings Configuration
+              </h3>
             </div>
-            
+
             <p className="text-xs text-slate-500 leading-relaxed">
-              Name your configuration preset. It will copy the current visual grid or raw YAML parameters to a reusable custom preset file.
+              Name your configuration preset. It will copy the current visual
+              grid or raw YAML parameters to a reusable custom preset file.
             </p>
 
             <div className="space-y-1">

@@ -18,14 +18,19 @@ export function GeneralSettingsCard({
   const isExpanded = !!expandedSections["project-advanced"];
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:shadow-md">
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <h3 className="font-bold text-sm font-display flex items-center gap-2">
-            <SettingsIcon size={16} className="text-primary animate-spin-slow" />
+            <SettingsIcon
+              size={16}
+              className="text-primary animate-spin-slow"
+            />
             General & Project Settings
           </h3>
-          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">Project</span>
+          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">
+            Project
+          </span>
         </div>
 
         <div className="space-y-3">
@@ -37,7 +42,9 @@ export function GeneralSettingsCard({
             <input
               type="text"
               value={configData.project?.name || ""}
-              onChange={(e) => handleUpdateConfigValue(["project", "name"], e.target.value)}
+              onChange={(e) =>
+                handleUpdateConfigValue(["project", "name"], e.target.value)
+              }
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
             />
           </div>
@@ -49,7 +56,12 @@ export function GeneralSettingsCard({
             </label>
             <select
               value={configData.project?.environment || "development"}
-              onChange={(e) => handleUpdateConfigValue(["project", "environment"], e.target.value)}
+              onChange={(e) =>
+                handleUpdateConfigValue(
+                  ["project", "environment"],
+                  e.target.value,
+                )
+              }
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
             >
               <option value="development">Development</option>
@@ -81,7 +93,12 @@ export function GeneralSettingsCard({
               <input
                 type="text"
                 value={configData.project?.version || ""}
-                onChange={(e) => handleUpdateConfigValue(["project", "version"], e.target.value)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["project", "version"],
+                    e.target.value,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               />
             </div>
@@ -94,7 +111,12 @@ export function GeneralSettingsCard({
               <input
                 type="number"
                 value={configData.ingestion?.batch_size ?? 10}
-                onChange={(e) => handleUpdateConfigValue(["ingestion", "batch_size"], parseInt(e.target.value) || 10)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["ingestion", "batch_size"],
+                    parseInt(e.target.value) || 10,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               />
             </div>
@@ -106,29 +128,46 @@ export function GeneralSettingsCard({
               </label>
               <select
                 value={configData.ingestion?.parser?.provider || "unstructured"}
-                onChange={(e) => handleUpdateConfigValue(["ingestion", "parser", "provider"], e.target.value)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["ingestion", "parser", "provider"],
+                    e.target.value,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               >
                 <option value="unstructured">Unstructured.io Parser</option>
                 <option value="llamaparse">LlamaParse Cloud API</option>
-                <option value="multimodal_unstructured">Multimodal Unstructured Parser</option>
+                <option value="multimodal_unstructured">
+                  Multimodal Unstructured Parser
+                </option>
               </select>
             </div>
 
             {/* Conditional Parser Config */}
             {(configData.ingestion?.parser?.provider === "unstructured" ||
-              configData.ingestion?.parser?.provider === "multimodal_unstructured") && (
+              configData.ingestion?.parser?.provider ===
+                "multimodal_unstructured") && (
               <div className="space-y-3 mt-3 pt-3 border-t border-dashed border-slate-100 dark:border-slate-800/50">
-                <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Parser Config</h4>
-                
+                <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Parser Config
+                </h4>
+
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] font-semibold flex items-center gap-1">
                     Parsing Strategy
                     <InfoTooltip text="Parsing strategy. hi_res parses structures like tables/images; fast is simple text; ocr_only runs OCR." />
                   </label>
                   <select
-                    value={configData.ingestion?.parser?.config?.strategy || "hi_res"}
-                    onChange={(e) => handleUpdateConfigValue(["ingestion", "parser", "config", "strategy"], e.target.value)}
+                    value={
+                      configData.ingestion?.parser?.config?.strategy || "hi_res"
+                    }
+                    onChange={(e) =>
+                      handleUpdateConfigValue(
+                        ["ingestion", "parser", "config", "strategy"],
+                        e.target.value,
+                      )
+                    }
                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
                   >
                     <option value="hi_res">Hi-Res Structure Extract</option>
@@ -139,14 +178,27 @@ export function GeneralSettingsCard({
 
                 <div className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-950/40 border border-slate-200/50 dark:border-slate-800/50 transition-colors">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-semibold">Extract Images</span>
-                    <span className="text-[8px] text-slate-400 dark:text-slate-500">Attempt to partition and extract inline images</span>
+                    <span className="text-[10px] font-semibold">
+                      Extract Images
+                    </span>
+                    <span className="text-[8px] text-slate-400 dark:text-slate-500">
+                      Attempt to partition and extract inline images
+                    </span>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={configData.ingestion?.parser?.config?.extract_images ?? (configData.ingestion?.parser?.provider === "multimodal_unstructured")}
-                      onChange={(e) => handleUpdateConfigValue(["ingestion", "parser", "config", "extract_images"], e.target.checked)}
+                      checked={
+                        configData.ingestion?.parser?.config?.extract_images ??
+                        configData.ingestion?.parser?.provider ===
+                          "multimodal_unstructured"
+                      }
+                      onChange={(e) =>
+                        handleUpdateConfigValue(
+                          ["ingestion", "parser", "config", "extract_images"],
+                          e.target.checked,
+                        )
+                      }
                       className="sr-only peer"
                     />
                     <div className="w-8 h-4 bg-slate-300 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary transition-all"></div>
@@ -160,10 +212,18 @@ export function GeneralSettingsCard({
                   </label>
                   <input
                     type="text"
-                    value={(configData.ingestion?.parser?.config?.languages || ["en"]).join(", ")}
+                    value={(
+                      configData.ingestion?.parser?.config?.languages || ["en"]
+                    ).join(", ")}
                     onChange={(e) => {
-                      const list = e.target.value.split(",").map(x => x.trim()).filter(Boolean);
-                      handleUpdateConfigValue(["ingestion", "parser", "config", "languages"], list);
+                      const list = e.target.value
+                        .split(",")
+                        .map((x) => x.trim())
+                        .filter(Boolean);
+                      handleUpdateConfigValue(
+                        ["ingestion", "parser", "config", "languages"],
+                        list,
+                      );
                     }}
                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
                   />
@@ -173,7 +233,9 @@ export function GeneralSettingsCard({
 
             {configData.ingestion?.parser?.provider === "llamaparse" && (
               <div className="space-y-3 mt-3 pt-3 border-t border-dashed border-slate-100 dark:border-slate-800/50">
-                <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">LlamaParse Config</h4>
+                <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  LlamaParse Config
+                </h4>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] font-semibold flex items-center gap-1">
@@ -184,21 +246,38 @@ export function GeneralSettingsCard({
                     type="password"
                     placeholder="••••••••••••••••"
                     value={configData.ingestion?.parser?.config?.api_key || ""}
-                    onChange={(e) => handleUpdateConfigValue(["ingestion", "parser", "config", "api_key"], e.target.value)}
+                    onChange={(e) =>
+                      handleUpdateConfigValue(
+                        ["ingestion", "parser", "config", "api_key"],
+                        e.target.value,
+                      )
+                    }
                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
                   />
                 </div>
 
                 <div className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-950/40 border border-slate-200/50 dark:border-slate-800/50 transition-colors">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-semibold">Premium Mode</span>
-                    <span className="text-[8px] text-slate-400 dark:text-slate-500">Run premium parsing algorithms for highest quality</span>
+                    <span className="text-[10px] font-semibold">
+                      Premium Mode
+                    </span>
+                    <span className="text-[8px] text-slate-400 dark:text-slate-500">
+                      Run premium parsing algorithms for highest quality
+                    </span>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={configData.ingestion?.parser?.config?.premium_mode ?? false}
-                      onChange={(e) => handleUpdateConfigValue(["ingestion", "parser", "config", "premium_mode"], e.target.checked)}
+                      checked={
+                        configData.ingestion?.parser?.config?.premium_mode ??
+                        false
+                      }
+                      onChange={(e) =>
+                        handleUpdateConfigValue(
+                          ["ingestion", "parser", "config", "premium_mode"],
+                          e.target.checked,
+                        )
+                      }
                       className="sr-only peer"
                     />
                     <div className="w-8 h-4 bg-slate-300 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary transition-all"></div>
@@ -212,8 +291,21 @@ export function GeneralSettingsCard({
                   </label>
                   <textarea
                     rows={2}
-                    value={configData.ingestion?.parser?.config?.parsing_instruction || ""}
-                    onChange={(e) => handleUpdateConfigValue(["ingestion", "parser", "config", "parsing_instruction"], e.target.value)}
+                    value={
+                      configData.ingestion?.parser?.config
+                        ?.parsing_instruction || ""
+                    }
+                    onChange={(e) =>
+                      handleUpdateConfigValue(
+                        [
+                          "ingestion",
+                          "parser",
+                          "config",
+                          "parsing_instruction",
+                        ],
+                        e.target.value,
+                      )
+                    }
                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 resize-none font-sans transition-colors"
                   />
                 </div>

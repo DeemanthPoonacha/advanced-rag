@@ -109,9 +109,32 @@ class ComponentFactory:
         return self._build("llm", cfg.provider, cfg.config)
 
     def create_vector_store(self) -> BaseVectorStore:
-        """Build the vector store specified in ``vector_store``."""
+        """Build the vector store specified in ``vector_store``.
+
+        This method automatically unifies configuration parameters for collection,
+        index, and table names, and infers vector dimensions from the configured
+        embeddings provider if ``vector_size`` is not explicitly provided.
+        """
         cfg = self._config.vector_store
-        return self._build("vector_store", cfg.provider, cfg.config)
+        store_config = cfg.config.copy()
+
+        # Unify collection_name, index_name, table_name
+        collection_name = (
+            store_config.get("collection_name")
+            or store_config.get("index_name")
+            or store_config.get("table_name")
+        )
+        if collection_name:
+            store_config["collection_name"] = collection_name
+            store_config["index_name"] = collection_name
+            store_config["table_name"] = collection_name
+
+        # Infer vector_size from embedding model if not specified or None
+        if "vector_size" not in store_config or store_config["vector_size"] is None:
+            embed_model = self.create_embedding_model()
+            store_config["vector_size"] = embed_model.dimensions
+
+        return self._build("vector_store", cfg.provider, store_config)
 
     def create_retriever(
         self,

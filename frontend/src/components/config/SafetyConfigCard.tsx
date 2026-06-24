@@ -19,31 +19,43 @@ export function SafetyConfigCard({
   const guardrailsEnabled = configData.guardrails?.enabled ?? true;
   const evaluationEnabled = configData.evaluation?.enabled ?? false;
   const inputProvider = configData.guardrails?.input?.provider || "llama_guard";
-  const outputProvider = configData.guardrails?.output?.provider || "llama_guard";
+  const outputProvider =
+    configData.guardrails?.output?.provider || "llama_guard";
   const evalProvider = configData.evaluation?.provider || "ragas";
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:shadow-md">
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <h3 className="font-bold text-sm font-display flex items-center gap-2">
             <ShieldAlert size={16} className="text-primary" />
             Guardrails & Evaluation
           </h3>
-          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">Safety</span>
+          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">
+            Safety
+          </span>
         </div>
 
         <div className="space-y-3">
           <div className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-950/40 border border-slate-200/50 dark:border-slate-800/50 transition-colors">
             <div className="flex flex-col">
-              <span className="text-[10px] font-semibold">Enable Guardrails</span>
-              <span className="text-[8px] text-slate-400 dark:text-slate-500">Filter queries and answers against safety policies</span>
+              <span className="text-[10px] font-semibold">
+                Enable Guardrails
+              </span>
+              <span className="text-[8px] text-slate-400 dark:text-slate-500">
+                Filter queries and answers against safety policies
+              </span>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 checked={guardrailsEnabled}
-                onChange={(e) => handleUpdateConfigValue(["guardrails", "enabled"], e.target.checked)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["guardrails", "enabled"],
+                    e.target.checked,
+                  )
+                }
                 className="sr-only peer"
               />
               <div className="w-8 h-4 bg-slate-300 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary transition-all"></div>
@@ -52,14 +64,23 @@ export function SafetyConfigCard({
 
           <div className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-950/40 border border-slate-200/50 dark:border-slate-800/50 transition-colors">
             <div className="flex flex-col">
-              <span className="text-[10px] font-semibold">Enable Evaluation</span>
-              <span className="text-[8px] text-slate-400 dark:text-slate-500">Compute faithfulness/relevance metrics</span>
+              <span className="text-[10px] font-semibold">
+                Enable Evaluation
+              </span>
+              <span className="text-[8px] text-slate-400 dark:text-slate-500">
+                Compute faithfulness/relevance metrics
+              </span>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 checked={evaluationEnabled}
-                onChange={(e) => handleUpdateConfigValue(["evaluation", "enabled"], e.target.checked)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["evaluation", "enabled"],
+                    e.target.checked,
+                  )
+                }
                 className="sr-only peer"
               />
               <div className="w-8 h-4 bg-slate-300 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary transition-all"></div>
@@ -88,7 +109,12 @@ export function SafetyConfigCard({
               </label>
               <select
                 value={inputProvider}
-                onChange={(e) => handleUpdateConfigValue(["guardrails", "input", "provider"], e.target.value)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["guardrails", "input", "provider"],
+                    e.target.value,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               >
                 <option value="llama_guard">Llama Guard Classifier</option>
@@ -103,7 +129,12 @@ export function SafetyConfigCard({
               </label>
               <select
                 value={outputProvider}
-                onChange={(e) => handleUpdateConfigValue(["guardrails", "output", "provider"], e.target.value)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["guardrails", "output", "provider"],
+                    e.target.value,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               >
                 <option value="llama_guard">Llama Guard Classifier</option>
@@ -118,7 +149,12 @@ export function SafetyConfigCard({
               </label>
               <select
                 value={evalProvider}
-                onChange={(e) => handleUpdateConfigValue(["evaluation", "provider"], e.target.value)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["evaluation", "provider"],
+                    e.target.value,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               >
                 <option value="ragas">Ragas framework</option>

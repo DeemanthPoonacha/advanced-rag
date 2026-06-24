@@ -14,7 +14,7 @@ import {
   Trash2,
   Edit2,
   Check,
-  X
+  X,
 } from "lucide-react";
 import { RAGStatus, Conversation } from "../types";
 
@@ -55,7 +55,7 @@ export function Sidebar({
     const saved = localStorage.getItem("sidebar_width");
     return saved ? parseInt(saved, 10) : 240;
   });
-  
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     return localStorage.getItem("sidebar_collapsed") === "true";
   });
@@ -109,7 +109,7 @@ export function Sidebar({
       <div
         className={cn(
           "border-b border-slate-200 dark:border-slate-800",
-          sidebarCollapsed ? "p-4 flex justify-center" : "p-5"
+          sidebarCollapsed ? "p-4 flex justify-center" : "p-5",
         )}
       >
         <div className="flex items-center gap-3">
@@ -133,7 +133,7 @@ export function Sidebar({
       <nav
         className={cn(
           "shrink-0 py-4 flex flex-col gap-1.5 border-b border-slate-200/50 dark:border-slate-800/60",
-          sidebarCollapsed ? "px-2 items-center" : "px-3"
+          sidebarCollapsed ? "px-2 items-center" : "px-3",
         )}
       >
         <button
@@ -145,7 +145,7 @@ export function Sidebar({
               : "w-full gap-3 px-3.5 py-2.5 text-sm font-semibold",
             activePage === "chat"
               ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 shadow-sm"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50",
           )}
           title={sidebarCollapsed ? "Assistant Chat" : undefined}
         >
@@ -162,7 +162,7 @@ export function Sidebar({
               : "w-full gap-3 px-3.5 py-2.5 text-sm font-semibold",
             activePage === "ingest"
               ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 shadow-sm"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50",
           )}
           title={sidebarCollapsed ? "Knowledge Base" : undefined}
         >
@@ -179,7 +179,7 @@ export function Sidebar({
               : "w-full gap-3 px-3.5 py-2.5 text-sm font-semibold",
             activePage === "config"
               ? "bg-primary/10 border-primary/20 text-primary dark:bg-primary/20 shadow-sm"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50",
           )}
           title={sidebarCollapsed ? "Pipeline Config" : undefined}
         >
@@ -239,15 +239,19 @@ export function Sidebar({
       <div
         className={cn(
           "border-t mt-auto border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-black/10 flex flex-col gap-3.5",
-          sidebarCollapsed ? "p-3 items-center" : "p-4"
+          sidebarCollapsed ? "p-3 items-center" : "p-4",
         )}
       >
         {/* Sandbox Mode Toggle */}
         {!sidebarCollapsed ? (
           <div className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-950/60 border border-slate-200/60 dark:border-slate-800/60 shadow-sm">
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold tracking-tight">Sandbox Mode</span>
-              <span className="text-[8px] text-slate-400 dark:text-slate-500">Mock responses</span>
+              <span className="text-[10px] font-bold tracking-tight">
+                Sandbox Mode
+              </span>
+              <span className="text-[8px] text-slate-400 dark:text-slate-500">
+                Mock responses
+              </span>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -266,33 +270,48 @@ export function Sidebar({
               "w-8 h-8 rounded-lg flex items-center justify-center border transition-all cursor-pointer",
               status?.mock_mode
                 ? "bg-amber-500/10 border-amber-500/30 text-amber-500"
-                : "bg-slate-100 border-slate-200 text-slate-400 dark:bg-slate-850 dark:border-slate-800"
+                : "bg-slate-100 border-slate-200 text-slate-400 dark:bg-slate-850 dark:border-slate-800",
             )}
             title={`Sandbox Mode: ${status?.mock_mode ? "ON" : "OFF"}`}
           >
-            <Zap size={14} className={status?.mock_mode ? "animate-pulse" : ""} />
+            <Zap
+              size={14}
+              className={status?.mock_mode ? "animate-pulse" : ""}
+            />
           </button>
         )}
 
         {/* Database Stats */}
-        {!sidebarCollapsed && isRAGActive && status?.chunk_count !== undefined && (
-          <div className="flex items-center gap-2 p-1.5 rounded-xl bg-white dark:bg-slate-950/40 border border-slate-200/40 dark:border-slate-800/40 text-[10px] text-slate-500 dark:text-slate-400">
-            <Database size={12} className="text-primary shrink-0" />
-            <span className="font-medium">
-              Indexed Chunks: <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{status.chunk_count}</span>
-            </span>
-          </div>
-        )}
+        {!sidebarCollapsed &&
+          isRAGActive &&
+          status?.chunk_count !== undefined && (
+            <div className="flex items-center gap-2 p-1.5 rounded-xl bg-white dark:bg-slate-950/40 border border-slate-200/40 dark:border-slate-800/40 text-[10px] text-slate-500 dark:text-slate-400">
+              <Database size={12} className="text-primary shrink-0" />
+              <span className="font-medium">
+                Indexed Chunks:{" "}
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                  {status.chunk_count}
+                </span>
+              </span>
+            </div>
+          )}
 
         {/* Status indicator & Theme toggle */}
-        <div className={cn("flex items-center w-full justify-between", sidebarCollapsed ? "flex-col gap-2.5" : "flex-row")}>
+        <div
+          className={cn(
+            "flex items-center w-full justify-between",
+            sidebarCollapsed ? "flex-col gap-2.5" : "flex-row",
+          )}
+        >
           <div className="flex items-center gap-1.5">
-            <span className={cn(
-              "w-2 h-2 rounded-full",
-              isRAGActive
-                ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-                : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"
-            )} />
+            <span
+              className={cn(
+                "w-2 h-2 rounded-full",
+                isRAGActive
+                  ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                  : "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]",
+              )}
+            />
             {!sidebarCollapsed && (
               <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 {isRAGActive ? "active" : "offline"}
@@ -388,11 +407,14 @@ function ConversationItem({
         "group flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium cursor-pointer transition-all duration-150 border border-transparent select-none",
         isActive
           ? "bg-slate-100 dark:bg-slate-800/80 text-slate-900 dark:text-white font-semibold"
-          : "text-slate-650 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-850/50"
+          : "text-slate-650 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-850/50",
       )}
     >
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        <MessageSquare size={13} className={isActive ? "text-primary animate-pulse" : "text-slate-400"} />
+        <MessageSquare
+          size={13}
+          className={isActive ? "text-primary animate-pulse" : "text-slate-400"}
+        />
         {isEditing ? (
           <input
             type="text"
@@ -404,10 +426,12 @@ function ConversationItem({
             autoFocus
           />
         ) : (
-          <span className="truncate pr-1 text-[11px]">{conversation.title}</span>
+          <span className="truncate pr-1 text-[11px]">
+            {conversation.title}
+          </span>
         )}
       </div>
-      
+
       {!isEditing && (
         <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity shrink-0">
           <button

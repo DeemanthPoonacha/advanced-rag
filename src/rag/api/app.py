@@ -982,10 +982,11 @@ async def get_document_chunks(filename: str):
                     "originalText": c.content,
                     "summaryText": summary,
                     "isRaw": not summary,
+                    "chunk_index": c.chunk_index,
                     "metadata": meta_dict
                 })
                 
-        filtered.sort(key=lambda x: (x.get("page") or 1, x.get("id")))
+        filtered.sort(key=lambda x: (x.get("page") or 1, x.get("chunk_index") or 0, x.get("id")))
         
         return {
             "status": "success",

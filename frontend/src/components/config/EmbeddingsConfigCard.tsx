@@ -19,14 +19,16 @@ export function EmbeddingsConfigCard({
   const provider = configData.embeddings?.provider || "openai";
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:shadow-md">
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <h3 className="font-bold text-sm font-display flex items-center gap-2">
             <Sliders size={16} className="text-primary" />
             Embedding Model
           </h3>
-          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">Embeddings</span>
+          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">
+            Embeddings
+          </span>
         </div>
 
         <div className="space-y-3">
@@ -37,7 +39,12 @@ export function EmbeddingsConfigCard({
             </label>
             <select
               value={provider}
-              onChange={(e) => handleUpdateConfigValue(["embeddings", "provider"], e.target.value)}
+              onChange={(e) =>
+                handleUpdateConfigValue(
+                  ["embeddings", "provider"],
+                  e.target.value,
+                )
+              }
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
             >
               <option value="openai">OpenAI Embedder</option>
@@ -60,7 +67,10 @@ export function EmbeddingsConfigCard({
               }
               onChange={(e) => {
                 const path = provider === "local" ? "model_name" : "model";
-                handleUpdateConfigValue(["embeddings", "config", path], e.target.value);
+                handleUpdateConfigValue(
+                  ["embeddings", "config", path],
+                  e.target.value,
+                );
               }}
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
             />
@@ -89,7 +99,12 @@ export function EmbeddingsConfigCard({
                 </label>
                 <select
                   value={configData.embeddings?.config?.device || "cpu"}
-                  onChange={(e) => handleUpdateConfigValue(["embeddings", "config", "device"], e.target.value)}
+                  onChange={(e) =>
+                    handleUpdateConfigValue(
+                      ["embeddings", "config", "device"],
+                      e.target.value,
+                    )
+                  }
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
                 >
                   <option value="cpu">CPU Only</option>
@@ -108,7 +123,12 @@ export function EmbeddingsConfigCard({
                 type="password"
                 placeholder="••••••••••••••••"
                 value={configData.embeddings?.config?.api_key || ""}
-                onChange={(e) => handleUpdateConfigValue(["embeddings", "config", "api_key"], e.target.value)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["embeddings", "config", "api_key"],
+                    e.target.value,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               />
             </div>

@@ -59,9 +59,25 @@ class LocalEmbeddingModel(BaseEmbeddingModel):
         if self._model is None:
             from sentence_transformers import SentenceTransformer
 
-            self._model = SentenceTransformer(
-                self._model_name, device=self._device
-            )
+            try:
+                self._model = SentenceTransformer(
+                    self._model_name, device=self._device
+                )
+            except Exception as e:
+                if self._device != "cpu":
+                    logger.warning(
+                        "local_model_load_device_failed_falling_back_to_cpu",
+                        model=self._model_name,
+                        device=self._device,
+                        error=str(e),
+                    )
+                    self._device = "cpu"
+                    self._model = SentenceTransformer(
+                        self._model_name, device="cpu"
+                    )
+                else:
+                    raise e
+
             # Probe dimensionality
             if hasattr(self._model, "get_embedding_dimension"):
                 self._dimensions_val = self._model.get_embedding_dimension()

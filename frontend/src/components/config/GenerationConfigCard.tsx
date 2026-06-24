@@ -22,14 +22,16 @@ export function GenerationConfigCard({
   const includeSources = configData.generation?.include_sources ?? true;
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:shadow-md">
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <h3 className="font-bold text-sm font-display flex items-center gap-2">
             <Sparkles size={16} className="text-primary animate-pulse" />
             Answer Generation
           </h3>
-          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">Synthesis</span>
+          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">
+            Synthesis
+          </span>
         </div>
 
         <div className="space-y-3">
@@ -41,7 +43,12 @@ export function GenerationConfigCard({
             <textarea
               rows={3}
               value={systemPrompt}
-              onChange={(e) => handleUpdateConfigValue(["generation", "system_prompt"], e.target.value)}
+              onChange={(e) =>
+                handleUpdateConfigValue(
+                  ["generation", "system_prompt"],
+                  e.target.value,
+                )
+              }
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 resize-none font-sans transition-colors"
             />
           </div>
@@ -69,7 +76,12 @@ export function GenerationConfigCard({
               <textarea
                 rows={3}
                 value={promptTemplate}
-                onChange={(e) => handleUpdateConfigValue(["generation", "prompt_template"], e.target.value)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["generation", "prompt_template"],
+                    e.target.value,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-[10px] font-mono focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 resize-none transition-colors"
               />
             </div>
@@ -90,21 +102,35 @@ export function GenerationConfigCard({
                 max="20"
                 step="1"
                 value={maxContextChunks}
-                onChange={(e) => handleUpdateConfigValue(["generation", "max_context_chunks"], parseInt(e.target.value))}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["generation", "max_context_chunks"],
+                    parseInt(e.target.value),
+                  )
+                }
                 className="w-full accent-primary h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
               />
             </div>
 
             <div className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-950/40 border border-slate-200/50 dark:border-slate-800/50 transition-colors">
               <div className="flex flex-col">
-                <span className="text-[10px] font-semibold">Include Sources</span>
-                <span className="text-[8px] text-slate-400 dark:text-slate-500">Inject reference metadata into response models</span>
+                <span className="text-[10px] font-semibold">
+                  Include Sources
+                </span>
+                <span className="text-[8px] text-slate-400 dark:text-slate-500">
+                  Inject reference metadata into response models
+                </span>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
                   checked={includeSources}
-                  onChange={(e) => handleUpdateConfigValue(["generation", "include_sources"], e.target.checked)}
+                  onChange={(e) =>
+                    handleUpdateConfigValue(
+                      ["generation", "include_sources"],
+                      e.target.checked,
+                    )
+                  }
                   className="sr-only peer"
                 />
                 <div className="w-8 h-4 bg-slate-300 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary transition-all"></div>

@@ -19,14 +19,16 @@ export function SplitterConfigCard({
   const provider = configData.ingestion?.chunker?.provider || "semantic";
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:shadow-md">
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <h3 className="font-bold text-sm font-display flex items-center gap-2">
             <Sliders size={16} className="text-primary" />
             Ingestion Splitter
           </h3>
-          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">Chunker</span>
+          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">
+            Chunker
+          </span>
         </div>
 
         <div className="space-y-3">
@@ -37,14 +39,21 @@ export function SplitterConfigCard({
             </label>
             <select
               value={provider}
-              onChange={(e) => handleUpdateConfigValue(["ingestion", "chunker", "provider"], e.target.value)}
+              onChange={(e) =>
+                handleUpdateConfigValue(
+                  ["ingestion", "chunker", "provider"],
+                  e.target.value,
+                )
+              }
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
             >
               <option value="semantic">Semantic Chunker</option>
               <option value="recursive">Recursive Character</option>
               <option value="hierarchical">Hierarchical Parent-Child</option>
               <option value="by_title">By Title Chunker</option>
-              <option value="multimodal_summarizer">Multimodal Summarizer Chunker</option>
+              <option value="multimodal_summarizer">
+                Multimodal Summarizer Chunker
+              </option>
             </select>
           </div>
 
@@ -58,7 +67,8 @@ export function SplitterConfigCard({
                     <InfoTooltip text="Maximum character size limit for a single semantic chunk." />
                   </span>
                   <span className="font-mono text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                    {configData.ingestion?.chunker?.config?.max_chunk_size ?? 1024}
+                    {configData.ingestion?.chunker?.config?.max_chunk_size ??
+                      1024}
                   </span>
                 </label>
                 <input
@@ -66,11 +76,14 @@ export function SplitterConfigCard({
                   min="100"
                   max="2048"
                   step="64"
-                  value={configData.ingestion?.chunker?.config?.max_chunk_size ?? 1024}
+                  value={
+                    configData.ingestion?.chunker?.config?.max_chunk_size ??
+                    1024
+                  }
                   onChange={(e) =>
                     handleUpdateConfigValue(
                       ["ingestion", "chunker", "config", "max_chunk_size"],
-                      parseInt(e.target.value)
+                      parseInt(e.target.value),
                     )
                   }
                   className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -84,7 +97,10 @@ export function SplitterConfigCard({
                     <InfoTooltip text="Distance threshold for semantic splits (higher = more chunks)." />
                   </span>
                   <span className="font-mono text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                    {(configData.ingestion?.chunker?.config?.breakpoint_threshold ?? 0.7).toFixed(2)}
+                    {(
+                      configData.ingestion?.chunker?.config
+                        ?.breakpoint_threshold ?? 0.7
+                    ).toFixed(2)}
                   </span>
                 </label>
                 <input
@@ -92,11 +108,19 @@ export function SplitterConfigCard({
                   min="0.1"
                   max="1.0"
                   step="0.05"
-                  value={configData.ingestion?.chunker?.config?.breakpoint_threshold ?? 0.7}
+                  value={
+                    configData.ingestion?.chunker?.config
+                      ?.breakpoint_threshold ?? 0.7
+                  }
                   onChange={(e) =>
                     handleUpdateConfigValue(
-                      ["ingestion", "chunker", "config", "breakpoint_threshold"],
-                      parseFloat(e.target.value)
+                      [
+                        "ingestion",
+                        "chunker",
+                        "config",
+                        "breakpoint_threshold",
+                      ],
+                      parseFloat(e.target.value),
                     )
                   }
                   className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -114,7 +138,8 @@ export function SplitterConfigCard({
                     <InfoTooltip text="Maximum characters per chunk." />
                   </span>
                   <span className="font-mono text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                    {configData.ingestion?.chunker?.config?.max_chunk_size ?? 1024}
+                    {configData.ingestion?.chunker?.config?.max_chunk_size ??
+                      1024}
                   </span>
                 </label>
                 <input
@@ -122,11 +147,14 @@ export function SplitterConfigCard({
                   min="100"
                   max="2048"
                   step="64"
-                  value={configData.ingestion?.chunker?.config?.max_chunk_size ?? 1024}
+                  value={
+                    configData.ingestion?.chunker?.config?.max_chunk_size ??
+                    1024
+                  }
                   onChange={(e) =>
                     handleUpdateConfigValue(
                       ["ingestion", "chunker", "config", "max_chunk_size"],
-                      parseInt(e.target.value)
+                      parseInt(e.target.value),
                     )
                   }
                   className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -140,7 +168,8 @@ export function SplitterConfigCard({
                     <InfoTooltip text="Overlap characters between successive chunks to keep context." />
                   </span>
                   <span className="font-mono text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                    {configData.ingestion?.chunker?.config?.chunk_overlap ?? 200}
+                    {configData.ingestion?.chunker?.config?.chunk_overlap ??
+                      200}
                   </span>
                 </label>
                 <input
@@ -148,11 +177,13 @@ export function SplitterConfigCard({
                   min="0"
                   max="1000"
                   step="20"
-                  value={configData.ingestion?.chunker?.config?.chunk_overlap ?? 200}
+                  value={
+                    configData.ingestion?.chunker?.config?.chunk_overlap ?? 200
+                  }
                   onChange={(e) =>
                     handleUpdateConfigValue(
                       ["ingestion", "chunker", "config", "chunk_overlap"],
-                      parseInt(e.target.value)
+                      parseInt(e.target.value),
                     )
                   }
                   className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -170,7 +201,8 @@ export function SplitterConfigCard({
                     <InfoTooltip text="Maximum character size of parent chunks." />
                   </span>
                   <span className="font-mono text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                    {configData.ingestion?.chunker?.config?.parent_chunk_size ?? 2048}
+                    {configData.ingestion?.chunker?.config?.parent_chunk_size ??
+                      2048}
                   </span>
                 </label>
                 <input
@@ -178,11 +210,14 @@ export function SplitterConfigCard({
                   min="200"
                   max="4096"
                   step="128"
-                  value={configData.ingestion?.chunker?.config?.parent_chunk_size ?? 2048}
+                  value={
+                    configData.ingestion?.chunker?.config?.parent_chunk_size ??
+                    2048
+                  }
                   onChange={(e) =>
                     handleUpdateConfigValue(
                       ["ingestion", "chunker", "config", "parent_chunk_size"],
-                      parseInt(e.target.value)
+                      parseInt(e.target.value),
                     )
                   }
                   className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -196,7 +231,8 @@ export function SplitterConfigCard({
                     <InfoTooltip text="Maximum character size of child chunks." />
                   </span>
                   <span className="font-mono text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                    {configData.ingestion?.chunker?.config?.child_chunk_size ?? 512}
+                    {configData.ingestion?.chunker?.config?.child_chunk_size ??
+                      512}
                   </span>
                 </label>
                 <input
@@ -204,11 +240,14 @@ export function SplitterConfigCard({
                   min="50"
                   max="1024"
                   step="32"
-                  value={configData.ingestion?.chunker?.config?.child_chunk_size ?? 512}
+                  value={
+                    configData.ingestion?.chunker?.config?.child_chunk_size ??
+                    512
+                  }
                   onChange={(e) =>
                     handleUpdateConfigValue(
                       ["ingestion", "chunker", "config", "child_chunk_size"],
-                      parseInt(e.target.value)
+                      parseInt(e.target.value),
                     )
                   }
                   className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -220,9 +259,11 @@ export function SplitterConfigCard({
           {provider === "by_title" && (
             <div className="space-y-3 animate-fade-in">
               <p className="text-xs text-slate-505 dark:text-slate-400 leading-normal border border-dashed border-slate-200 dark:border-slate-800 p-2.5 rounded-lg bg-slate-50/50 dark:bg-slate-950/20">
-                Splits documents semantically under layout-parsed titles and headers. Sub-chunks exceeding limits will split recursively, prepending the section name.
+                Splits documents semantically under layout-parsed titles and
+                headers. Sub-chunks exceeding limits will split recursively,
+                prepending the section name.
               </p>
-              
+
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold flex items-center justify-between">
                   <span className="flex items-center gap-1">
@@ -230,7 +271,8 @@ export function SplitterConfigCard({
                     <InfoTooltip text="Maximum characters allowed in a single chunk for layout sections." />
                   </span>
                   <span className="font-mono text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                    {configData.ingestion?.chunker?.config?.max_chunk_size ?? 1024}
+                    {configData.ingestion?.chunker?.config?.max_chunk_size ??
+                      1024}
                   </span>
                 </label>
                 <input
@@ -238,11 +280,14 @@ export function SplitterConfigCard({
                   min="100"
                   max="2048"
                   step="64"
-                  value={configData.ingestion?.chunker?.config?.max_chunk_size ?? 1024}
+                  value={
+                    configData.ingestion?.chunker?.config?.max_chunk_size ??
+                    1024
+                  }
                   onChange={(e) =>
                     handleUpdateConfigValue(
                       ["ingestion", "chunker", "config", "max_chunk_size"],
-                      parseInt(e.target.value)
+                      parseInt(e.target.value),
                     )
                   }
                   className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -256,7 +301,8 @@ export function SplitterConfigCard({
                     <InfoTooltip text="Character overlap between successive splits of the same section." />
                   </span>
                   <span className="font-mono text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                    {configData.ingestion?.chunker?.config?.chunk_overlap ?? 200}
+                    {configData.ingestion?.chunker?.config?.chunk_overlap ??
+                      200}
                   </span>
                 </label>
                 <input
@@ -264,11 +310,13 @@ export function SplitterConfigCard({
                   min="0"
                   max="1000"
                   step="20"
-                  value={configData.ingestion?.chunker?.config?.chunk_overlap ?? 200}
+                  value={
+                    configData.ingestion?.chunker?.config?.chunk_overlap ?? 200
+                  }
                   onChange={(e) =>
                     handleUpdateConfigValue(
                       ["ingestion", "chunker", "config", "chunk_overlap"],
-                      parseInt(e.target.value)
+                      parseInt(e.target.value),
                     )
                   }
                   className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -279,7 +327,9 @@ export function SplitterConfigCard({
 
           {provider === "multimodal_summarizer" && (
             <p className="text-xs text-slate-500 leading-normal border border-dashed border-slate-200 dark:border-slate-800 p-2.5 rounded-lg animate-fade-in bg-slate-50/50 dark:bg-slate-950/20">
-              You have selected the Multimodal Summarizer directly. This chunker will summarize all document elements using vision language models. Configure parameters in the multimodal section below.
+              You have selected the Multimodal Summarizer directly. This chunker
+              will summarize all document elements using vision language models.
+              Configure parameters in the multimodal section below.
             </p>
           )}
         </div>
@@ -308,7 +358,8 @@ export function SplitterConfigCard({
                       <InfoTooltip text="Minimum character size of a semantic chunk." />
                     </span>
                     <span className="font-mono text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                      {configData.ingestion?.chunker?.config?.min_chunk_size ?? 128}
+                      {configData.ingestion?.chunker?.config?.min_chunk_size ??
+                        128}
                     </span>
                   </label>
                   <input
@@ -316,11 +367,14 @@ export function SplitterConfigCard({
                     min="10"
                     max="512"
                     step="10"
-                    value={configData.ingestion?.chunker?.config?.min_chunk_size ?? 128}
+                    value={
+                      configData.ingestion?.chunker?.config?.min_chunk_size ??
+                      128
+                    }
                     onChange={(e) =>
                       handleUpdateConfigValue(
                         ["ingestion", "chunker", "config", "min_chunk_size"],
-                        parseInt(e.target.value)
+                        parseInt(e.target.value),
                       )
                     }
                     className="w-full accent-primary h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -342,11 +396,13 @@ export function SplitterConfigCard({
                     min="0"
                     max="5"
                     step="1"
-                    value={configData.ingestion?.chunker?.config?.buffer_size ?? 1}
+                    value={
+                      configData.ingestion?.chunker?.config?.buffer_size ?? 1
+                    }
                     onChange={(e) =>
                       handleUpdateConfigValue(
                         ["ingestion", "chunker", "config", "buffer_size"],
-                        parseInt(e.target.value)
+                        parseInt(e.target.value),
                       )
                     }
                     className="w-full accent-primary h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -357,7 +413,9 @@ export function SplitterConfigCard({
 
             {provider === "recursive" && (
               <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal">
-                Recursive character chunker recursively splits using a hierarchy of separators (paragraphs, sentences, words, etc.) to keep semantic blocks together.
+                Recursive character chunker recursively splits using a hierarchy
+                of separators (paragraphs, sentences, words, etc.) to keep
+                semantic blocks together.
               </p>
             )}
 
@@ -365,11 +423,10 @@ export function SplitterConfigCard({
               <div className="space-y-3">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] font-semibold flex items-center justify-between">
-                    <span className="flex items-center">
-                      Parent Overlap
-                    </span>
+                    <span className="flex items-center">Parent Overlap</span>
                     <span className="font-mono text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                      {configData.ingestion?.chunker?.config?.parent_overlap ?? 256}
+                      {configData.ingestion?.chunker?.config?.parent_overlap ??
+                        256}
                     </span>
                   </label>
                   <input
@@ -377,11 +434,14 @@ export function SplitterConfigCard({
                     min="0"
                     max="1024"
                     step="32"
-                    value={configData.ingestion?.chunker?.config?.parent_overlap ?? 256}
+                    value={
+                      configData.ingestion?.chunker?.config?.parent_overlap ??
+                      256
+                    }
                     onChange={(e) =>
                       handleUpdateConfigValue(
                         ["ingestion", "chunker", "config", "parent_overlap"],
-                        parseInt(e.target.value)
+                        parseInt(e.target.value),
                       )
                     }
                     className="w-full accent-primary h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -390,11 +450,10 @@ export function SplitterConfigCard({
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[11px] font-semibold flex items-center justify-between">
-                    <span className="flex items-center">
-                      Child Overlap
-                    </span>
+                    <span className="flex items-center">Child Overlap</span>
                     <span className="font-mono text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                      {configData.ingestion?.chunker?.config?.child_overlap ?? 64}
+                      {configData.ingestion?.chunker?.config?.child_overlap ??
+                        64}
                     </span>
                   </label>
                   <input
@@ -402,11 +461,13 @@ export function SplitterConfigCard({
                     min="0"
                     max="256"
                     step="8"
-                    value={configData.ingestion?.chunker?.config?.child_overlap ?? 64}
+                    value={
+                      configData.ingestion?.chunker?.config?.child_overlap ?? 64
+                    }
                     onChange={(e) =>
                       handleUpdateConfigValue(
                         ["ingestion", "chunker", "config", "child_overlap"],
-                        parseInt(e.target.value)
+                        parseInt(e.target.value),
                       )
                     }
                     className="w-full accent-primary h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
@@ -428,8 +489,16 @@ export function SplitterConfigCard({
                   <InfoTooltip text="LLM client provider for the vision summarizer. Select 'Use Primary LLM' to reuse the main completions model config." />
                 </label>
                 <select
-                  value={configData.ingestion?.multimodal_summarizer?.provider || "primary"}
-                  onChange={(e) => handleUpdateConfigValue(["ingestion", "multimodal_summarizer", "provider"], e.target.value)}
+                  value={
+                    configData.ingestion?.multimodal_summarizer?.provider ||
+                    "primary"
+                  }
+                  onChange={(e) =>
+                    handleUpdateConfigValue(
+                      ["ingestion", "multimodal_summarizer", "provider"],
+                      e.target.value,
+                    )
+                  }
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
                 >
                   <option value="primary">Use Primary LLM</option>
@@ -440,7 +509,8 @@ export function SplitterConfigCard({
                 </select>
               </div>
 
-              {configData.ingestion?.multimodal_summarizer?.provider !== "primary" && (
+              {configData.ingestion?.multimodal_summarizer?.provider !==
+                "primary" && (
                 <div className="flex flex-col gap-1.5 animate-fade-in">
                   <label className="text-[11px] font-semibold flex items-center gap-1">
                     LLM Model Name
@@ -448,8 +518,16 @@ export function SplitterConfigCard({
                   </label>
                   <input
                     type="text"
-                    value={configData.ingestion?.multimodal_summarizer?.model_name || "gpt-4o"}
-                    onChange={(e) => handleUpdateConfigValue(["ingestion", "multimodal_summarizer", "model_name"], e.target.value)}
+                    value={
+                      configData.ingestion?.multimodal_summarizer?.model_name ||
+                      "gpt-4o"
+                    }
+                    onChange={(e) =>
+                      handleUpdateConfigValue(
+                        ["ingestion", "multimodal_summarizer", "model_name"],
+                        e.target.value,
+                      )
+                    }
                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
                   />
                 </div>
@@ -462,7 +540,10 @@ export function SplitterConfigCard({
                     <InfoTooltip text="Generation temperature settings for Vision summaries." />
                   </span>
                   <span className="font-mono text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                    {(configData.ingestion?.multimodal_summarizer?.temperature ?? 0.0).toFixed(2)}
+                    {(
+                      configData.ingestion?.multimodal_summarizer
+                        ?.temperature ?? 0.0
+                    ).toFixed(2)}
                   </span>
                 </label>
                 <input
@@ -470,18 +551,22 @@ export function SplitterConfigCard({
                   min="0.0"
                   max="1.0"
                   step="0.05"
-                  value={configData.ingestion?.multimodal_summarizer?.temperature ?? 0.0}
+                  value={
+                    configData.ingestion?.multimodal_summarizer?.temperature ??
+                    0.0
+                  }
                   onChange={(e) =>
                     handleUpdateConfigValue(
                       ["ingestion", "multimodal_summarizer", "temperature"],
-                      parseFloat(e.target.value)
+                      parseFloat(e.target.value),
                     )
                   }
                   className="w-full accent-primary h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
                 />
               </div>
 
-              {configData.ingestion?.multimodal_summarizer?.provider !== "primary" && (
+              {configData.ingestion?.multimodal_summarizer?.provider !==
+                "primary" && (
                 <div className="space-y-3 animate-fade-in">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[11px] font-semibold flex items-center gap-1">
@@ -491,8 +576,16 @@ export function SplitterConfigCard({
                     <input
                       type="password"
                       placeholder="••••••••••••••••"
-                      value={configData.ingestion?.multimodal_summarizer?.api_key || ""}
-                      onChange={(e) => handleUpdateConfigValue(["ingestion", "multimodal_summarizer", "api_key"], e.target.value)}
+                      value={
+                        configData.ingestion?.multimodal_summarizer?.api_key ||
+                        ""
+                      }
+                      onChange={(e) =>
+                        handleUpdateConfigValue(
+                          ["ingestion", "multimodal_summarizer", "api_key"],
+                          e.target.value,
+                        )
+                      }
                       className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
                     />
                   </div>
@@ -505,8 +598,16 @@ export function SplitterConfigCard({
                     <input
                       type="text"
                       placeholder="https://api.openai.com/v1"
-                      value={configData.ingestion?.multimodal_summarizer?.base_url || ""}
-                      onChange={(e) => handleUpdateConfigValue(["ingestion", "multimodal_summarizer", "base_url"], e.target.value)}
+                      value={
+                        configData.ingestion?.multimodal_summarizer?.base_url ||
+                        ""
+                      }
+                      onChange={(e) =>
+                        handleUpdateConfigValue(
+                          ["ingestion", "multimodal_summarizer", "base_url"],
+                          e.target.value,
+                        )
+                      }
                       className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
                     />
                   </div>

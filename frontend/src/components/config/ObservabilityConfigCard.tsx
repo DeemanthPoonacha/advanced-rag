@@ -21,20 +21,24 @@ export function ObservabilityConfigCard({
   const loggingFormat = configData.observability?.logging?.format || "json";
   const loggingOutput = configData.observability?.logging?.output || "stdout";
   const filePath = configData.observability?.logging?.file_path || "";
-  const tracingProvider = configData.observability?.tracing?.provider || "opentelemetry";
-  const tracingEndpoint = configData.observability?.tracing?.endpoint || "http://localhost:4317";
+  const tracingProvider =
+    configData.observability?.tracing?.provider || "opentelemetry";
+  const tracingEndpoint =
+    configData.observability?.tracing?.endpoint || "http://localhost:4317";
   const metricsEnabled = configData.observability?.metrics?.enabled ?? true;
   const metricsPort = configData.observability?.metrics?.port ?? 9090;
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:shadow-md">
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <h3 className="font-bold text-sm font-display flex items-center gap-2">
             <Eye size={16} className="text-primary" />
             Observability & Telemetry
           </h3>
-          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">Metrics</span>
+          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">
+            Metrics
+          </span>
         </div>
 
         <div className="space-y-3">
@@ -45,7 +49,12 @@ export function ObservabilityConfigCard({
             </label>
             <select
               value={logLevel}
-              onChange={(e) => handleUpdateConfigValue(["observability", "logging", "level"], e.target.value)}
+              onChange={(e) =>
+                handleUpdateConfigValue(
+                  ["observability", "logging", "level"],
+                  e.target.value,
+                )
+              }
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
             >
               <option value="DEBUG">DEBUG</option>
@@ -54,22 +63,6 @@ export function ObservabilityConfigCard({
               <option value="ERROR">ERROR</option>
               <option value="CRITICAL">CRITICAL</option>
             </select>
-          </div>
-
-          <div className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-950/40 border border-slate-200/50 dark:border-slate-800/50 transition-colors animate-fade-in">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-semibold">Enable OTEL Tracing</span>
-              <span className="text-[8px] text-slate-400 dark:text-slate-500">Record structured traces across pipeline stages</span>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={tracingEnabled}
-                onChange={(e) => handleUpdateConfigValue(["observability", "tracing", "enabled"], e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-8 h-4 bg-slate-300 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary transition-all"></div>
-            </label>
           </div>
         </div>
       </div>
@@ -87,6 +80,31 @@ export function ObservabilityConfigCard({
 
         {isExpanded && (
           <div className="space-y-3 mt-3 pt-3 border-t border-dashed border-slate-100 dark:border-slate-800/50 animate-fade-in">
+            <div className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-950/40 border border-slate-200/50 dark:border-slate-800/50 transition-colors animate-fade-in">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-semibold">
+                  Enable OTEL Tracing
+                </span>
+                <span className="text-[8px] text-slate-400 dark:text-slate-500">
+                  Record structured traces across pipeline stages
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={tracingEnabled}
+                  onChange={(e) =>
+                    handleUpdateConfigValue(
+                      ["observability", "tracing", "enabled"],
+                      e.target.checked,
+                    )
+                  }
+                  className="sr-only peer"
+                />
+                <div className="w-8 h-4 bg-slate-300 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary transition-all"></div>
+              </label>
+            </div>
+
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold flex items-center gap-1">
                 Log Print Format
@@ -94,7 +112,12 @@ export function ObservabilityConfigCard({
               </label>
               <select
                 value={loggingFormat}
-                onChange={(e) => handleUpdateConfigValue(["observability", "logging", "format"], e.target.value)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["observability", "logging", "format"],
+                    e.target.value,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               >
                 <option value="json">Structured JSON</option>
@@ -109,7 +132,12 @@ export function ObservabilityConfigCard({
               </label>
               <select
                 value={loggingOutput}
-                onChange={(e) => handleUpdateConfigValue(["observability", "logging", "output"], e.target.value)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["observability", "logging", "output"],
+                    e.target.value,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               >
                 <option value="stdout">Standard Out (Console)</option>
@@ -127,7 +155,12 @@ export function ObservabilityConfigCard({
                   type="text"
                   placeholder="logs/rag.log"
                   value={filePath}
-                  onChange={(e) => handleUpdateConfigValue(["observability", "logging", "file_path"], e.target.value)}
+                  onChange={(e) =>
+                    handleUpdateConfigValue(
+                      ["observability", "logging", "file_path"],
+                      e.target.value,
+                    )
+                  }
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
                 />
               </div>
@@ -140,7 +173,12 @@ export function ObservabilityConfigCard({
               </label>
               <select
                 value={tracingProvider}
-                onChange={(e) => handleUpdateConfigValue(["observability", "tracing", "provider"], e.target.value)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["observability", "tracing", "provider"],
+                    e.target.value,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               >
                 <option value="opentelemetry">OpenTelemetry Collector</option>
@@ -156,21 +194,35 @@ export function ObservabilityConfigCard({
               <input
                 type="text"
                 value={tracingEndpoint}
-                onChange={(e) => handleUpdateConfigValue(["observability", "tracing", "endpoint"], e.target.value)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["observability", "tracing", "endpoint"],
+                    e.target.value,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               />
             </div>
 
             <div className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-slate-950/40 border border-slate-200/50 dark:border-slate-800/50 transition-colors animate-fade-in">
               <div className="flex flex-col">
-                <span className="text-[10px] font-semibold">Prometheus Metrics</span>
-                <span className="text-[8px] text-slate-400 dark:text-slate-500">Expose scraping endpoint for performance queries</span>
+                <span className="text-[10px] font-semibold">
+                  Prometheus Metrics
+                </span>
+                <span className="text-[8px] text-slate-400 dark:text-slate-500">
+                  Expose scraping endpoint for performance queries
+                </span>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
                   checked={metricsEnabled}
-                  onChange={(e) => handleUpdateConfigValue(["observability", "metrics", "enabled"], e.target.checked)}
+                  onChange={(e) =>
+                    handleUpdateConfigValue(
+                      ["observability", "metrics", "enabled"],
+                      e.target.checked,
+                    )
+                  }
                   className="sr-only peer"
                 />
                 <div className="w-8 h-4 bg-slate-300 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary transition-all"></div>
@@ -185,7 +237,12 @@ export function ObservabilityConfigCard({
               <input
                 type="number"
                 value={metricsPort}
-                onChange={(e) => handleUpdateConfigValue(["observability", "metrics", "port"], parseInt(e.target.value) || 9090)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["observability", "metrics", "port"],
+                    parseInt(e.target.value) || 9090,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               />
             </div>

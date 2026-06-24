@@ -56,26 +56,36 @@ export function IngestPanel({
   const [activeStep, setActiveStep] = useState<number>(1);
   const [maxStepReached, setMaxStepReached] = useState<number>(1);
   const [selectedChunk, setSelectedChunk] = useState<ChunkData | null>(null);
-  const [inspectorTab, setInspectorTab] = useState<"original" | "summary" | "metadata">("original");
+  const [inspectorTab, setInspectorTab] = useState<
+    "original" | "summary" | "metadata"
+  >("original");
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
 
   // Accordion toggles state mapping
-  const [openPartitionFiles, setOpenPartitionFiles] = useState<Record<string, boolean>>({});
-  const [openChunkFiles, setOpenChunkFiles] = useState<Record<string, boolean>>({});
-  const [openRegistryFiles, setOpenRegistryFiles] = useState<Record<string, boolean>>({});
+  const [openPartitionFiles, setOpenPartitionFiles] = useState<
+    Record<string, boolean>
+  >({});
+  const [openChunkFiles, setOpenChunkFiles] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [openRegistryFiles, setOpenRegistryFiles] = useState<
+    Record<string, boolean>
+  >({});
 
   const togglePartitionAccordion = (fileId: string) => {
-    setOpenPartitionFiles(prev => ({ ...prev, [fileId]: !prev[fileId] }));
+    setOpenPartitionFiles((prev) => ({ ...prev, [fileId]: !prev[fileId] }));
   };
 
   const toggleChunkAccordion = (fileId: string) => {
-    setOpenChunkFiles(prev => ({ ...prev, [fileId]: !prev[fileId] }));
+    setOpenChunkFiles((prev) => ({ ...prev, [fileId]: !prev[fileId] }));
   };
 
   // toggleRegistryAccordion is defined below selectedFile to avoid reference errors
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [documentChunks, setDocumentChunks] = useState<Record<string, ChunkData[]>>({});
+  const [documentChunks, setDocumentChunks] = useState<
+    Record<string, ChunkData[]>
+  >({});
 
   // Simulation files
   const [files, setFiles] = useState<ProcessingFile[]>([
@@ -97,8 +107,10 @@ export function IngestPanel({
           id: "f1-c1",
           page: 1,
           type: "text",
-          snippet: "Attention Is All You Need. Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones...",
-          originalText: "Attention Is All You Need\n\nAshish Vaswani*, Noam Shazeer*, Niki Parmar*, Jakob Uszkoreit*, Llion Jones*, Aidan N. Gomez*†, Łukasz Kaiser*, Illia Polosukhin*‡\nGoogle Brain, Google Research\n\nAbstract\nThe dominant sequence transduction models are based on complex recurrent or convolutional neural networks...",
+          snippet:
+            "Attention Is All You Need. Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones...",
+          originalText:
+            "Attention Is All You Need\n\nAshish Vaswani*, Noam Shazeer*, Niki Parmar*, Jakob Uszkoreit*, Llion Jones*, Aidan N. Gomez*†, Łukasz Kaiser*, Illia Polosukhin*‡\nGoogle Brain, Google Research\n\nAbstract\nThe dominant sequence transduction models are based on complex recurrent or convolutional neural networks...",
           summaryText: "",
           isRaw: true,
           metadata: {
@@ -107,16 +119,19 @@ export function IngestPanel({
             file_type: "pdf",
             language: "en",
             page_number: 1,
-            total_pages: 15
-          }
+            total_pages: 15,
+          },
         },
         {
           id: "f1-c2",
           page: 2,
           type: "image",
-          snippet: "### Searchable Description for Document Content on Neural Sequence Transduction Models #### Question Variations...",
-          originalText: "3 Model Architecture\nMost competitive neural sequence transduction models have an encoder-decoder structure [5, 2, 35]. Here, the encoder maps an input sequence of symbol representations (x1, ..., xn) to a sequence of continuous representations z = (z1, ..., zn). Given z, the decoder then generates an output sequence (y1, ..., ym) of symbols one element at a time. At each step the model is auto-regressive [10].",
-          summaryText: "Searchable description of the core Transformer model architecture diagram. The diagram outlines the stacked encoder-decoder layout using multi-head attention and pointwise, fully connected layers. Visual components include input/output embeddings, positional encoding, multi-head attention blocks, and linear projection/softmax output.",
+          snippet:
+            "### Searchable Description for Document Content on Neural Sequence Transduction Models #### Question Variations...",
+          originalText:
+            "3 Model Architecture\nMost competitive neural sequence transduction models have an encoder-decoder structure [5, 2, 35]. Here, the encoder maps an input sequence of symbol representations (x1, ..., xn) to a sequence of continuous representations z = (z1, ..., zn). Given z, the decoder then generates an output sequence (y1, ..., ym) of symbols one element at a time. At each step the model is auto-regressive [10].",
+          summaryText:
+            "Searchable description of the core Transformer model architecture diagram. The diagram outlines the stacked encoder-decoder layout using multi-head attention and pointwise, fully connected layers. Visual components include input/output embeddings, positional encoding, multi-head attention blocks, and linear projection/softmax output.",
           isRaw: false,
           metadata: {
             source: "data/temp_uploads/attention-is-all-you-need.pdf",
@@ -125,16 +140,19 @@ export function IngestPanel({
             language: "en",
             page_number: 2,
             total_pages: 15,
-            image_extracted: true
-          }
+            image_extracted: true,
+          },
         },
         {
           id: "f1-c3",
           page: 2,
           type: "table",
-          snippet: "Table 1: Maximum path lengths, sequential operations and minimum number of sequential operations...",
-          originalText: "Table 1: Maximum path lengths, sequential operations and minimum number of sequential operations for different layer types. n is the sequence length, d is the representation dimension, k is the kernel size of convolutions and r the size of the neighborhood in local self-attention.\n\n| Layer Type | Complexity per Layer | Sequential Operations | Maximum Path Length |\n|---|---|---|---|\n| Self-Attention | O(n^2 * d) | O(1) | O(1) |\n| Recurrent | O(n * d^2) | O(n) | O(n) |\n| Convolutional | O(k * n * d^2) | O(1) | O(log_k(n)) |\n| Self-Attention (restricted) | O(r * n * d) | O(1) | O(n/r) |",
-          summaryText: "Structured Markdown representation of Table 1 comparing computational complexity, sequential operations, and maximum path lengths across Self-Attention, Recurrent, and Convolutional layers. Details Self-Attention's O(1) sequential operation advantage.",
+          snippet:
+            "Table 1: Maximum path lengths, sequential operations and minimum number of sequential operations...",
+          originalText:
+            "Table 1: Maximum path lengths, sequential operations and minimum number of sequential operations for different layer types. n is the sequence length, d is the representation dimension, k is the kernel size of convolutions and r the size of the neighborhood in local self-attention.\n\n| Layer Type | Complexity per Layer | Sequential Operations | Maximum Path Length |\n|---|---|---|---|\n| Self-Attention | O(n^2 * d) | O(1) | O(1) |\n| Recurrent | O(n * d^2) | O(n) | O(n) |\n| Convolutional | O(k * n * d^2) | O(1) | O(log_k(n)) |\n| Self-Attention (restricted) | O(r * n * d) | O(1) | O(n/r) |",
+          summaryText:
+            "Structured Markdown representation of Table 1 comparing computational complexity, sequential operations, and maximum path lengths across Self-Attention, Recurrent, and Convolutional layers. Details Self-Attention's O(1) sequential operation advantage.",
           isRaw: false,
           metadata: {
             source: "data/temp_uploads/attention-is-all-you-need.pdf",
@@ -143,10 +161,10 @@ export function IngestPanel({
             language: "en",
             page_number: 2,
             total_pages: 15,
-            table_extracted: true
-          }
-        }
-      ]
+            table_extracted: true,
+          },
+        },
+      ],
     },
     {
       id: "f2",
@@ -166,8 +184,10 @@ export function IngestPanel({
           id: "f2-c1",
           page: 1,
           type: "text",
-          snippet: "Q3 Performance Review. Revenue grew by 14% year over year reaching record highs...",
-          originalText: "Q3 Performance Review\n\nExecutive Summary:\nOur revenue for the third quarter of this fiscal year grew by 14% year over year, reaching an all-time record high. Operating margins improved by 230 basis points due to operational efficiency and overhead reduction.",
+          snippet:
+            "Q3 Performance Review. Revenue grew by 14% year over year reaching record highs...",
+          originalText:
+            "Q3 Performance Review\n\nExecutive Summary:\nOur revenue for the third quarter of this fiscal year grew by 14% year over year, reaching an all-time record high. Operating margins improved by 230 basis points due to operational efficiency and overhead reduction.",
           summaryText: "",
           isRaw: true,
           metadata: {
@@ -176,16 +196,19 @@ export function IngestPanel({
             file_type: "pdf",
             language: "en",
             page_number: 1,
-            total_pages: 8
-          }
+            total_pages: 8,
+          },
         },
         {
           id: "f2-c2",
           page: 3,
           type: "table",
-          snippet: "Table 2: Regional revenue breakdown. North America remains our biggest market...",
-          originalText: "Table 2: Regional revenue breakdown by quarters (in Millions USD):\n\n| Region | Q1 | Q2 | Q3 |\n|---|---|---|---|\n| North America | 450 | 480 | 520 |\n| EMEA | 280 | 300 | 310 |\n| APAC | 150 | 180 | 210 |\n| LATAM | 80 | 90 | 95 |",
-          summaryText: "Quarterly revenue table grouped by regions (North America, EMEA, APAC, LATAM) spanning Q1 to Q3. North America shows consistent growth and largest share (520M in Q3). LATAM has lowest share (95M in Q3).",
+          snippet:
+            "Table 2: Regional revenue breakdown. North America remains our biggest market...",
+          originalText:
+            "Table 2: Regional revenue breakdown by quarters (in Millions USD):\n\n| Region | Q1 | Q2 | Q3 |\n|---|---|---|---|\n| North America | 450 | 480 | 520 |\n| EMEA | 280 | 300 | 310 |\n| APAC | 150 | 180 | 210 |\n| LATAM | 80 | 90 | 95 |",
+          summaryText:
+            "Quarterly revenue table grouped by regions (North America, EMEA, APAC, LATAM) spanning Q1 to Q3. North America shows consistent growth and largest share (520M in Q3). LATAM has lowest share (95M in Q3).",
           isRaw: false,
           metadata: {
             source: "data/temp_uploads/quarterly_report.pdf",
@@ -194,10 +217,10 @@ export function IngestPanel({
             language: "en",
             page_number: 3,
             total_pages: 8,
-            table_extracted: true
-          }
-        }
-      ]
+            table_extracted: true,
+          },
+        },
+      ],
     },
     {
       id: "f3",
@@ -217,8 +240,10 @@ export function IngestPanel({
           id: "f3-c1",
           page: 1,
           type: "text",
-          snippet: "This document contains basic instructions and release log info. Plain text file parsed directly...",
-          originalText: "Advanced RAG Pipeline Release Log\n\nUsage:\n1. Run the local backend container using run_servers.sh\n2. Load config.yaml templates to initiate core databases\n3. Connect client frontend interface via API endpoints",
+          snippet:
+            "This document contains basic instructions and release log info. Plain text file parsed directly...",
+          originalText:
+            "Advanced RAG Pipeline Release Log\n\nUsage:\n1. Run the local backend container using run_servers.sh\n2. Load config.yaml templates to initiate core databases\n3. Connect client frontend interface via API endpoints",
           summaryText: "",
           isRaw: true,
           metadata: {
@@ -227,21 +252,23 @@ export function IngestPanel({
             file_type: "txt",
             language: "en",
             page_number: 1,
-            total_pages: 1
-          }
-        }
-      ]
-    }
+            total_pages: 1,
+          },
+        },
+      ],
+    },
   ]);
 
   const fetchDocumentChunks = async (filename: string, fileId: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/documents/${encodeURIComponent(filename)}/chunks`);
+      const res = await fetch(
+        `http://localhost:8000/api/documents/${encodeURIComponent(filename)}/chunks`,
+      );
       if (res.ok) {
         const data = await res.json();
-        setDocumentChunks(prev => ({
+        setDocumentChunks((prev) => ({
           ...prev,
-          [fileId]: data.chunks || []
+          [fileId]: data.chunks || [],
         }));
       }
     } catch (e) {
@@ -259,7 +286,9 @@ export function IngestPanel({
   const [ragSearchResults, setRagSearchResults] = useState<any | null>(null);
   const [ragSearchError, setRagSearchError] = useState<string | null>(null);
 
-  const [realIngestStatus, setRealIngestStatus] = useState<Record<string, any>>({});
+  const [realIngestStatus, setRealIngestStatus] = useState<Record<string, any>>(
+    {},
+  );
 
   useEffect(() => {
     let intervalId: any;
@@ -275,7 +304,7 @@ export function IngestPanel({
           console.error("Failed to fetch ingest status", e);
         }
       };
-      
+
       pollStatus();
       intervalId = setInterval(pollStatus, 800);
     }
@@ -290,7 +319,10 @@ export function IngestPanel({
     name: file.name,
     size: file.size,
     status: file.status,
-    uploadTime: file.name === "read_me.txt" ? "Jun 21, 2026, 04:20 PM" : "Jun 22, 2026, 10:30 AM",
+    uploadTime:
+      file.name === "read_me.txt"
+        ? "Jun 21, 2026, 04:20 PM"
+        : "Jun 22, 2026, 10:30 AM",
     textCount: file.textCount,
     tableCount: file.tableCount,
     imageCount: file.imageCount,
@@ -305,59 +337,73 @@ export function IngestPanel({
   }));
 
   const uploadedFilesList = useMemo(() => {
-    const allUniqueFilenames = Array.from(new Set([
-      ...uploadLogs.map(l => l.filename),
-      ...Object.keys(realIngestStatus)
-    ]));
+    const allUniqueFilenames = Array.from(
+      new Set([
+        ...uploadLogs.map((l) => l.filename),
+        ...Object.keys(realIngestStatus),
+      ]),
+    );
 
     return allUniqueFilenames.map((filename, idx) => {
-      const log = uploadLogs.find(l => l.filename.toLowerCase() === filename.toLowerCase());
+      const log = uploadLogs.find(
+        (l) => l.filename.toLowerCase() === filename.toLowerCase(),
+      );
       const activeInfo = realIngestStatus[filename];
-      
+
       const statusValue = activeInfo
-        ? (activeInfo.status === "completed" 
-            ? ("completed" as const) 
-            : activeInfo.status === "failed" 
-            ? ("failed" as const) 
-            : ("processing" as const))
+        ? activeInfo.status === "completed"
+          ? ("completed" as const)
+          : activeInfo.status === "failed"
+            ? ("failed" as const)
+            : ("processing" as const)
         : ("completed" as const);
 
-      const fileId = log ? `uploaded-${uploadLogs.indexOf(log)}-${filename}` : `db-${idx}-${filename}`;
+      const fileId = log
+        ? `uploaded-${uploadLogs.indexOf(log)}-${filename}`
+        : `db-${idx}-${filename}`;
       const fileChunks = documentChunks[fileId] || [];
 
-      const textCount = fileChunks.length > 0
-        ? fileChunks.filter(c => c.type === "text").length
-        : (activeInfo?.text_count || 0);
+      const textCount =
+        fileChunks.length > 0
+          ? fileChunks.filter((c) => c.type === "text").length
+          : activeInfo?.text_count || 0;
 
-      const tableCount = fileChunks.length > 0
-        ? fileChunks.filter(c => c.type === "table").length
-        : (activeInfo?.table_count || 0);
+      const tableCount =
+        fileChunks.length > 0
+          ? fileChunks.filter((c) => c.type === "table").length
+          : activeInfo?.table_count || 0;
 
-      const imageCount = fileChunks.length > 0
-        ? fileChunks.filter(c => c.type === "image").length
-        : (activeInfo?.image_count || 0);
+      const imageCount =
+        fileChunks.length > 0
+          ? fileChunks.filter((c) => c.type === "image").length
+          : activeInfo?.image_count || 0;
 
-      const titleCount = fileChunks.length > 0
-        ? fileChunks.filter(c => c.metadata?.title_extracted).length
-        : (activeInfo?.title_count || 0);
+      const titleCount =
+        fileChunks.length > 0
+          ? fileChunks.filter((c) => c.metadata?.title_extracted).length
+          : activeInfo?.title_count || 0;
 
       const otherCount = 0;
-      
-      const totalChunks = fileChunks.length > 0
-        ? fileChunks.length
-        : (activeInfo?.chunks_count || (log ? log.chunks_count : 0));
 
-      const totalElements = fileChunks.length > 0
-        ? textCount + tableCount + imageCount
-        : (activeInfo?.total_elements || totalChunks || 1);
+      const totalChunks =
+        fileChunks.length > 0
+          ? fileChunks.length
+          : activeInfo?.chunks_count || (log ? log.chunks_count : 0);
 
-      const summarizedChunks = fileChunks.length > 0
-        ? fileChunks.filter(c => !c.isRaw).length
-        : (activeInfo?.chunks ? activeInfo.chunks.filter((c: any) => !c.isRaw).length : 0);
+      const totalElements =
+        fileChunks.length > 0
+          ? textCount + tableCount + imageCount
+          : activeInfo?.total_elements || totalChunks || 1;
 
-      const finalChunks = fileChunks.length > 0
-        ? fileChunks
-        : (activeInfo?.chunks || []);
+      const summarizedChunks =
+        fileChunks.length > 0
+          ? fileChunks.filter((c) => !c.isRaw).length
+          : activeInfo?.chunks
+            ? activeInfo.chunks.filter((c: any) => !c.isRaw).length
+            : 0;
+
+      const finalChunks =
+        fileChunks.length > 0 ? fileChunks : activeInfo?.chunks || [];
 
       return {
         id: fileId,
@@ -380,15 +426,17 @@ export function IngestPanel({
   }, [uploadLogs, documentChunks, realIngestStatus]);
 
   const isMockMode = status?.mock_mode || false;
-  const allFiles = isMockMode ? [...uploadedFilesList, ...mockFilesList] : uploadedFilesList;
-  const selectedFile = allFiles.find(f => f.id === selectedFileId) || null;
+  const allFiles = isMockMode
+    ? [...uploadedFilesList, ...mockFilesList]
+    : uploadedFilesList;
+  const selectedFile = allFiles.find((f) => f.id === selectedFileId) || null;
 
   const toggleRegistryAccordion = (fileId: string) => {
-    setOpenRegistryFiles(prev => {
+    setOpenRegistryFiles((prev) => {
       const isExpanded = !prev[fileId];
       if (isExpanded) {
         setSelectedFileId(fileId);
-        const fileObj = allFiles.find(f => f.id === fileId);
+        const fileObj = allFiles.find((f) => f.id === fileId);
         if (fileObj && !fileObj.isMock && !documentChunks[fileId]) {
           fetchDocumentChunks(fileObj.name, fileId);
         }
@@ -443,22 +491,26 @@ export function IngestPanel({
       const res = await fetch("http://localhost:8000/api/retrieve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: ragSearchQuery })
+        body: JSON.stringify({ query: ragSearchQuery }),
       });
       if (res.ok) {
         const data = await res.json();
         setRagSearchResults({
           sources: data.chunks || [],
           latency_ms: 15,
-          trace_id: "api-retrieval-" + Math.random().toString(36).substring(2, 8),
+          trace_id:
+            "api-retrieval-" + Math.random().toString(36).substring(2, 8),
           isSimulated: false,
-          retrievalType: "Dense Vector Search (Qdrant Index)"
+          retrievalType: "Dense Vector Search (Qdrant Index)",
         });
         setIsRagSearching(false);
         return;
       }
     } catch (e) {
-      console.warn("Connection to RAG API failed, falling back to local simulation", e);
+      console.warn(
+        "Connection to RAG API failed, falling back to local simulation",
+        e,
+      );
     }
 
     // Client-side fallback matching
@@ -475,7 +527,7 @@ export function IngestPanel({
                 fileType: chunk.type,
                 summaryText: chunk.summaryText,
                 isRaw: chunk.isRaw,
-                metadata: chunk.metadata
+                metadata: chunk.metadata,
               });
             });
           }
@@ -483,19 +535,20 @@ export function IngestPanel({
 
         if (localChunks.length === 0) {
           setRagSearchResults({
-            answer: "No document chunks are currently indexed in the registry. Please upload files above to parse them into searchable chunks.",
+            answer:
+              "No document chunks are currently indexed in the registry. Please upload files above to parse them into searchable chunks.",
             sources: [],
             latency_ms: 10,
             trace_id: "local-sim-empty",
             isSimulated: true,
-            retrievalType: "Local Database Scan (0 chunks found)"
+            retrievalType: "Local Database Scan (0 chunks found)",
           });
           setIsRagSearching(false);
           return;
         }
 
         const queryClean = ragSearchQuery.toLowerCase().trim();
-        const queryTerms = queryClean.split(/\W+/).filter(t => t.length > 2);
+        const queryTerms = queryClean.split(/\W+/).filter((t) => t.length > 2);
 
         const scored = localChunks.map((item) => {
           const contentLower = item.content.toLowerCase();
@@ -507,11 +560,11 @@ export function IngestPanel({
               if (contentLower.includes(term)) {
                 matchCount++;
                 const occurrences = contentLower.split(term).length - 1;
-                score += 0.25 + (occurrences * 0.05);
+                score += 0.25 + occurrences * 0.05;
               }
             });
             if (matchCount > 1) {
-              score *= (1.0 + 0.3 * matchCount);
+              score *= 1.0 + 0.3 * matchCount;
             }
           } else {
             if (contentLower.includes(queryClean)) {
@@ -519,35 +572,37 @@ export function IngestPanel({
             }
           }
 
-          const pseudoDistance = (Math.abs(Math.sin(item.content.length)) * 0.05);
+          const pseudoDistance = Math.abs(Math.sin(item.content.length)) * 0.05;
           score = Math.min(0.98, score + pseudoDistance);
 
           return {
             ...item,
-            score
+            score,
           };
         });
 
         const matchedResults = scored
-          .filter(x => x.score > 0.08 || queryTerms.length === 0)
+          .filter((x) => x.score > 0.08 || queryTerms.length === 0)
           .sort((a, b) => b.score - a.score)
           .slice(0, 3);
 
         let answer = "";
         if (matchedResults.length > 0) {
           const topMatch = matchedResults[0];
-          answer = `**[Simulated RAG Answer]** Synthesized response for query: *"${ragSearchQuery}"* using retrieved context:\n\n` +
+          answer =
+            `**[Simulated RAG Answer]** Synthesized response for query: *"${ragSearchQuery}"* using retrieved context:\n\n` +
             `From the document **${topMatch.fileName}** (Page ${topMatch.pageNumber}), the semantic search retrieved matching text with a similarity score of **${(topMatch.score * 100).toFixed(0)}%**:\n` +
             `> "${topMatch.content.substring(0, 240)}..."\n\n` +
             `In a production environment, the pipeline feeds these top chunks directly into the LLM system prompt context, enforcing grounding and preventing hallucination.`;
         } else {
-          answer = `The retrieval engine scanned all ${localChunks.length} indexed chunks in the database but could not find a semantic match for your query: "${ragSearchQuery}".\n\n` +
+          answer =
+            `The retrieval engine scanned all ${localChunks.length} indexed chunks in the database but could not find a semantic match for your query: "${ragSearchQuery}".\n\n` +
             `Try adjusting your keywords or upload documents that contain content related to your search.`;
         }
 
         setRagSearchResults({
           answer,
-          sources: matchedResults.map(m => ({
+          sources: matchedResults.map((m) => ({
             content: m.content,
             score: m.score,
             metadata: {
@@ -556,13 +611,13 @@ export function IngestPanel({
               page_number: m.pageNumber,
               file_type: m.fileType,
               summary_text: m.summaryText,
-              ...m.metadata
-            }
+              ...m.metadata,
+            },
           })),
           latency_ms: 20 + Math.random() * 30,
           trace_id: "sim-" + Math.random().toString(36).substring(2, 10),
           isSimulated: true,
-          retrievalType: "Local Database Scan (Fallback Mode)"
+          retrievalType: "Local Database Scan (Fallback Mode)",
         });
       } catch (err: any) {
         setRagSearchError(err?.message || "Simulation failed");
@@ -587,11 +642,19 @@ export function IngestPanel({
 
   const onDeleteFileClick = async (filename: string, isMockFile: boolean) => {
     if (isMockFile) {
-      if (window.confirm(`Are you sure you want to permanently delete mock document "${filename}"?`)) {
-        setFiles(prev => prev.filter(f => f.name !== filename));
+      if (
+        window.confirm(
+          `Are you sure you want to permanently delete mock document "${filename}"?`,
+        )
+      ) {
+        setFiles((prev) => prev.filter((f) => f.name !== filename));
       }
     } else {
-      if (window.confirm(`Are you sure you want to permanently delete document "${filename}" and all its vector chunks?`)) {
+      if (
+        window.confirm(
+          `Are you sure you want to permanently delete document "${filename}" and all its vector chunks?`,
+        )
+      ) {
         await handleDeleteFile(filename);
       }
     }
@@ -604,7 +667,7 @@ export function IngestPanel({
 
   const wizardFiles = React.useMemo(() => {
     if (isMockMode) return files;
-    
+
     const keys = Object.keys(realIngestStatus);
     if (keys.length > 0) {
       return keys.map((filename, idx) => {
@@ -613,11 +676,12 @@ export function IngestPanel({
           id: `real-ingest-${idx}-${filename}`,
           name: filename,
           size: "N/A",
-          status: info.status === "completed" 
-            ? ("completed" as const) 
-            : info.status === "failed" 
-            ? ("failed" as const) 
-            : ("processing" as const),
+          status:
+            info.status === "completed"
+              ? ("completed" as const)
+              : info.status === "failed"
+                ? ("failed" as const)
+                : ("processing" as const),
           textCount: info.text_count || 0,
           tableCount: info.table_count || 0,
           imageCount: info.image_count || 0,
@@ -625,12 +689,14 @@ export function IngestPanel({
           otherCount: 0,
           totalElements: info.total_elements || 0,
           totalChunks: info.chunks_count || 0,
-          summarizedChunks: info.chunks ? info.chunks.filter((c: any) => !c.isRaw).length : 0,
-          chunks: info.chunks || []
+          summarizedChunks: info.chunks
+            ? info.chunks.filter((c: any) => !c.isRaw).length
+            : 0,
+          chunks: info.chunks || [],
         };
       });
     }
-    
+
     return uploadedFilesList as unknown as ProcessingFile[];
   }, [isMockMode, files, realIngestStatus, uploadedFilesList]);
 
@@ -638,15 +704,15 @@ export function IngestPanel({
     setWizardActive(true);
     setActiveStep(targetFileId ? 3 : 1);
     setMaxStepReached(targetFileId ? 3 : 1);
-    
-    const selectFile = targetFileId 
-      ? (wizardFiles.find(f => f.id === targetFileId) || wizardFiles[0])
+
+    const selectFile = targetFileId
+      ? wizardFiles.find((f) => f.id === targetFileId) || wizardFiles[0]
       : wizardFiles[0];
 
     if (selectFile) {
       setOpenPartitionFiles({ [selectFile.id]: true });
       setOpenChunkFiles({ [selectFile.id]: true });
-      setOpenRegistryFiles(prev => ({ ...prev, [selectFile.id]: true }));
+      setOpenRegistryFiles((prev) => ({ ...prev, [selectFile.id]: true }));
 
       if (selectFile.chunks && selectFile.chunks.length > 0) {
         setSelectedChunk(selectFile.chunks[0]);
@@ -661,7 +727,11 @@ export function IngestPanel({
   useEffect(() => {
     if (wizardActive && !selectedChunk) {
       const activeFilesList = wizardFiles;
-      if (activeFilesList.length > 0 && activeFilesList[0].chunks && activeFilesList[0].chunks.length > 0) {
+      if (
+        activeFilesList.length > 0 &&
+        activeFilesList[0].chunks &&
+        activeFilesList[0].chunks.length > 0
+      ) {
         setSelectedChunk(activeFilesList[0].chunks[0]);
         setOpenPartitionFiles({ [activeFilesList[0].id]: true });
         setOpenChunkFiles({ [activeFilesList[0].id]: true });
@@ -675,13 +745,16 @@ export function IngestPanel({
     if (isMockMode) {
       if (maxStepReached < 3) {
         const stepDurations = [3500, 4500];
-        const timer = setTimeout(() => {
-          setMaxStepReached(prev => {
-            const next = prev + 1;
-            setActiveStep(next);
-            return next;
-          });
-        }, stepDurations[maxStepReached - 1]);
+        const timer = setTimeout(
+          () => {
+            setMaxStepReached((prev) => {
+              const next = prev + 1;
+              setActiveStep(next);
+              return next;
+            });
+          },
+          stepDurations[maxStepReached - 1],
+        );
         return () => clearTimeout(timer);
       }
     } else {
@@ -697,13 +770,16 @@ export function IngestPanel({
               minStep = Math.min(minStep, 1);
             } else if (info.status === "partitioning") {
               minStep = Math.min(minStep, 2);
-            } else if (info.status === "chunking" || info.status === "indexing") {
+            } else if (
+              info.status === "chunking" ||
+              info.status === "indexing"
+            ) {
               minStep = Math.min(minStep, 3);
             }
           }
         });
-        
-        setMaxStepReached(prev => {
+
+        setMaxStepReached((prev) => {
           if (minStep > prev) {
             setActiveStep(minStep);
             return minStep;
@@ -731,7 +807,7 @@ export function IngestPanel({
     if (droppedFiles.length > 0) {
       startIngestionWizard();
       const mockEvent = {
-        target: { files: e.dataTransfer.files }
+        target: { files: e.dataTransfer.files },
       } as unknown as React.ChangeEvent<HTMLInputElement>;
       handleFileUpload(mockEvent);
     }
@@ -749,7 +825,6 @@ export function IngestPanel({
     <div className="flex-1 flex flex-col overflow-hidden">
       {!wizardActive ? (
         <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
-          
           {/* Grouped file registry list (Left Column) */}
           <FileRegistryList
             sortedGroupKeys={sortedGroupKeys}

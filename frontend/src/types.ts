@@ -2,7 +2,7 @@ export interface Source {
   content: string;
   score: number;
   metadata?: {
-    filename?: string;
+    file_name?: string;
     source?: string;
     [key: string]: any;
   };

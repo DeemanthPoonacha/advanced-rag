@@ -39,9 +39,13 @@ export function IngestOverview({
   return (
     <div className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto scrollbar-thin animate-fade-in">
       <div className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-        <h3 className="text-md font-bold mb-1 font-display">Ingest Documents</h3>
+        <h3 className="text-md font-bold mb-1 font-display">
+          Ingest Documents
+        </h3>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
-          Upload multiple documents. Layouts will be partitioned (extracting text, tables, and images), and summarized dynamically using Vision models. Plain text is treated raw and skipped from summaries.
+          Upload multiple documents. Layouts will be partitioned (extracting
+          text, tables, and images), and summarized dynamically using Vision
+          models. Plain text is treated raw and skipped from summaries.
         </p>
 
         <div
@@ -56,10 +60,15 @@ export function IngestOverview({
               : "border-slate-200 dark:border-slate-800 hover:border-primary dark:hover:border-primary bg-slate-50 dark:bg-slate-950/20 hover:bg-primary/5 hover:scale-[1.01]"
           }`}
         >
-          <UploadCloud className={`w-12 h-12 text-primary ${isDragActive ? "animate-bounce" : "animate-pulse"}`} />
-          <div className="text-sm font-semibold">Click or drag files to upload</div>
+          <UploadCloud
+            className={`w-12 h-12 text-primary ${isDragActive ? "animate-bounce" : "animate-pulse"}`}
+          />
+          <div className="text-sm font-semibold">
+            Click or drag files to upload
+          </div>
           <div className="text-xs text-slate-400 text-center max-w-[280px]">
-            Supports PDF, DOCX, CSV, PPTX, TXT, or Markdown (Upload multiple files)
+            Supports PDF, DOCX, CSV, PPTX, TXT, or Markdown (Upload multiple
+            files)
           </div>
           <input
             type="file"
@@ -73,25 +82,35 @@ export function IngestOverview({
       </div>
 
       <div className="border-b border-slate-200 dark:border-slate-800 pb-3 mb-1">
-        <h3 className="text-xs font-bold text-slate-850 dark:text-slate-100 uppercase tracking-wider">Ingestion Engine Settings</h3>
+        <h3 className="text-xs font-bold text-slate-850 dark:text-slate-100 uppercase tracking-wider">
+          Ingestion Engine Settings
+        </h3>
       </div>
-      
+
       <div className="space-y-4 text-xs">
         <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
           <span className="text-slate-500">Parser Model</span>
-          <span className="font-semibold text-slate-800 dark:text-slate-200 capitalize">{status?.parser_provider || "unstructured"}</span>
+          <span className="font-semibold text-slate-800 dark:text-slate-200 capitalize">
+            {status?.parser_provider || "unstructured"}
+          </span>
         </div>
         <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
           <span className="text-slate-500">Chunking Strategy</span>
-          <span className="font-semibold text-slate-800 dark:text-slate-200 capitalize">{status?.chunker_provider || "semantic"}</span>
+          <span className="font-semibold text-slate-800 dark:text-slate-200 capitalize">
+            {status?.chunker_provider || "semantic"}
+          </span>
         </div>
         <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
           <span className="text-slate-500">DB Schema Collection</span>
-          <span className="font-semibold text-slate-800 dark:text-slate-200">{status?.collection_name || "documents"}</span>
+          <span className="font-semibold text-slate-800 dark:text-slate-200">
+            {status?.collection_name || "documents"}
+          </span>
         </div>
         <div className="flex justify-between pb-1">
           <span className="text-slate-500">Indexing Engine</span>
-          <span className="font-semibold text-accent capitalize">{status?.vector_store_provider || "qdrant"}</span>
+          <span className="font-semibold text-accent capitalize">
+            {status?.vector_store_provider || "qdrant"}
+          </span>
         </div>
       </div>
 
@@ -101,7 +120,11 @@ export function IngestOverview({
           Multi-Modal RAG
         </h3>
         <p className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
-          Hi-res partitioning processes document layouts to extract text blocks, tables, and images. Chunks with complex visuals are summarized using Vision LLMs, while text-only chunks remain raw. During answer synthesis, original high-fidelity layout data is loaded directly into the LLM context.
+          Hi-res partitioning processes document layouts to extract text blocks,
+          tables, and images. Chunks with complex visuals are summarized using
+          Vision LLMs, while text-only chunks remain raw. During answer
+          synthesis, original high-fidelity layout data is loaded directly into
+          the LLM context.
         </p>
       </div>
     </div>

@@ -1,0 +1,27 @@
+Acme RAG Engine Release Notes
+============================
+
+Release v3.0.0 (June 20, 2026)
+------------------------------
+We are excited to announce Acme RAG v3.0.0, which features major performance enhancements, native multimodal processing, and advanced metadata filtering.
+
+Key Features & Updates:
+* **Performance Update:** Ingestion speeds have been optimized by up to 45% using concurrent chunking and token batching.
+* **Multimodal Support:** Native extraction of images and tables from PDF documents using deep learning layout analysis.
+* **Vector Database:** Added support for Qdrant client connection pooling and hybrid search.
+* **Security:** Integrated input and output safety guardrails to prevent prompt injections and check response alignment.
+
+Bug Fixes:
+* Resolved a memory leak in the local sentence-transformer embedding model when parsing large documents on CPU.
+* Fixed incorrect page number offsets when parsing multi-page DOCX files.
+* Corrected coordinate matching issues for extracted image bounding boxes.
+
+
+Release v2.5.0 (April 15, 2026)
+------------------------------
+Acme RAG v2.5.0 introduces custom loaders, distributed tracing, and local model inference options.
+
+Key Features & Updates:
+* **Custom Chunker Registry:** Developers can now register custom chunkers and parsers using the ComponentRegistry interface.
+* **Observability:** Out-of-the-box OpenTelemetry tracing integration for latency profiling across each stage (PARSE, CHUNK, EMBED, RETRIEVE, LLM).
+* **Local Inference:** Fully tested support for Gemma 2B and Llama 3 models via local Ollama services.

@@ -1,0 +1,13 @@
+sku,name,category,price,inventory_count,status,release_date
+SKU-9901,Quantum Server Rack,Hardware,12500.00,12,In Stock,2025-11-15
+SKU-9902,Aegis Security Gateway,Hardware,3400.00,45,In Stock,2026-01-20
+SKU-8801,Nebula Cloud Compute Hub,Software,450.00,999,Active,2025-05-10
+SKU-8802,Chronos DB Clustering Engine,Software,1200.00,999,Active,2025-08-01
+SKU-8803,Helios Load Balancer API,Software,250.00,999,Active,2025-09-12
+SKU-7701,Titan Fiber Optic Cable 10m,Cables,85.50,150,In Stock,2024-04-18
+SKU-7702,Titan Fiber Optic Cable 50m,Cables,299.00,80,In Stock,2024-04-18
+SKU-6601,Apex Pro Developer Station,Workstations,4200.00,8,Low Stock,2026-03-01
+SKU-6602,Apex Lite Developer Station,Workstations,2500.00,0,Out of Stock,2026-03-01
+SKU-5501,Lumen LED Console Panel,Hardware,150.00,300,In Stock,2025-02-28
+SKU-4401,Aether VPN License (1 Year),Software,99.00,999,Active,2024-10-01
+SKU-3301,Krypton Backup Battery Unit,Hardware,850.00,5,Low Stock,2025-07-22

@@ -19,14 +19,16 @@ export function VectorDbConfigCard({
   const provider = configData.vector_store?.provider || "qdrant";
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:shadow-md">
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <h3 className="font-bold text-sm font-display flex items-center gap-2">
             <Database size={16} className="text-primary" />
             Vector Database
           </h3>
-          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">Database</span>
+          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">
+            Database
+          </span>
         </div>
 
         <div className="space-y-3">
@@ -37,7 +39,12 @@ export function VectorDbConfigCard({
             </label>
             <select
               value={provider}
-              onChange={(e) => handleUpdateConfigValue(["vector_store", "provider"], e.target.value)}
+              onChange={(e) =>
+                handleUpdateConfigValue(
+                  ["vector_store", "provider"],
+                  e.target.value,
+                )
+              }
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
             >
               <option value="qdrant">Qdrant Vector DB</option>
@@ -56,7 +63,12 @@ export function VectorDbConfigCard({
               type="text"
               placeholder="http://localhost:6333"
               value={configData.vector_store?.config?.url || ""}
-              onChange={(e) => handleUpdateConfigValue(["vector_store", "config", "url"], e.target.value)}
+              onChange={(e) =>
+                handleUpdateConfigValue(
+                  ["vector_store", "config", "url"],
+                  e.target.value,
+                )
+              }
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
             />
           </div>
@@ -68,10 +80,20 @@ export function VectorDbConfigCard({
             </label>
             <input
               type="text"
-              value={configData.vector_store?.config?.collection_name || configData.vector_store?.config?.index_name || ""}
+              value={
+                configData.vector_store?.config?.collection_name ||
+                configData.vector_store?.config?.index_name ||
+                ""
+              }
               onChange={(e) => {
-                handleUpdateConfigValue(["vector_store", "config", "collection_name"], e.target.value);
-                handleUpdateConfigValue(["vector_store", "config", "index_name"], e.target.value);
+                handleUpdateConfigValue(
+                  ["vector_store", "config", "collection_name"],
+                  e.target.value,
+                );
+                handleUpdateConfigValue(
+                  ["vector_store", "config", "index_name"],
+                  e.target.value,
+                );
               }}
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
             />
@@ -100,7 +122,12 @@ export function VectorDbConfigCard({
               <input
                 type="number"
                 value={configData.vector_store?.config?.vector_size ?? 384}
-                onChange={(e) => handleUpdateConfigValue(["vector_store", "config", "vector_size"], parseInt(e.target.value) || 384)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["vector_store", "config", "vector_size"],
+                    parseInt(e.target.value) || 384,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               />
             </div>
@@ -108,14 +135,25 @@ export function VectorDbConfigCard({
             {provider === "qdrant" && (
               <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-950/40 border border-slate-200/50 dark:border-slate-800/50 transition-colors animate-fade-in">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-semibold">Prefer gRPC Protocol</span>
-                  <span className="text-[8px] text-slate-400 dark:text-slate-500">Use gRPC port 6334 instead of HTTP</span>
+                  <span className="text-[10px] font-semibold">
+                    Prefer gRPC Protocol
+                  </span>
+                  <span className="text-[8px] text-slate-400 dark:text-slate-500">
+                    Use gRPC port 6334 instead of HTTP
+                  </span>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={configData.vector_store?.config?.prefer_grpc ?? true}
-                    onChange={(e) => handleUpdateConfigValue(["vector_store", "config", "prefer_grpc"], e.target.checked)}
+                    checked={
+                      configData.vector_store?.config?.prefer_grpc ?? true
+                    }
+                    onChange={(e) =>
+                      handleUpdateConfigValue(
+                        ["vector_store", "config", "prefer_grpc"],
+                        e.target.checked,
+                      )
+                    }
                     className="sr-only peer"
                   />
                   <div className="w-8 h-4 bg-slate-300 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary transition-all"></div>
@@ -132,7 +170,12 @@ export function VectorDbConfigCard({
                 type="password"
                 placeholder="••••••••••••••••"
                 value={configData.vector_store?.config?.api_key || ""}
-                onChange={(e) => handleUpdateConfigValue(["vector_store", "config", "api_key"], e.target.value)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["vector_store", "config", "api_key"],
+                    e.target.value,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               />
             </div>

@@ -1,7 +1,15 @@
 import React, { useState, useRef } from "react";
-import { Send, ChevronRight, Paperclip, FileText, X, Loader2, AlertCircle } from "lucide-react";
+import {
+  Send,
+  ChevronRight,
+  Paperclip,
+  FileText,
+  X,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
 import { Message, Source, Evaluation, Attachment } from "../types";
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 interface MessageDetailsProps {
@@ -11,7 +19,9 @@ interface MessageDetailsProps {
 }
 
 function MessageDetails({ sources, evaluation, latency }: MessageDetailsProps) {
-  const [openSection, setOpenSection] = useState<"citations" | "eval" | null>(null);
+  const [openSection, setOpenSection] = useState<"citations" | "eval" | null>(
+    null,
+  );
 
   const toggleSection = (section: "citations" | "eval") => {
     setOpenSection(openSection === section ? null : section);
@@ -42,9 +52,12 @@ function MessageDetails({ sources, evaluation, latency }: MessageDetailsProps) {
                 >
                   <div className="flex justify-between font-bold text-[10px] text-slate-400">
                     <span className="truncate max-w-[200px]">
-                      Doc {i + 1}: {src.metadata?.filename || src.metadata?.source || "Doc"}
+                      Doc {i + 1}:{" "}
+                      {src.metadata?.file_name || src.metadata?.source || "Doc"}
                     </span>
-                    <span className="text-accent font-mono">Similarity: {(src.score * 100).toFixed(0)}%</span>
+                    <span className="text-accent font-mono">
+                      Similarity: {(src.score * 100).toFixed(0)}%
+                    </span>
                   </div>
                   <div className="italic text-slate-600 dark:text-slate-300 leading-relaxed font-sans pr-1">
                     {src.content}
@@ -78,23 +91,27 @@ function MessageDetails({ sources, evaluation, latency }: MessageDetailsProps) {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  {Object.entries(evaluation.metrics || {}).map(([metric, score]) => (
-                    <div
-                      key={metric}
-                      className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/50 flex flex-col gap-0.5"
-                    >
-                      <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider pr-1">
-                        {metric.replace("_", " ")}
-                      </span>
-                      <span
-                        className={`text-md font-bold font-display ${
-                          Number(score) >= 0.7 ? "text-emerald-500" : "text-amber-500"
-                        }`}
+                  {Object.entries(evaluation.metrics || {}).map(
+                    ([metric, score]) => (
+                      <div
+                        key={metric}
+                        className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/50 flex flex-col gap-0.5"
                       >
-                        {Number(score).toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
+                        <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider pr-1">
+                          {metric.replace("_", " ")}
+                        </span>
+                        <span
+                          className={`text-md font-bold font-display ${
+                            Number(score) >= 0.7
+                              ? "text-emerald-500"
+                              : "text-amber-500"
+                          }`}
+                        >
+                          {Number(score).toFixed(2)}
+                        </span>
+                      </div>
+                    ),
+                  )}
                   {latency && (
                     <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/50 flex flex-col gap-0.5">
                       <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">
@@ -167,9 +184,9 @@ export function ChatPanel({
   const handlePaste = (e: React.ClipboardEvent) => {
     const items = Array.from(e.clipboardData.items);
     const files = items
-      .map(item => item.getAsFile())
+      .map((item) => item.getAsFile())
       .filter((file): file is File => file !== null);
-    
+
     if (files.length > 0) {
       onAttachFiles(files);
     }
@@ -188,18 +205,21 @@ export function ChatPanel({
   };
 
   const isUploadDisabled = isGenerating;
-  const isSendDisabled = isGenerating || (input.trim() === "" && !pendingAttachments.some(a => a.status === "ready"));
-  
-  const cleanAiResponse=(text:string)=>{
+  const isSendDisabled =
+    isGenerating ||
+    (input.trim() === "" &&
+      !pendingAttachments.some((a) => a.status === "ready"));
+
+  const cleanAiResponse = (text: string) => {
     return text
       .replace(/\s+\*\s+\*\*/g, "\n\n-  **")
       .replace(/ \* /g, "\n- ")
       .replace(/\s\*\*\s/g, "**")
       .trim();
-  }
+  };
 
   return (
-    <div 
+    <div
       className="flex-1 flex flex-col max-w-4xl w-full mx-auto bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden relative"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -210,8 +230,12 @@ export function ChatPanel({
         <div className="absolute inset-0 bg-primary/10 border-2 border-dashed border-primary rounded-2xl flex flex-col items-center justify-center backdrop-blur-sm z-50 animate-fade-in pointer-events-none">
           <div className="bg-white dark:bg-slate-905 p-6 rounded-2xl shadow-xl flex flex-col items-center gap-3">
             <Paperclip className="w-10 h-10 text-primary animate-bounce" />
-            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Drop files to attach to this chat</p>
-            <p className="text-xs text-slate-400">Images, PDFs, or Text files are supported</p>
+            <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+              Drop files to attach to this chat
+            </p>
+            <p className="text-xs text-slate-400">
+              Images, PDFs, or Text files are supported
+            </p>
           </div>
         </div>
       )}
@@ -249,17 +273,27 @@ export function ChatPanel({
                           className="w-10 h-10 rounded object-cover shadow-sm"
                         />
                       ) : (
-                        <div className={`w-10 h-10 rounded flex items-center justify-center text-[10px] font-bold ${
-                          msg.sender === "user" ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-primary"
-                        }`}>
+                        <div
+                          className={`w-10 h-10 rounded flex items-center justify-center text-[10px] font-bold ${
+                            msg.sender === "user"
+                              ? "bg-white/20 text-white"
+                              : "bg-slate-100 dark:bg-slate-800 text-primary"
+                          }`}
+                        >
                           <FileText size={18} />
                         </div>
                       )}
                       <div className="flex flex-col max-w-[160px]">
-                        <span className="font-semibold truncate text-[11px] leading-tight">{att.filename}</span>
-                        <span className={`text-[8px] uppercase tracking-wider font-semibold leading-none mt-1 ${
-                          msg.sender === "user" ? "text-white/60" : "text-slate-400"
-                        }`}>
+                        <span className="font-semibold truncate text-[11px] leading-tight">
+                          {att.filename}
+                        </span>
+                        <span
+                          className={`text-[8px] uppercase tracking-wider font-semibold leading-none mt-1 ${
+                            msg.sender === "user"
+                              ? "text-white/60"
+                              : "text-slate-400"
+                          }`}
+                        >
                           {att.file_type.split("/")[1] || att.file_type}
                         </span>
                       </div>
@@ -272,7 +306,9 @@ export function ChatPanel({
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {cleanAiResponse(msg.text)}
                 </ReactMarkdown>
-                {msg.status === "streaming" && <span className="streaming-caret" />}
+                {msg.status === "streaming" && (
+                  <span className="streaming-caret" />
+                )}
                 {msg.status === "loading" && (
                   <div className="flex gap-1.5 py-1.5">
                     <span className="streaming-caret animate-pulse" />
@@ -283,13 +319,20 @@ export function ChatPanel({
               </div>
 
               {/* Detail Accordions */}
-              {msg.sender === "assistant" && (msg.sources || msg.evaluation) && (
-                <MessageDetails sources={msg.sources} evaluation={msg.evaluation} latency={msg.latency} />
-              )}
+              {msg.sender === "assistant" &&
+                (msg.sources || msg.evaluation) && (
+                  <MessageDetails
+                    sources={msg.sources}
+                    evaluation={msg.evaluation}
+                    latency={msg.latency}
+                  />
+                )}
             </div>
             <div className="mt-1.5 flex gap-2 text-[10px] font-semibold text-slate-400 px-1.5">
               <span>{msg.sender === "user" ? "You" : "RAG Assistant"}</span>
-              {msg.latency && <span className="font-mono">({msg.latency.toFixed(0)}ms)</span>}
+              {msg.latency && (
+                <span className="font-mono">({msg.latency.toFixed(0)}ms)</span>
+              )}
             </div>
           </div>
         ))}
@@ -298,7 +341,6 @@ export function ChatPanel({
 
       {/* Chat Input form */}
       <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 shrink-0">
-        
         {/* Pending attachments preview list */}
         {pendingAttachments.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3 px-2">
@@ -306,8 +348,8 @@ export function ChatPanel({
               <div
                 key={att.id}
                 className={`flex items-center gap-2 p-1.5 bg-white dark:bg-slate-950 border rounded-xl text-xs pr-2 select-none group relative shadow-sm transition-all duration-200 ${
-                  att.status === "error" 
-                    ? "border-rose-500/50 bg-rose-50/10" 
+                  att.status === "error"
+                    ? "border-rose-500/50 bg-rose-50/10"
                     : "border-slate-200 dark:border-slate-850 hover:border-slate-350 dark:hover:border-slate-700"
                 }`}
               >
@@ -338,7 +380,10 @@ export function ChatPanel({
                   </div>
                 )}
                 {att.status === "error" && (
-                  <div className="ml-1 shrink-0 text-rose-500" title={att.error}>
+                  <div
+                    className="ml-1 shrink-0 text-rose-500"
+                    title={att.error}
+                  >
                     <AlertCircle size={12} />
                   </div>
                 )}
@@ -367,7 +412,7 @@ export function ChatPanel({
           >
             <Paperclip className="w-4.5 h-4.5" />
           </button>
-          
+
           <input
             type="file"
             ref={fileInputRef}
@@ -389,7 +434,15 @@ export function ChatPanel({
 
           {/* Mode switcher (Stream vs Evaluate) */}
           <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-full shadow-sm text-xs font-medium shrink-0">
-            <span onClick={() => setStreamResponse(false)} className={(!streamResponse ? "text-primary" : "text-slate-500")+" cursor-pointer"}>Evaluate</span>
+            <span
+              onClick={() => setStreamResponse(false)}
+              className={
+                (!streamResponse ? "text-primary" : "text-slate-500") +
+                " cursor-pointer"
+              }
+            >
+              Evaluate
+            </span>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
@@ -399,7 +452,15 @@ export function ChatPanel({
               />
               <div className="w-7 h-4 bg-slate-200 dark:bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
             </label>
-            <span onClick={() => setStreamResponse(true)} className={(streamResponse ? "text-primary" : "text-slate-500")+" cursor-pointer"}>Stream</span>
+            <span
+              onClick={() => setStreamResponse(true)}
+              className={
+                (streamResponse ? "text-primary" : "text-slate-500") +
+                " cursor-pointer"
+              }
+            >
+              Stream
+            </span>
           </div>
 
           <button

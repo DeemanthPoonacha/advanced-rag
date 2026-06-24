@@ -19,14 +19,16 @@ export function LlmConfigCard({
   const temp = configData.llm?.config?.temperature ?? 0.1;
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:scale-[1.01] hover:shadow-md">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between transition-all duration-300 hover:shadow-md">
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
           <h3 className="font-bold text-sm font-display flex items-center gap-2">
             <Sparkles size={16} className="text-primary animate-pulse" />
             LLM & Completions
           </h3>
-          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">LLM</span>
+          <span className="text-[9px] uppercase font-extrabold tracking-widest text-slate-400">
+            LLM
+          </span>
         </div>
 
         <div className="space-y-3">
@@ -37,7 +39,9 @@ export function LlmConfigCard({
             </label>
             <select
               value={configData.llm?.provider || "openai"}
-              onChange={(e) => handleUpdateConfigValue(["llm", "provider"], e.target.value)}
+              onChange={(e) =>
+                handleUpdateConfigValue(["llm", "provider"], e.target.value)
+              }
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
             >
               <option value="openai">OpenAI GPT</option>
@@ -49,51 +53,19 @@ export function LlmConfigCard({
 
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold flex items-center gap-1">
-              LLM Base URL
-              <InfoTooltip text="The API base endpoint URL (required for local/Ollama setups)." />
-            </label>
-            <input
-              type="text"
-              placeholder={configData.llm?.provider === "local" ? "http://localhost:11434/v1" : "https://api.openai.com/v1"}
-              value={configData.llm?.config?.base_url || ""}
-              onChange={(e) => handleUpdateConfigValue(["llm", "config", "base_url"], e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold flex items-center gap-1">
               Model Identifier
               <InfoTooltip text="Specific model tag running completions (e.g. gpt-4o-mini, llama3.2:1b)." />
             </label>
             <input
               type="text"
               value={configData.llm?.config?.model || ""}
-              onChange={(e) => handleUpdateConfigValue(["llm", "config", "model"], e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold flex items-center justify-between">
-              <span className="flex items-center gap-1">
-                Temperature (Creativity)
-                <InfoTooltip text="Creativity controller. 0.0 is deterministic; 1.0 is creative." />
-              </span>
-              <span className="font-mono text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
-                {temp.toFixed(2)}
-              </span>
-            </label>
-            <input
-              type="range"
-              min="0.0"
-              max="1.0"
-              step="0.05"
-              value={temp}
               onChange={(e) =>
-                handleUpdateConfigValue(["llm", "config", "temperature"], parseFloat(e.target.value))
+                handleUpdateConfigValue(
+                  ["llm", "config", "model"],
+                  e.target.value,
+                )
               }
-              className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer hover:bg-slate-350 dark:hover:bg-slate-700 transition-colors"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
             />
           </div>
         </div>
@@ -113,6 +85,55 @@ export function LlmConfigCard({
         {isExpanded && (
           <div className="space-y-3 mt-3 pt-3 border-t border-dashed border-slate-100 dark:border-slate-800/50 animate-fade-in">
             <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  Temperature (Creativity)
+                  <InfoTooltip text="Creativity controller. 0.0 is deterministic; 1.0 is creative." />
+                </span>
+                <span className="font-mono text-xs font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded">
+                  {temp.toFixed(2)}
+                </span>
+              </label>
+              <input
+                type="range"
+                min="0.0"
+                max="1.0"
+                step="0.05"
+                value={temp}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["llm", "config", "temperature"],
+                    parseFloat(e.target.value),
+                  )
+                }
+                className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer hover:bg-slate-350 dark:hover:bg-slate-700 transition-colors"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] font-semibold flex items-center gap-1">
+                LLM Base URL
+                <InfoTooltip text="The API base endpoint URL (required for local/Ollama setups)." />
+              </label>
+              <input
+                type="text"
+                placeholder={
+                  configData.llm?.provider === "local"
+                    ? "http://localhost:11434/v1"
+                    : "https://api.openai.com/v1"
+                }
+                value={configData.llm?.config?.base_url || ""}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["llm", "config", "base_url"],
+                    e.target.value,
+                  )
+                }
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
               <label className="text-[11px] font-semibold flex items-center gap-1">
                 API Authorization Key
                 <InfoTooltip text="Secret token key used to authorize API generation calls." />
@@ -121,7 +142,12 @@ export function LlmConfigCard({
                 type="password"
                 placeholder="••••••••••••••••"
                 value={configData.llm?.config?.api_key || ""}
-                onChange={(e) => handleUpdateConfigValue(["llm", "config", "api_key"], e.target.value)}
+                onChange={(e) =>
+                  handleUpdateConfigValue(
+                    ["llm", "config", "api_key"],
+                    e.target.value,
+                  )
+                }
                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
               />
             </div>

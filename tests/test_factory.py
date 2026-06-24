@@ -238,3 +238,38 @@ def test_factory_disabled_or_missing_components():
     assert factory.create_input_guardrail() is None
     assert factory.create_output_guardrail() is None
     assert factory.create_evaluator() is None
+
+
+def test_factory_vector_store_unification():
+    raw_config = {
+        "project": {"name": "factory-test-unification"},
+        "ingestion": {},
+        "embeddings": {
+            "provider": "openai",
+            "config": {"model": "text-embedding-3-small"}
+        },
+        "llm": {"provider": "openai"},
+        "vector_store": {
+            "provider": "qdrant",
+            "config": {
+                "url": "http://localhost:6333",
+                "index_name": "unified-collection" # testing name unification
+            }
+        },
+        "retrieval": {
+            "strategy": "simple"
+        }
+    }
+
+    config = load_config_from_dict(raw_config)
+    factory = ComponentFactory(config)
+
+    store = factory.create_vector_store()
+    assert isinstance(store, MockVectorStore)
+    # Check that collection_name, index_name, and table_name are unified to "unified-collection"
+    assert store.kwargs.get("collection_name") == "unified-collection"
+    assert store.kwargs.get("index_name") == "unified-collection"
+    assert store.kwargs.get("table_name") == "unified-collection"
+    
+    # Check that vector_size was automatically inferred from mock embeddings model dimensions (1536)
+    assert store.kwargs.get("vector_size") == 1536

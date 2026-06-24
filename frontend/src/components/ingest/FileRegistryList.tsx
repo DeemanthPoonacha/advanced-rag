@@ -1,15 +1,15 @@
 import { useState } from "react";
-import { 
-  Search, 
-  X, 
-  Loader2, 
-  Info, 
-  Database, 
-  FileText, 
-  ChevronDown, 
-  ChevronRight, 
-  CheckCircle2, 
-  Trash2 
+import {
+  Search,
+  X,
+  Loader2,
+  Info,
+  Database,
+  FileText,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  Trash2,
 } from "lucide-react";
 
 interface FileRegistryListProps {
@@ -49,9 +49,10 @@ export function FileRegistryList({
   ragSearchQuery,
   setRagSearchQuery,
 }: FileRegistryListProps) {
-  
-  const [registryChunkFilters, setRegistryChunkFilters] = useState<Record<string, "all" | "text" | "table" | "image">>({});
-  
+  const [registryChunkFilters, setRegistryChunkFilters] = useState<
+    Record<string, "all" | "text" | "table" | "image">
+  >({});
+
   // Helper to color-code similarity scores dynamically
   const getScoreBadgeClass = (score: number) => {
     if (score >= 0.8) {
@@ -66,8 +67,10 @@ export function FileRegistryList({
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex-1 flex flex-col min-h-[300px] overflow-hidden backdrop-blur-md bg-white/80 dark:bg-slate-900/80">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 shrink-0">
-        <h3 className="text-md font-bold font-display">Ingested Files Registry</h3>
-        
+        <h3 className="text-md font-bold font-display">
+          Ingested Files Registry
+        </h3>
+
         {/* RAG Retrieval Search Bar */}
         <div className="relative w-full md:w-80 shrink-0">
           <Search className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
@@ -98,7 +101,9 @@ export function FileRegistryList({
         <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8 gap-3">
           <Loader2 className="w-8 h-8 text-primary animate-spin" />
           <p className="text-sm font-semibold">Interrogating Vector Index...</p>
-          <p className="text-xs text-slate-500">Retrieving most relevant document chunks and synthesizing answer</p>
+          <p className="text-xs text-slate-500">
+            Retrieving most relevant document chunks and synthesizing answer
+          </p>
         </div>
       ) : ragSearchError ? (
         <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8 gap-2">
@@ -126,15 +131,21 @@ export function FileRegistryList({
             </div>
             <div className="flex items-center gap-3">
               <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono flex items-center gap-2">
-                <span>Latency: {ragSearchResults.latency_ms?.toFixed(0)}ms</span>
+                <span>
+                  Latency: {ragSearchResults.latency_ms?.toFixed(0)}ms
+                </span>
                 <span>•</span>
-                <span>Trace ID: {ragSearchResults.trace_id?.substring(0, 8)}...</span>
+                <span>
+                  Trace ID: {ragSearchResults.trace_id?.substring(0, 8)}...
+                </span>
               </div>
-              <span className={`px-1.5 py-0.5 rounded font-sans text-[8px] font-bold ${
-                ragSearchResults.isSimulated 
-                  ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" 
-                  : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-              }`}>
+              <span
+                className={`px-1.5 py-0.5 rounded font-sans text-[8px] font-bold ${
+                  ragSearchResults.isSimulated
+                    ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                    : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                }`}
+              >
                 {ragSearchResults.retrievalType || "Vector DB Search"}
               </span>
               <button
@@ -157,27 +168,31 @@ export function FileRegistryList({
                   const chunkObj = {
                     id: `retrieved-${idx}`,
                     page: source.metadata?.page_number || 1,
-                    type: (
-                      source.metadata?.file_type === "image" || 
-                      source.metadata?.image_extracted || 
+                    type:
+                      source.metadata?.file_type === "image" ||
+                      source.metadata?.image_extracted ||
                       source.metadata?.image_base64 ||
-                      (Array.isArray(source.metadata?.images_base64) && source.metadata.images_base64.length > 0)
-                    )
-                      ? ("image" as const)
-                      : (
-                        source.metadata?.table_extracted || 
-                        (Array.isArray(source.metadata?.tables_html) && source.metadata.tables_html.length > 0)
-                      )
-                      ? ("table" as const)
-                      : ("text" as const),
-                    snippet: source.content ? (source.content.length > 120 ? source.content.substring(0, 120) + "..." : source.content) : "",
+                      (Array.isArray(source.metadata?.images_base64) &&
+                        source.metadata.images_base64.length > 0)
+                        ? ("image" as const)
+                        : source.metadata?.table_extracted ||
+                            (Array.isArray(source.metadata?.tables_html) &&
+                              source.metadata.tables_html.length > 0)
+                          ? ("table" as const)
+                          : ("text" as const),
+                    snippet: source.content
+                      ? source.content.length > 120
+                        ? source.content.substring(0, 120) + "..."
+                        : source.content
+                      : "",
                     originalText: source.content || "",
                     summaryText: source.metadata?.summary_text || "",
                     isRaw: !source.metadata?.summary_text,
                     metadata: source.metadata || {},
                   };
 
-                  const isSelected = selectedChunk?.originalText === source.content;
+                  const isSelected =
+                    selectedChunk?.originalText === source.content;
                   const scorePercent = (source.score * 100).toFixed(0);
 
                   return (
@@ -195,11 +210,15 @@ export function FileRegistryList({
                           <span className="px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 text-[8px] font-bold text-primary">
                             Rank #{idx + 1}
                           </span>
-                          <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${getScoreBadgeClass(source.score)}`}>
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${getScoreBadgeClass(source.score)}`}
+                          >
                             Score: {scorePercent}%
                           </span>
                           <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[150px] font-semibold">
-                            {source.metadata?.file_name || source.metadata?.source || "Unknown Document"}
+                            {source.metadata?.file_name ||
+                              source.metadata?.source ||
+                              "Unknown Document"}
                           </span>
                         </div>
                         <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">
@@ -224,7 +243,9 @@ export function FileRegistryList({
         <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-8">
           <Database className="w-12 h-12 text-slate-300 dark:text-slate-800 mb-2 animate-pulse" />
           <p className="text-sm font-semibold">No files ingested yet</p>
-          <p className="text-xs text-slate-400 mt-1">Upload files above to compile the RAG registry.</p>
+          <p className="text-xs text-slate-400 mt-1">
+            Upload files above to compile the RAG registry.
+          </p>
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto space-y-6 pr-1 scrollbar-thin">
@@ -279,12 +300,13 @@ export function FileRegistryList({
                                 {file.size}
                               </span>
                             )}
-                            
+
                             {/* Dynamic Ingest Status Badge */}
                             {(() => {
-                              const detailedStatus = !file.isMock && realIngestStatus[file.name]
-                                ? realIngestStatus[file.name].status
-                                : file.status;
+                              const detailedStatus =
+                                !file.isMock && realIngestStatus[file.name]
+                                  ? realIngestStatus[file.name].status
+                                  : file.status;
 
                               return (
                                 <>
@@ -333,7 +355,7 @@ export function FileRegistryList({
                                 </>
                               );
                             })()}
-                            
+
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -357,14 +379,17 @@ export function FileRegistryList({
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                        </div>                        {/* Expanded Ingestion details panel */}
+                        </div>{" "}
+                        {/* Expanded Ingestion details panel */}
                         {isExpanded && (
                           <div className="border-t border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-950/20 p-5 space-y-4 animate-fade-in">
                             {/* Chunks breakdown List */}
                             <div className="space-y-4">
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 select-none">
-                                <div className="text-xs font-bold text-slate-700 dark:text-slate-300">Document Chunk Index Registry</div>
-                                
+                                <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                  Document Chunk Index Registry
+                                </div>
+
                                 {/* Filter Button Row */}
                                 {file.chunks && file.chunks.length > 0 && (
                                   <div className="flex flex-wrap gap-1 bg-slate-100 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-200/55 dark:border-slate-800/50 shrink-0">
@@ -374,17 +399,27 @@ export function FileRegistryList({
                                       { key: "table", label: "Tables" },
                                       { key: "image", label: "Images" },
                                     ].map((filter) => {
-                                      const count = filter.key === "all" 
-                                        ? file.chunks.length
-                                        : file.chunks.filter((c: any) => c.type === filter.key).length;
-                                      
-                                      const activeFilter = registryChunkFilters[file.id] || "all";
-                                      const isActive = activeFilter === filter.key;
-                                      
+                                      const count =
+                                        filter.key === "all"
+                                          ? file.chunks.length
+                                          : file.chunks.filter(
+                                              (c: any) => c.type === filter.key,
+                                            ).length;
+
+                                      const activeFilter =
+                                        registryChunkFilters[file.id] || "all";
+                                      const isActive =
+                                        activeFilter === filter.key;
+
                                       return (
                                         <button
                                           key={filter.key}
-                                          onClick={() => setRegistryChunkFilters(prev => ({ ...prev, [file.id]: filter.key as any }))}
+                                          onClick={() =>
+                                            setRegistryChunkFilters((prev) => ({
+                                              ...prev,
+                                              [file.id]: filter.key as any,
+                                            }))
+                                          }
                                           className={`px-2.5 py-0.5 rounded-lg text-[9px] font-extrabold border transition-all duration-200 cursor-pointer ${
                                             isActive
                                               ? "bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-700 shadow-sm"
@@ -401,16 +436,20 @@ export function FileRegistryList({
 
                               {file.chunks && file.chunks.length > 0 ? (
                                 (() => {
-                                  const activeFilter = registryChunkFilters[file.id] || "all";
-                                  const filteredChunks = file.chunks.filter((chunk: any) => {
-                                    if (activeFilter === "all") return true;
-                                    return chunk.type === activeFilter;
-                                  });
+                                  const activeFilter =
+                                    registryChunkFilters[file.id] || "all";
+                                  const filteredChunks = file.chunks.filter(
+                                    (chunk: any) => {
+                                      if (activeFilter === "all") return true;
+                                      return chunk.type === activeFilter;
+                                    },
+                                  );
 
                                   if (filteredChunks.length === 0) {
                                     return (
                                       <div className="text-center py-8 text-xs text-slate-400 dark:text-slate-500 bg-slate-50/20 dark:bg-slate-900/10 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl animate-fade-in">
-                                        No chunks match the active filter "{activeFilter}".
+                                        No chunks match the active filter "
+                                        {activeFilter}".
                                       </div>
                                     );
                                   }
@@ -418,11 +457,14 @@ export function FileRegistryList({
                                   return (
                                     <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1.5 scrollbar-thin animate-fade-in">
                                       {filteredChunks.map((chunk: any) => {
-                                        const isSelected = selectedChunk?.id === chunk.id;
+                                        const isSelected =
+                                          selectedChunk?.id === chunk.id;
                                         return (
                                           <div
                                             key={chunk.id}
-                                            onClick={() => setSelectedChunk(chunk)}
+                                            onClick={() =>
+                                              setSelectedChunk(chunk)
+                                            }
                                             className={`p-3 rounded-lg border text-left cursor-pointer transition-all duration-200 hover:scale-[1.005] ${
                                               isSelected
                                                 ? "bg-primary/5 border-primary/45 shadow-sm"
@@ -447,12 +489,26 @@ export function FileRegistryList({
                                                   </span>
                                                 )}
                                               </div>
-                                              <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500 truncate max-w-[120px]" title={chunk.id}>
-                                                ID: {chunk.id}
-                                              </span>
+                                              <div className="flex gap-1.5 items-center">
+                                                <span
+                                                  className="text-[9px] font-mono text-slate-400 dark:text-slate-500 truncate max-w-[120px]"
+                                                  title={chunk.id}
+                                                >
+                                                  Chunk Index:{" "}
+                                                  {chunk.chunk_index}
+                                                </span>
+                                                <span className="text-xs text-slate-300 dark:text-slate-600">|</span>
+                                                <span
+                                                  className="text-[9px] font-mono text-slate-400 dark:text-slate-500 truncate max-w-[120px]"
+                                                  title={chunk.id}
+                                                >
+                                                  ID: {chunk.id}
+                                                </span>
+                                              </div>
                                             </div>
                                             <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
-                                              {chunk.originalText || chunk.snippet}
+                                              {chunk.originalText ||
+                                                chunk.snippet}
                                             </p>
                                           </div>
                                         );
@@ -462,7 +518,8 @@ export function FileRegistryList({
                                 })()
                               ) : (
                                 <div className="text-center py-4 text-xs text-slate-400 dark:text-slate-500">
-                                  No chunks generated or indexed for this document.
+                                  No chunks generated or indexed for this
+                                  document.
                                 </div>
                               )}
                             </div>
