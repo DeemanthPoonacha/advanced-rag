@@ -140,6 +140,53 @@ project:
     res = client.get("/api/documents")
     assert not any(doc["name"] == "test_doc.txt" for doc in res.json()["documents"])
 
+    # 14. Test GET /api/presets
+    print("\nTesting GET /api/presets:")
+    res = client.get("/api/presets")
+    print(f"Status Code: {res.status_code}")
+    print(f"Response: {res.json()}")
+    assert res.status_code == 200
+    assert "presets" in res.json()
+    assert len(res.json()["presets"]) >= 4
+    
+    # 15. Test GET /api/presets/{name}
+    print("\nTesting GET /api/presets/local_sandbox:")
+    res = client.get("/api/presets/local_sandbox")
+    print(f"Status Code: {res.status_code}")
+    assert res.status_code == 200
+    assert "raw_yaml" in res.json()
+
+    # 16. Test POST /api/presets/{name} (Save custom preset)
+    print("\nTesting POST /api/presets/test_custom_preset:")
+    custom_yaml = """
+project:
+  name: "test-custom-preset"
+  environment: "staging"
+embeddings:
+  provider: "openai"
+llm:
+  provider: "openai"
+vector_store:
+  provider: "qdrant"
+retrieval:
+  strategy: "simple"
+"""
+    res = client.post("/api/presets/test_custom_preset", json={"yaml_content": custom_yaml})
+    print(f"Status Code: {res.status_code}")
+    assert res.status_code == 200
+
+    # 17. Test POST /api/presets/{name}/activate (Activate preset)
+    print("\nTesting POST /api/presets/test_custom_preset/activate:")
+    res = client.post("/api/presets/test_custom_preset/activate")
+    print(f"Status Code: {res.status_code}")
+    assert res.status_code == 200
+
+    # 18. Test DELETE /api/presets/{name} (Delete custom preset)
+    print("\nTesting DELETE /api/presets/test_custom_preset:")
+    res = client.delete("/api/presets/test_custom_preset")
+    print(f"Status Code: {res.status_code}")
+    assert res.status_code == 200
+
     print("\n--- All API Integration Tests Passed! ---")
 
 if __name__ == "__main__":

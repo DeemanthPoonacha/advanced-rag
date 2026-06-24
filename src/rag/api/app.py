@@ -398,6 +398,220 @@ async def parse_config_yaml(req: ConfigUpdateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse yaml: {str(e)}")
 
+# ── Preset Configuration Management ───────────────────────────────────
+
+PRESETS_DIR = Path("presets")
+PREDEFINED_PRESETS = {
+    "local_sandbox": {
+        "name": "local_sandbox",
+        "label": "Lightweight Local Sandbox",
+        "description": "Local CPU-based models (MiniLM) and local LLM configurations for prototyping.",
+        "is_predefined": True
+    },
+    "enterprise_accuracy": {
+        "name": "enterprise_accuracy",
+        "label": "High-Accuracy Enterprise",
+        "description": "Hierarchical chunking, hybrid search, Cohere reranking, safety guardrails, and quality evaluations.",
+        "is_predefined": True
+    },
+    "multimodal_layout": {
+        "name": "multimodal_layout",
+        "label": "Multi-Modal Layout RAG",
+        "description": "Extracts text, tables, and images with vision-supported models for rich document parsing.",
+        "is_predefined": True
+    },
+    "strict_security": {
+        "name": "strict_security",
+        "label": "Strict Security & Safety",
+        "description": "Strict content moderation checks with Llama Guard and safety-vetted prompts.",
+        "is_predefined": True
+    }
+}
+
+def check_active_preset():
+    config_path = Path("config.yaml")
+    if not config_path.exists():
+        return None
+    try:
+        config_data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        if not isinstance(config_data, dict):
+            return None
+            
+        for name in PREDEFINED_PRESETS:
+            preset_path = PRESETS_DIR / f"{name}.yaml"
+            if preset_path.exists():
+                preset_data = yaml.safe_load(preset_path.read_text(encoding="utf-8"))
+                if preset_data == config_data:
+                    return name
+                    
+        # Check custom presets
+        for file in PRESETS_DIR.glob("*.yaml"):
+            preset_name = file.stem
+            if preset_name in PREDEFINED_PRESETS:
+                continue
+            preset_data = yaml.safe_load(file.read_text(encoding="utf-8"))
+            if preset_data == config_data:
+                return preset_name
+    except Exception:
+        pass
+    return None
+
+@app.get("/api/presets")
+async def list_presets():
+    """List predefined and custom presets."""
+    PRESETS_DIR.mkdir(parents=True, exist_ok=True)
+    presets_list = []
+    
+    # 1. Add predefined presets
+    for key, val in PREDEFINED_PRESETS.items():
+        presets_list.append(val)
+        
+    # 2. Add custom presets
+    for file in PRESETS_DIR.glob("*.yaml"):
+        name = file.stem
+        if name in PREDEFINED_PRESETS:
+            continue
+        presets_list.append({
+            "name": name,
+            "label": name.replace("_", " ").title(),
+            "description": "User-defined custom settings configuration.",
+            "is_predefined": False
+        })
+        
+    active = check_active_preset()
+    return {
+        "status": "success",
+        "presets": presets_list,
+        "active_preset": active
+    }
+
+@app.get("/api/presets/{name}")
+async def get_preset(name: str):
+    """Retrieve specific preset details."""
+    preset_path = PRESETS_DIR / f"{name}.yaml"
+    if not preset_path.exists():
+        raise HTTPException(status_code=404, detail=f"Preset '{name}' not found.")
+        
+    try:
+        raw_yaml = preset_path.read_text(encoding="utf-8")
+        parsed_config = yaml.safe_load(raw_yaml)
+        return {
+            "name": name,
+            "raw_yaml": raw_yaml,
+            "parsed_config": parsed_config
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read preset: {str(e)}")
+
+@app.post("/api/presets/{name}")
+async def save_preset(name: str, req: ConfigUpdateRequest):
+    """Create or update a custom preset."""
+    if name in PREDEFINED_PRESETS:
+        raise HTTPException(status_code=400, detail="Cannot modify predefined presets.")
+        
+    try:
+        # Validate YAML content
+        raw_data = yaml.safe_load(req.yaml_content)
+        if not isinstance(raw_data, dict):
+            raise HTTPException(status_code=400, detail="Preset configuration must be a dictionary.")
+        # Dry-run validation through loader
+        load_config_from_dict(raw_data)
+        
+        PRESETS_DIR.mkdir(parents=True, exist_ok=True)
+        preset_path = PRESETS_DIR / f"{name}.yaml"
+        preset_path.write_text(req.yaml_content, encoding="utf-8")
+        
+        return {
+            "status": "success",
+            "message": f"Preset '{name}' saved successfully."
+        }
+    except ValidationError as ve:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "Pydantic validation failed", "errors": ve.errors()}
+        )
+    except yaml.YAMLError as ye:
+        raise HTTPException(status_code=400, detail=f"Invalid YAML syntax: {str(ye)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save preset: {str(e)}")
+
+@app.post("/api/presets/{name}/json")
+async def save_preset_json(name: str, req: Dict[str, Any]):
+    """Create or update a custom preset from JSON representation."""
+    if name in PREDEFINED_PRESETS:
+        raise HTTPException(status_code=400, detail="Cannot modify predefined presets.")
+        
+    try:
+        # Validate configuration using loader
+        load_config_from_dict(req)
+        
+        PRESETS_DIR.mkdir(parents=True, exist_ok=True)
+        preset_path = PRESETS_DIR / f"{name}.yaml"
+        yaml_content = yaml.dump(req, default_flow_style=False)
+        preset_path.write_text(yaml_content, encoding="utf-8")
+        
+        return {
+            "status": "success",
+            "message": f"Preset '{name}' saved successfully from JSON."
+        }
+    except ValidationError as ve:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": "Pydantic validation failed", "errors": ve.errors()}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save preset: {str(e)}")
+
+@app.post("/api/presets/{name}/activate")
+async def activate_preset(name: str):
+    """Activate preset: overwrite config.yaml and reload orchestrator."""
+    preset_path = PRESETS_DIR / f"{name}.yaml"
+    if not preset_path.exists():
+        raise HTTPException(status_code=404, detail=f"Preset '{name}' not found.")
+        
+    global orchestrator, init_error
+    try:
+        raw_yaml = preset_path.read_text(encoding="utf-8")
+        raw_data = yaml.safe_load(raw_yaml)
+        validated_config = load_config_from_dict(raw_data)
+        
+        # Write to config.yaml
+        config_path = Path("config.yaml")
+        config_path.write_text(raw_yaml, encoding="utf-8")
+        
+        # Reload orchestrator
+        if orchestrator:
+            await orchestrator.close()
+            
+        orchestrator = RAGPipelineOrchestrator(validated_config)
+        init_error = None
+        
+        return {
+            "status": "success",
+            "message": f"Preset '{name}' activated and pipeline reloaded successfully."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to activate preset: {str(e)}")
+
+@app.delete("/api/presets/{name}")
+async def delete_preset(name: str):
+    """Delete a custom preset."""
+    if name in PREDEFINED_PRESETS:
+        raise HTTPException(status_code=400, detail="Cannot delete predefined presets.")
+        
+    preset_path = PRESETS_DIR / f"{name}.yaml"
+    if not preset_path.exists():
+        raise HTTPException(status_code=404, detail=f"Preset '{name}' not found.")
+        
+    try:
+        preset_path.unlink()
+        return {
+            "status": "success",
+            "message": f"Preset '{name}' deleted successfully."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete preset: {str(e)}")
+
 @app.get("/api/chunks")
 async def get_all_chunks(limit: int = 10000):
     global orchestrator

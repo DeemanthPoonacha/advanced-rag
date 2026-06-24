@@ -238,7 +238,7 @@ export function Sidebar({
       {/* Telemetry/Status Footer */}
       <div
         className={cn(
-          "border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-black/10 flex flex-col gap-3.5",
+          "border-t mt-auto border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-black/10 flex flex-col gap-3.5",
           sidebarCollapsed ? "p-3 items-center" : "p-4"
         )}
       >

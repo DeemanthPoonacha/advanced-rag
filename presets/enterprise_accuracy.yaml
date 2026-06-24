@@ -1,0 +1,85 @@
+project:
+  name: "enterprise-accuracy-pipeline"
+  environment: "production"
+  version: "1.0.0"
+
+ingestion:
+  parser:
+    provider: "unstructured"
+    config:
+      strategy: "hi_res"
+      languages: ["en"]
+  chunker:
+    provider: "semantic"
+    config:
+      target_chunk_size: 800
+      buffer_size: 1
+  batch_size: 50
+
+embeddings:
+  provider: "openai"
+  config:
+    model: "text-embedding-3-small"
+    api_key: "${OPENAI_API_KEY}"
+
+llm:
+  provider: "openai"
+  config:
+    model: "gpt-4o"
+    temperature: 0.2
+    api_key: "${OPENAI_API_KEY}"
+
+vector_store:
+  provider: "qdrant"
+  config:
+    url: "http://localhost:6333"
+    collection_name: "enterprise_kb"
+    vector_size: 1536
+
+retrieval:
+  strategy: "auto_merging"
+  top_k: 10
+  similarity_threshold: 0.5
+  config:
+    merge_threshold: 0.5
+  reranker:
+    provider: "cohere"
+    config:
+      model: "rerank-english-v3.0"
+      api_key: "${COHERE_API_KEY}"
+
+generation:
+  system_prompt: "You are an expert enterprise research assistant. Answer the question using only the provided context. Structure your answer using professional markdown."
+  prompt_template: "Enterprise Context:\n{context}\n\n---\n\nResearch Question: {query}\n\nDetailed Synthesis:"
+  max_context_chunks: 5
+  include_sources: true
+
+guardrails:
+  enabled: true
+  input:
+    provider: "llama_guard"
+    config:
+      model: "meta-llama/Llama-Guard-3-8B"
+  output:
+    provider: "llama_guard"
+    config:
+      model: "meta-llama/Llama-Guard-3-8B"
+
+evaluation:
+  enabled: true
+  provider: "ragas"
+  config:
+    metrics: ["faithfulness", "answer_relevance"]
+
+observability:
+  logging:
+    level: "INFO"
+    format: "json"
+  metrics:
+    enabled: true
+    port: 9090
+  tracing:
+    enabled: true
+    provider: "opentelemetry"
+    endpoint: "http://localhost:4317"
+    service_name: "enterprise-rag"
