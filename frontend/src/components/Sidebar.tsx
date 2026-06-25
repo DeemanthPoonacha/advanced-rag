@@ -22,7 +22,6 @@ interface SidebarProps {
   activePage: "chat" | "ingest" | "config";
   setActivePage: (page: "chat" | "ingest" | "config") => void;
   status: RAGStatus | null;
-  handleToggleMock: (checked: boolean) => void;
   isDarkMode: boolean;
   toggleTheme: () => void;
   conversations: Conversation[];
@@ -41,7 +40,6 @@ export function Sidebar({
   activePage,
   setActivePage,
   status,
-  handleToggleMock,
   isDarkMode,
   toggleTheme,
   conversations,
@@ -242,44 +240,6 @@ export function Sidebar({
           sidebarCollapsed ? "p-3 items-center" : "p-4",
         )}
       >
-        {/* Sandbox Mode Toggle */}
-        {!sidebarCollapsed ? (
-          <div className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-950/60 border border-slate-200/60 dark:border-slate-800/60 shadow-sm">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold tracking-tight">
-                Sandbox Mode
-              </span>
-              <span className="text-[8px] text-slate-400 dark:text-slate-500">
-                Mock responses
-              </span>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={status?.mock_mode || false}
-                onChange={(e) => handleToggleMock(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-7 h-4 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary"></div>
-            </label>
-          </div>
-        ) : (
-          <button
-            onClick={() => handleToggleMock(!status?.mock_mode)}
-            className={cn(
-              "w-8 h-8 rounded-lg flex items-center justify-center border transition-all cursor-pointer",
-              status?.mock_mode
-                ? "bg-amber-500/10 border-amber-500/30 text-amber-500"
-                : "bg-slate-100 border-slate-200 text-slate-400 dark:bg-slate-850 dark:border-slate-800",
-            )}
-            title={`Sandbox Mode: ${status?.mock_mode ? "ON" : "OFF"}`}
-          >
-            <Zap
-              size={14}
-              className={status?.mock_mode ? "animate-pulse" : ""}
-            />
-          </button>
-        )}
 
         {/* Database Stats */}
         {!sidebarCollapsed &&

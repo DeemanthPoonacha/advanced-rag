@@ -23,178 +23,11 @@ from rag.core.interfaces import (
 # Global orchestrator and initialization status
 orchestrator: Optional[RAGPipelineOrchestrator] = None
 init_error: Optional[str] = None
-use_mock_mode: bool = False
-
-
-# ── Mock Sandbox Implementations for Fallback/Demo ───────────────────
-
-class SandboxParser(BaseParser):
-    def __init__(self, **kwargs):
-        pass
-
-    async def parse(self, source, metadata=None):
-        from rag.core.types import Document, DocumentMetadata
-        name = (metadata or {}).get("filename") or getattr(source, "filename", str(source))
-        if isinstance(source, bytes):
-            name = "uploaded_document"
-        return [Document(content=f"Extracted content from {name}. This is mock information stored to test the RAG flow.", metadata=DocumentMetadata(source=name, file_name=name))]
-    async def parse_batch(self, sources, metadata=None):
-        return []
-
-class SandboxChunker(BaseChunker):
-    def __init__(self, **kwargs):
-        pass
-
-    async def chunk(self, document):
-        from rag.core.types import Chunk
-        # Split mock document into 3 sentences
-        sentences = [s.strip() for s in document.content.split(".") if s.strip()]
-        chunks = []
-        for i, sent in enumerate(sentences):
-            chunks.append(Chunk(content=sent + ".", document_id=document.id, chunk_index=i, metadata=document.metadata))
-        return chunks if chunks else [Chunk(content=document.content, document_id=document.id, chunk_index=0)]
-    async def chunk_batch(self, documents):
-        chunks = []
-        for doc in documents:
-            chunks.extend(await self.chunk(doc))
-        return chunks
-
-class SandboxEmbedder(BaseEmbeddingModel):
-    def __init__(self, **kwargs):
-        pass
-
-    async def embed(self, texts):
-        return [[0.1] * self.dimensions for _ in texts]
-    async def embed_query(self, query):
-        return [0.1] * self.dimensions
-    @property
-    def dimensions(self):
-        return 1536
-
-class SandboxDB(BaseVectorStore):
-    def __init__(self, **kwargs):
-        self.storage = []
-    async def initialize(self): pass
-    async def upsert(self, chunks):
-        self.storage.extend(chunks)
-        return [c.id for c in chunks]
-    async def search(self, query_embedding, top_k=10, filters=None):
-        from rag.core.types import RetrievalResult
-        # Simple string-match simulation
-        results = [RetrievalResult(chunk=c, score=0.95) for c in self.storage]
-        return results[:top_k]
-    async def hybrid_search(self, q_emb, s_vec, top_k=10, alpha=0.5, filters=None):
-        return []
-    async def delete(self, ids): pass
-    async def delete_by_metadata(self, key, value):
-        new_storage = []
-        for c in self.storage:
-            val_in_c = None
-            if c.metadata:
-                if hasattr(c.metadata, key):
-                    val_in_c = getattr(c.metadata, key)
-                elif hasattr(c.metadata, "custom") and isinstance(c.metadata.custom, dict):
-                    val_in_c = c.metadata.custom.get(key)
-            if val_in_c == value:
-                continue
-            new_storage.append(c)
-        self.storage = new_storage
-    async def list_chunks(self, limit=10000):
-        return self.storage[:limit]
-    async def get_by_id(self, id):
-        for c in self.storage:
-            if c.id == id:
-                return c
-        return None
-    async def count(self): return len(self.storage)
-    async def close(self): pass
-
-class SandboxRetriever(BaseRetriever):
-    def __init__(self, vector_store, embedding_model, **kwargs):
-        self.db = vector_store
-        self.embedder = embedding_model
-    async def retrieve(self, context):
-        q_emb = await self.embedder.embed_query(context.original_query)
-        return await self.db.search(q_emb, top_k=context.top_k)
-
-class SandboxLLM(BaseLLM):
-    def __init__(self, **kwargs):
-        pass
-
-    async def generate(self, prompt, **kwargs):
-        # Simulate answering queries
-        query_text = prompt.split("Question:")[-1].split("Answer:")[0].strip() if "Question:" in prompt else "Query"
-        return f"This is a mock RAG response generated for query: '{query_text}'.\n\nThe mock parser extracted relevant chunks from your document and stored them in a sandbox database. Then, the sandbox LLM generated this response based on that retrieved context."
-    
-    async def generate_stream(self, prompt, **kwargs):
-        text = await self.generate(prompt, **kwargs)
-        # Yield in small chunks
-        words = text.split(" ")
-        for i, word in enumerate(words):
-            yield (word + " ")
-            await asyncio.sleep(0.08)
-
-    async def generate_structured(self, prompt, output_schema, **kwargs):
-        return output_schema()
-
-# ── Orchestrator Initializer ──────────────────────────────────────────
-
-def register_mock_components():
-    """Register mock components under the standard provider names to bypass external API requirements."""
-    ComponentRegistry.discover()
-    ComponentRegistry.register("parser", "unstructured")(SandboxParser)
-    ComponentRegistry.register("chunker", "semantic")(SandboxChunker)
-    ComponentRegistry.register("embedding_model", "openai")(SandboxEmbedder)
-    ComponentRegistry.register("vector_store", "qdrant")(SandboxDB)
-    ComponentRegistry.register("retriever", "simple")(SandboxRetriever)
-    ComponentRegistry.register("llm", "openai")(SandboxLLM)
-
-def init_orchestrator(force_mock: bool = False):
-    global orchestrator, init_error, use_mock_mode
-    use_mock_mode = force_mock
-    
-    # Check if config.yaml specifies fully local setup (which doesn't require OpenAI keys)
-    is_local_only = False
+def init_orchestrator():
+    global orchestrator, init_error
     try:
-        config_path = Path("config.yaml")
-        if config_path.exists():
-            with open(config_path, "r", encoding="utf-8") as f:
-                raw_data = yaml.safe_load(f)
-            if isinstance(raw_data, dict):
-                emb_prov = raw_data.get("embeddings", {}).get("provider")
-                llm_prov = raw_data.get("llm", {}).get("provider")
-                if emb_prov == "local" and llm_prov == "local":
-                    is_local_only = True
-    except Exception:
-        pass
-
-    # If no OpenAI Key is available and we haven't forced mock, check if we should default to mock
-    if not force_mock and not os.environ.get("OPENAI_API_KEY") and not is_local_only:
-        print("OPENAI_API_KEY environment variable not found. Defaulting to Mock Sandbox Mode.")
-        use_mock_mode = True
-
-    try:
-        if use_mock_mode:
-            print("Initializing API in Mock Sandbox Mode...")
-            register_mock_components()
-            
-            # Create a simple mock configuration
-            mock_config = {
-                "project": {"name": "mock-sandbox-pipeline", "environment": "development"},
-                "ingestion": {
-                    "parser": {"provider": "unstructured"},
-                    "chunker": {"provider": "semantic"},
-                    "batch_size": 10
-                },
-                "embeddings": {"provider": "openai"},
-                "llm": {"provider": "openai"},
-                "vector_store": {"provider": "qdrant", "config": {}},
-                "retrieval": {"strategy": "simple", "top_k": 3}
-            }
-            config = load_config_from_dict(mock_config)
-        else:
-            print("Initializing API in Standard RAG Mode...")
-            config = load_config("config.yaml")
+        print("Initializing API in Standard RAG Mode...")
+        config = load_config("config.yaml")
 
         # Initialize Orchestrator
         orchestrator = RAGPipelineOrchestrator(config)
@@ -249,11 +82,11 @@ class ConfigUpdateRequest(BaseModel):
 
 @app.get("/api/status")
 async def get_status():
-    global orchestrator, init_error, use_mock_mode
+    global orchestrator, init_error
     
     status_data = {
         "status": "active" if orchestrator is not None else "failed",
-        "mock_mode": use_mock_mode,
+        "mock_mode": False,
         "error": init_error,
     }
     
@@ -275,16 +108,6 @@ async def get_status():
             status_data["chunk_count"] = 0
             
     return status_data
-
-@app.post("/api/toggle-mode")
-async def toggle_mode(mock: bool):
-    """Dynamically toggle between Mock Sandbox and Standard configuration modes."""
-    init_orchestrator(force_mock=mock)
-    return {
-        "status": "success",
-        "mock_mode": use_mock_mode,
-        "error": init_error
-    }
 
 @app.get("/api/config")
 async def get_config():
@@ -1024,7 +847,7 @@ async def get_document_chunks(filename: str):
 
 @app.post("/api/parse-attachment")
 async def parse_attachment(file: UploadFile = File(...)):
-    global orchestrator, use_mock_mode
+    global orchestrator
     if not orchestrator:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

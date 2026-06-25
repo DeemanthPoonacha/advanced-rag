@@ -18,7 +18,7 @@ interface FileRegistryListProps {
   openRegistryFiles: Record<string, boolean>;
   toggleRegistryAccordion: (fileId: string) => void;
   realIngestStatus: Record<string, any>;
-  onDeleteFileClick: (filename: string, isMock: boolean) => void;
+  onDeleteFileClick: (filename: string) => void;
   selectedChunk: any;
   setSelectedChunk: (chunk: any) => void;
   isRagSearching: boolean;
@@ -304,7 +304,7 @@ export function FileRegistryList({
                             {/* Dynamic Ingest Status Badge */}
                             {(() => {
                               const detailedStatus =
-                                !file.isMock && realIngestStatus[file.name]
+                                realIngestStatus[file.name]
                                   ? realIngestStatus[file.name].status
                                   : file.status;
 
@@ -371,7 +371,7 @@ export function FileRegistryList({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onDeleteFileClick(file.name, !!file.isMock);
+                                onDeleteFileClick(file.name);
                               }}
                               className="ml-1.5 p-1.5 hover:bg-rose-500/10 dark:hover:bg-rose-500/20 text-slate-400 hover:text-rose-500 rounded-lg transition-all duration-200 active:scale-90 cursor-pointer flex items-center justify-center shrink-0"
                               title="Delete document and all its chunks"

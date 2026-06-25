@@ -16,7 +16,6 @@ interface FileMetricsInspectorProps {
     totalChunks: number;
     summarizedChunks: number;
     chunks: any[];
-    isMock: boolean;
   };
   setSelectedFileId: (id: string | null) => void;
   setOpenRegistryFiles: (

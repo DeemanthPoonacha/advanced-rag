@@ -15,9 +15,7 @@ export function Header({ activePage, status }: HeaderProps) {
           {activePage === "config" && "Pipeline Configuration Settings"}
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          {status?.mock_mode
-            ? "Sandbox Mode Active — simulating RAG actions"
-            : `Generic Engine Tier: ${status?.environment || "Development"}`}
+          Generic Engine Tier: {status?.environment || "Development"}
         </p>
       </div>
       <div className="flex items-center gap-3">

@@ -43,7 +43,6 @@ export interface Conversation {
 
 export interface RAGStatus {
   status: "active" | "offline";
-  mock_mode: boolean;
   parser_provider: string;
   chunker_provider: string;
   collection_name: string;

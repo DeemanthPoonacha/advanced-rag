@@ -319,24 +319,6 @@ export default function App() {
     }
   };
 
-  const handleToggleMock = async (checked: boolean) => {
-    try {
-      const res = await fetch(`${API_BASE}/api/toggle-mode?mock=${checked}`, {
-        method: "POST",
-      });
-      if (res.ok) {
-        showToast(
-          checked ? "Switched to Mock Sandbox Mode" : "Switched to Standard RAG Mode",
-          "success"
-        );
-        fetchStatus();
-        fetchConfig();
-      }
-    } catch (e) {
-      showToast("Failed to toggle execution modes", "error");
-    }
-  };
-
   const handleUpdateConfigValue = (path: string[], value: any) => {
     setConfigData((prev) => {
       if (!prev) return prev;
@@ -816,7 +798,6 @@ export default function App() {
         activePage={activePage}
         setActivePage={setActivePage}
         status={status}
-        handleToggleMock={handleToggleMock}
         isDarkMode={isDarkMode}
         toggleTheme={toggleTheme}
         conversations={conversations}

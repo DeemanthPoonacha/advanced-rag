@@ -104,177 +104,7 @@ export function IngestPanel({
     Record<string, ChunkData[]>
   >({});
 
-  // Simulation files
-  const [files, setFiles] = useState<ProcessingFile[]>([
-    {
-      id: "f1",
-      name: "attention-is-all-you-need.pdf",
-      size: "2.1 MB",
-      status: "completed",
-      textCount: 166,
-      tableCount: 4,
-      imageCount: 7,
-      titleCount: 30,
-      otherCount: 13,
-      totalElements: 220,
-      totalChunks: 25,
-      summarizedChunks: 8,
-      chunks: [
-        {
-          id: "f1-c1",
-          page: 1,
-          type: "text",
-          snippet:
-            "Attention Is All You Need. Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones...",
-          originalText:
-            "Attention Is All You Need\n\nAshish Vaswani*, Noam Shazeer*, Niki Parmar*, Jakob Uszkoreit*, Llion Jones*, Aidan N. Gomez*†, Łukasz Kaiser*, Illia Polosukhin*‡\nGoogle Brain, Google Research\n\nAbstract\nThe dominant sequence transduction models are based on complex recurrent or convolutional neural networks...",
-          summaryText: "",
-          isRaw: true,
-          metadata: {
-            source: "data/temp_uploads/attention-is-all-you-need.pdf",
-            file_name: "attention-is-all-you-need.pdf",
-            file_type: "pdf",
-            language: "en",
-            page_number: 1,
-            total_pages: 15,
-          },
-        },
-        {
-          id: "f1-c2",
-          page: 2,
-          type: "image",
-          snippet:
-            "### Searchable Description for Document Content on Neural Sequence Transduction Models #### Question Variations...",
-          originalText:
-            "3 Model Architecture\nMost competitive neural sequence transduction models have an encoder-decoder structure [5, 2, 35]. Here, the encoder maps an input sequence of symbol representations (x1, ..., xn) to a sequence of continuous representations z = (z1, ..., zn). Given z, the decoder then generates an output sequence (y1, ..., ym) of symbols one element at a time. At each step the model is auto-regressive [10].",
-          summaryText:
-            "Searchable description of the core Transformer model architecture diagram. The diagram outlines the stacked encoder-decoder layout using multi-head attention and pointwise, fully connected layers. Visual components include input/output embeddings, positional encoding, multi-head attention blocks, and linear projection/softmax output.",
-          isRaw: false,
-          metadata: {
-            source: "data/temp_uploads/attention-is-all-you-need.pdf",
-            file_name: "attention-is-all-you-need.pdf",
-            file_type: "pdf",
-            language: "en",
-            page_number: 2,
-            total_pages: 15,
-            image_extracted: true,
-          },
-        },
-        {
-          id: "f1-c3",
-          page: 2,
-          type: "table",
-          snippet:
-            "Table 1: Maximum path lengths, sequential operations and minimum number of sequential operations...",
-          originalText:
-            "Table 1: Maximum path lengths, sequential operations and minimum number of sequential operations for different layer types. n is the sequence length, d is the representation dimension, k is the kernel size of convolutions and r the size of the neighborhood in local self-attention.\n\n| Layer Type | Complexity per Layer | Sequential Operations | Maximum Path Length |\n|---|---|---|---|\n| Self-Attention | O(n^2 * d) | O(1) | O(1) |\n| Recurrent | O(n * d^2) | O(n) | O(n) |\n| Convolutional | O(k * n * d^2) | O(1) | O(log_k(n)) |\n| Self-Attention (restricted) | O(r * n * d) | O(1) | O(n/r) |",
-          summaryText:
-            "Structured Markdown representation of Table 1 comparing computational complexity, sequential operations, and maximum path lengths across Self-Attention, Recurrent, and Convolutional layers. Details Self-Attention's O(1) sequential operation advantage.",
-          isRaw: false,
-          metadata: {
-            source: "data/temp_uploads/attention-is-all-you-need.pdf",
-            file_name: "attention-is-all-you-need.pdf",
-            file_type: "pdf",
-            language: "en",
-            page_number: 2,
-            total_pages: 15,
-            table_extracted: true,
-          },
-        },
-      ],
-    },
-    {
-      id: "f2",
-      name: "quarterly_report.pdf",
-      size: "1.4 MB",
-      status: "completed",
-      textCount: 110,
-      tableCount: 8,
-      imageCount: 3,
-      titleCount: 15,
-      otherCount: 8,
-      totalElements: 144,
-      totalChunks: 18,
-      summarizedChunks: 11,
-      chunks: [
-        {
-          id: "f2-c1",
-          page: 1,
-          type: "text",
-          snippet:
-            "Q3 Performance Review. Revenue grew by 14% year over year reaching record highs...",
-          originalText:
-            "Q3 Performance Review\n\nExecutive Summary:\nOur revenue for the third quarter of this fiscal year grew by 14% year over year, reaching an all-time record high. Operating margins improved by 230 basis points due to operational efficiency and overhead reduction.",
-          summaryText: "",
-          isRaw: true,
-          metadata: {
-            source: "data/temp_uploads/quarterly_report.pdf",
-            file_name: "quarterly_report.pdf",
-            file_type: "pdf",
-            language: "en",
-            page_number: 1,
-            total_pages: 8,
-          },
-        },
-        {
-          id: "f2-c2",
-          page: 3,
-          type: "table",
-          snippet:
-            "Table 2: Regional revenue breakdown. North America remains our biggest market...",
-          originalText:
-            "Table 2: Regional revenue breakdown by quarters (in Millions USD):\n\n| Region | Q1 | Q2 | Q3 |\n|---|---|---|---|\n| North America | 450 | 480 | 520 |\n| EMEA | 280 | 300 | 310 |\n| APAC | 150 | 180 | 210 |\n| LATAM | 80 | 90 | 95 |",
-          summaryText:
-            "Quarterly revenue table grouped by regions (North America, EMEA, APAC, LATAM) spanning Q1 to Q3. North America shows consistent growth and largest share (520M in Q3). LATAM has lowest share (95M in Q3).",
-          isRaw: false,
-          metadata: {
-            source: "data/temp_uploads/quarterly_report.pdf",
-            file_name: "quarterly_report.pdf",
-            file_type: "pdf",
-            language: "en",
-            page_number: 3,
-            total_pages: 8,
-            table_extracted: true,
-          },
-        },
-      ],
-    },
-    {
-      id: "f3",
-      name: "read_me.txt",
-      size: "12 KB",
-      status: "completed",
-      textCount: 12,
-      tableCount: 0,
-      imageCount: 0,
-      titleCount: 0,
-      otherCount: 0,
-      totalElements: 12,
-      totalChunks: 2,
-      summarizedChunks: 0,
-      chunks: [
-        {
-          id: "f3-c1",
-          page: 1,
-          type: "text",
-          snippet:
-            "This document contains basic instructions and release log info. Plain text file parsed directly...",
-          originalText:
-            "Advanced RAG Pipeline Release Log\n\nUsage:\n1. Run the local backend container using run_servers.sh\n2. Load config.yaml templates to initiate core databases\n3. Connect client frontend interface via API endpoints",
-          summaryText: "",
-          isRaw: true,
-          metadata: {
-            source: "data/temp_uploads/read_me.txt",
-            file_name: "read_me.txt",
-            file_type: "txt",
-            language: "en",
-            page_number: 1,
-            total_pages: 1,
-          },
-        },
-      ],
-    },
-  ]);
+  const [files, setFiles] = useState<ProcessingFile[]>([]);
 
   const fetchDocumentChunks = async (filename: string, fileId: string) => {
     try {
@@ -305,28 +135,6 @@ export function IngestPanel({
 
 
 
-  // Unified files mapping and sorting/grouping
-  const mockFilesList = files?.map((file) => ({
-    id: file.id,
-    name: file.name,
-    size: file.size,
-    status: file.status,
-    uploadTime:
-      file.name === "read_me.txt"
-        ? "Jun 21, 2026, 04:20 PM"
-        : "Jun 22, 2026, 10:30 AM",
-    textCount: file.textCount,
-    tableCount: file.tableCount,
-    imageCount: file.imageCount,
-    titleCount: file.titleCount,
-    otherCount: file.otherCount,
-    totalElements: file.totalElements,
-    totalChunks: file.totalChunks,
-    summarizedChunks: file.summarizedChunks,
-    chunksCount: file.totalChunks,
-    chunks: file.chunks,
-    isMock: true,
-  }));
 
   const uploadedFilesList = useMemo(() => {
     const allUniqueFilenames = Array.from(
@@ -417,10 +225,7 @@ export function IngestPanel({
     });
   }, [uploadLogs, documentChunks, realIngestStatus]);
 
-  const isMockMode = status?.mock_mode || false;
-  const allFiles = isMockMode
-    ? [...uploadedFilesList, ...mockFilesList]
-    : uploadedFilesList;
+  const allFiles = uploadedFilesList;
   const selectedFile = allFiles.find((f) => f.id === selectedFileId) || null;
 
   const toggleRegistryAccordion = (fileId: string) => {
@@ -429,7 +234,7 @@ export function IngestPanel({
       if (isExpanded) {
         setSelectedFileId(fileId);
         const fileObj = allFiles.find((f) => f.id === fileId);
-        if (fileObj && !fileObj.isMock && !documentChunks[fileId]) {
+        if (fileObj && !documentChunks[fileId]) {
           fetchDocumentChunks(fileObj.name, fileId);
         }
       } else if (selectedFileId === fileId) {
@@ -632,23 +437,13 @@ export function IngestPanel({
     }
   }, [ragSearchQuery]);
 
-  const onDeleteFileClick = async (filename: string, isMockFile: boolean) => {
-    if (isMockFile) {
-      if (
-        window.confirm(
-          `Are you sure you want to permanently delete mock document "${filename}"?`,
-        )
-      ) {
-        setFiles((prev) => prev.filter((f) => f.name !== filename));
-      }
-    } else {
-      if (
-        window.confirm(
-          `Are you sure you want to permanently delete document "${filename}" and all its vector chunks?`,
-        )
-      ) {
-        await handleDeleteFile(filename);
-      }
+  const onDeleteFileClick = async (filename: string) => {
+    if (
+      window.confirm(
+        `Are you sure you want to permanently delete document "${filename}" and all its vector chunks?`,
+      )
+    ) {
+      await handleDeleteFile(filename);
     }
   };
 
@@ -659,8 +454,6 @@ export function IngestPanel({
   };
 
   const wizardFiles = React.useMemo(() => {
-    if (isMockMode) return files;
-
     const keys = Object.keys(realIngestStatus);
     if (keys.length > 0) {
       return keys.map((filename, idx) => {
@@ -691,7 +484,7 @@ export function IngestPanel({
     }
 
     return uploadedFilesList as unknown as ProcessingFile[];
-  }, [isMockMode, files, realIngestStatus, uploadedFilesList]);
+  }, [realIngestStatus, uploadedFilesList]);
 
   const startIngestionWizard = (targetFileId?: string) => {
     setWizardActive(true);
@@ -736,53 +529,36 @@ export function IngestPanel({
   useEffect(() => {
     if (!wizardActive) return;
 
-    if (isMockMode) {
-      if (maxStepReached < 3) {
-        const stepDurations = [3500, 4500];
-        const timer = setTimeout(
-          () => {
-            setMaxStepReached((prev) => {
-              const next = prev + 1;
-              setActiveStep(next);
-              return next;
-            });
-          },
-          stepDurations[maxStepReached - 1],
-        );
-        return () => clearTimeout(timer);
-      }
-    } else {
-      const keys = Object.keys(realIngestStatus);
-      if (keys.length > 0) {
-        let minStep = 3;
-        keys.forEach((filename) => {
-          const info = realIngestStatus[filename];
-          if (info && typeof info.step === "number") {
-            minStep = Math.min(minStep, info.step);
-          } else if (info) {
-            if (info.status === "uploading") {
-              minStep = Math.min(minStep, 1);
-            } else if (info.status === "partitioning") {
-              minStep = Math.min(minStep, 2);
-            } else if (
-              info.status === "chunking" ||
-              info.status === "indexing"
-            ) {
-              minStep = Math.min(minStep, 3);
-            }
+    const keys = Object.keys(realIngestStatus);
+    if (keys.length > 0) {
+      let minStep = 3;
+      keys.forEach((filename) => {
+        const info = realIngestStatus[filename];
+        if (info && typeof info.step === "number") {
+          minStep = Math.min(minStep, info.step);
+        } else if (info) {
+          if (info.status === "uploading") {
+            minStep = Math.min(minStep, 1);
+          } else if (info.status === "partitioning") {
+            minStep = Math.min(minStep, 2);
+          } else if (
+            info.status === "chunking" ||
+            info.status === "indexing"
+          ) {
+            minStep = Math.min(minStep, 3);
           }
-        });
+        }
+      });
 
-        setMaxStepReached((prev) => {
-          if (minStep > prev) {
-            setActiveStep(minStep);
-            return minStep;
-          }
-          return prev;
-        });
-      }
+      setMaxStepReached((prev) => {
+        if (minStep > prev) {
+          setActiveStep(minStep);
+          return minStep;
+        }
+        return prev;
+      });
     }
-  }, [wizardActive, maxStepReached, isMockMode, realIngestStatus]);
+  }, [wizardActive, maxStepReached, realIngestStatus]);
 
   useEffect(() => {
     if (wizardActive && !isUploading && maxStepReached < 3) {
