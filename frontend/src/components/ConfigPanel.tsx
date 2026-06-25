@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { PipelineConfig } from "../types";
+import { usePipelineConfig, useUpdateConfig } from "../api/queries";
 import { GeneralSettingsCard } from "./config/GeneralSettingsCard";
 import { LlmConfigCard } from "./config/LlmConfigCard";
 import { SplitterConfigCard } from "./config/SplitterConfigCard";
@@ -21,27 +22,135 @@ import {
   BookmarkPlus,
 } from "lucide-react";
 
-interface ConfigPanelProps {
-  configData: PipelineConfig | null;
-  rawYaml: string;
-  setRawYaml: (val: string) => void;
-  editMode: "visual" | "yaml";
-  setEditMode: (mode: "visual" | "yaml") => void;
-  handleUpdateConfigValue: (path: string[], value: any) => void;
-  handleSaveConfig: () => Promise<void>;
-  fetchConfig: () => Promise<void>;
+function jsonToYaml(obj: any, indent = 0): string {
+  if (obj === null || obj === undefined) return "null";
+  if (typeof obj !== "object") {
+    if (typeof obj === "string") {
+      if (obj.includes("\n")) {
+        const lines = obj.split("\n");
+        const spaces = " ".repeat(indent + 2);
+        return "|\n" + lines.map(line => spaces + line).join("\n");
+      }
+      const hasSpecial = /[:#\?\{\}\[\]\s,\|&\*!%@`"']/.test(obj) || obj === "true" || obj === "false" || obj === "null" || !isNaN(Number(obj));
+      if (hasSpecial) {
+        return `"${obj.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+      }
+      return obj;
+    }
+    return String(obj);
+  }
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) return "[]";
+    const spaces = " ".repeat(indent);
+    return obj.map(item => `\n${spaces}- ${jsonToYaml(item, indent + 2)}`).join("");
+  }
+  
+  let yamlStr = "";
+  const keys = Object.keys(obj);
+  keys.forEach((key, idx) => {
+    const val = obj[key];
+    const spaces = " ".repeat(indent);
+    
+    if (val === null || val === undefined) {
+      yamlStr += `${spaces}${key}: null`;
+    } else if (typeof val === "object" && !Array.isArray(val) && Object.keys(val).length === 0) {
+      yamlStr += `${spaces}${key}: {}`;
+    } else if (typeof val === "object") {
+      yamlStr += `${spaces}${key}:\n${jsonToYaml(val, indent + 2)}`;
+    } else {
+      yamlStr += `${spaces}${key}: ${jsonToYaml(val, indent)}`;
+    }
+    
+    if (idx < keys.length - 1) {
+      yamlStr += "\n";
+    }
+  });
+  return yamlStr;
 }
 
-export function ConfigPanel({
-  configData,
-  rawYaml,
-  setRawYaml,
-  editMode,
-  setEditMode,
-  handleUpdateConfigValue,
-  handleSaveConfig,
-  fetchConfig,
-}: ConfigPanelProps) {
+export function ConfigPanel() {
+  const { data: queryData, refetch: fetchConfig } = usePipelineConfig();
+  const configDataQuery = queryData?.resolved_config || null;
+  const rawYamlQuery = queryData?.raw_yaml || "";
+
+  const [configData, setConfigData] = useState<PipelineConfig | null>(null);
+  const [rawYaml, setRawYaml] = useState("");
+  const [editMode, setEditMode] = useState<"visual" | "yaml">("visual");
+
+  // Sync draft states when fresh config is loaded from the backend
+  useEffect(() => {
+    if (configDataQuery && !configData) {
+      setConfigData(configDataQuery);
+    }
+    if (rawYamlQuery && !rawYaml) {
+      setRawYaml(rawYamlQuery);
+    }
+  }, [configDataQuery, rawYamlQuery]);
+
+  const handleUpdateConfigValue = (path: string[], value: any) => {
+    setConfigData((prev) => {
+      if (!prev) return prev;
+      const copy = JSON.parse(JSON.stringify(prev));
+      let current = copy;
+      for (let i = 0; i < path.length - 1; i++) {
+        if (current[path[i]] === undefined || current[path[i]] === null) {
+          current[path[i]] = {};
+        }
+        current = current[path[i]];
+      }
+      current[path[path.length - 1]] = value;
+      return copy;
+    });
+  };
+
+  const handleSetEditMode = async (mode: "visual" | "yaml") => {
+    if (mode === "yaml" && editMode === "visual" && configData) {
+      try {
+        const yamlStr = jsonToYaml(configData);
+        setRawYaml(yamlStr);
+      } catch (e) {
+        console.error("Failed to serialize visual config to YAML", e);
+      }
+    } else if (mode === "visual" && editMode === "yaml" && rawYaml) {
+      try {
+        const res = await fetch("http://localhost:8000/api/config/parse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ yaml_content: rawYaml }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setConfigData(data.resolved_config);
+        } else {
+          const data = await res.json();
+          const detail = data.detail;
+          let errMsg = typeof detail === "string" ? detail : detail.message || "Invalid YAML";
+          if (detail.errors) {
+            errMsg += ": " + detail.errors.map((err: any) => `${err.loc.join(".")}: ${err.msg}`).join(", ");
+          }
+          alert(`YAML parsing failed: ${errMsg}`);
+          return;
+        }
+      } catch (e) {
+        alert("Error connecting to parser endpoint");
+        return;
+      }
+    }
+    setEditMode(mode);
+  };
+
+  const updateConfigMutation = useUpdateConfig();
+  const handleSaveConfig = async () => {
+    updateConfigMutation.mutate({ editMode, rawYaml, configData });
+  };
+
+  const handleResetConfig = async () => {
+    const fresh = await fetchConfig();
+    if (fresh.data) {
+      setConfigData(fresh.data.resolved_config);
+      setRawYaml(fresh.data.raw_yaml);
+    }
+  };
   // State to track expanded sections for advanced config keys
   const [expandedSections, setExpandedSections] = useState<
     Record<string, boolean>
@@ -183,7 +292,7 @@ export function ConfigPanel({
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shrink-0">
         <div className="flex gap-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-xl shadow-sm self-start">
           <button
-            onClick={() => setEditMode("visual")}
+            onClick={handleSetEditMode.bind(null, "visual")}
             className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
               editMode === "visual"
                 ? "bg-primary text-white shadow-sm"
@@ -193,7 +302,7 @@ export function ConfigPanel({
             Visual Config Grid
           </button>
           <button
-            onClick={() => setEditMode("yaml")}
+            onClick={handleSetEditMode.bind(null, "yaml")}
             className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
               editMode === "yaml"
                 ? "bg-primary text-white shadow-sm"
@@ -206,7 +315,7 @@ export function ConfigPanel({
 
         <div className="flex gap-3 justify-end">
           <button
-            onClick={fetchConfig}
+            onClick={handleResetConfig}
             className="px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition active:scale-95 cursor-pointer"
           >
             Reset Changes

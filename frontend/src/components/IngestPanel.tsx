@@ -1,34 +1,11 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { RAGStatus, UploadLog } from "../types";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { FileRegistryList } from "./ingest/FileRegistryList";
 import { ChunkInspector } from "./ingest/ChunkInspector";
 import { FileMetricsInspector } from "./ingest/FileMetricsInspector";
 import { IngestOverview } from "./ingest/IngestOverview";
 import { PipelineVisualizer } from "./ingest/PipelineVisualizer";
-
-interface IngestPanelProps {
-  status: RAGStatus | null;
-  isUploading: boolean;
-  uploadLogs: UploadLog[];
-  handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleCancelUpload: () => void;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
-  handleDeleteFile: (filename: string) => Promise<void>;
-  wizardActive: boolean;
-  setWizardActive: (val: boolean) => void;
-  wizardMinimized: boolean;
-  setWizardMinimized: (val: boolean) => void;
-  activeStep: number;
-  setActiveStep: (val: number | ((prev: number) => number)) => void;
-  maxStepReached: number;
-  setMaxStepReached: (val: number | ((prev: number) => number)) => void;
-  realIngestStatus: Record<string, any>;
-  setRealIngestStatus: (
-    val:
-      | Record<string, any>
-      | ((prev: Record<string, any>) => Record<string, any>),
-  ) => void;
-}
+import { useStore } from "../store/useStore";
+import { useRagStatus, useDocuments, useUploadDocuments, useDeleteDocument } from "../api/queries";
 
 interface ChunkData {
   id: string;
@@ -57,25 +34,37 @@ interface ProcessingFile {
   chunks: ChunkData[];
 }
 
-export function IngestPanel({
-  status,
-  isUploading,
-  uploadLogs,
-  handleFileUpload,
-  handleCancelUpload,
-  fileInputRef,
-  handleDeleteFile,
-  wizardActive,
-  setWizardActive,
-  wizardMinimized,
-  setWizardMinimized,
-  activeStep,
-  setActiveStep,
-  maxStepReached,
-  setMaxStepReached,
-  realIngestStatus,
-  setRealIngestStatus,
-}: IngestPanelProps) {
+export function IngestPanel() {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const { data: statusQuery } = useRagStatus();
+  const status = statusQuery || null;
+
+  const { data: uploadLogsQuery } = useDocuments();
+  const uploadLogs = uploadLogsQuery || [];
+
+  const isUploading = useStore((s) => s.isUploading);
+  const wizardActive = useStore((s) => s.wizardActive);
+  const setWizardActive = useStore((s) => s.setWizardActive);
+  const wizardMinimized = useStore((s) => s.wizardMinimized);
+  const setWizardMinimized = useStore((s) => s.setWizardMinimized);
+  const activeStep = useStore((s) => s.activeStep);
+  const setActiveStep = useStore((s) => s.setActiveStep);
+  const maxStepReached = useStore((s) => s.maxStepReached);
+  const setMaxStepReached = useStore((s) => s.setMaxStepReached);
+  const realIngestStatus = useStore((s) => s.realIngestStatus);
+  const setRealIngestStatus = useStore((s) => s.setRealIngestStatus);
+  const handleCancelUpload = useStore((s) => s.handleCancelUpload);
+
+  const uploadDocsMutation = useUploadDocuments();
+  const handleFileUpload = (files: File[]) => {
+    uploadDocsMutation.mutate({ files });
+  };
+
+  const deleteDocMutation = useDeleteDocument();
+  const handleDeleteFile = async (filename: string) => {
+    await deleteDocMutation.mutateAsync({ filename });
+  };
   const [selectedChunk, setSelectedChunk] = useState<ChunkData | null>(null);
   const [inspectorTab, setInspectorTab] = useState<
     "original" | "summary" | "metadata"
@@ -581,10 +570,7 @@ export function IngestPanel({
     const droppedFiles = Array.from(e.dataTransfer.files);
     if (droppedFiles.length > 0) {
       startIngestionWizard();
-      const mockEvent = {
-        target: { files: e.dataTransfer.files },
-      } as unknown as React.ChangeEvent<HTMLInputElement>;
-      handleFileUpload(mockEvent);
+      handleFileUpload(droppedFiles);
     }
   };
 
@@ -592,7 +578,7 @@ export function IngestPanel({
     const selected = Array.from(e.target.files || []);
     if (selected.length > 0) {
       startIngestionWizard();
-      handleFileUpload(e);
+      handleFileUpload(selected);
     }
   };
 

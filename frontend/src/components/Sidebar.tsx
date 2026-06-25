@@ -16,39 +16,27 @@ import {
   Check,
   X,
 } from "lucide-react";
-import { RAGStatus, Conversation } from "../types";
-
-interface SidebarProps {
-  activePage: "chat" | "ingest" | "config";
-  setActivePage: (page: "chat" | "ingest" | "config") => void;
-  status: RAGStatus | null;
-  isDarkMode: boolean;
-  toggleTheme: () => void;
-  conversations: Conversation[];
-  activeConversationId: string;
-  setActiveConversationId: (id: string) => void;
-  onNewConversation: () => void;
-  onDeleteConversation: (id: string) => void;
-  onRenameConversation: (id: string, title: string) => void;
-}
+import { useStore } from "../store/useStore";
+import { useRagStatus } from "../api/queries";
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function Sidebar({
-  activePage,
-  setActivePage,
-  status,
-  isDarkMode,
-  toggleTheme,
-  conversations,
-  activeConversationId,
-  setActiveConversationId,
-  onNewConversation,
-  onDeleteConversation,
-  onRenameConversation,
-}: SidebarProps) {
+export function Sidebar() {
+  const activePage = useStore((s) => s.activePage);
+  const setActivePage = useStore((s) => s.setActivePage);
+  const isDarkMode = useStore((s) => s.isDarkMode);
+  const toggleTheme = useStore((s) => s.toggleTheme);
+  const conversations = useStore((s) => s.conversations);
+  const activeConversationId = useStore((s) => s.activeConversationId);
+  const setActiveConversationId = useStore((s) => s.setActiveConversationId);
+  const onNewConversation = useStore((s) => s.handleNewConversation);
+  const onDeleteConversation = useStore((s) => s.handleDeleteConversation);
+  const onRenameConversation = useStore((s) => s.handleRenameConversation);
+
+  const { data: statusQuery } = useRagStatus();
+  const status = statusQuery || null;
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem("sidebar_width");
     return saved ? parseInt(saved, 10) : 240;

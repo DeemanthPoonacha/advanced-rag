@@ -1,4 +1,5 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { useStore } from "../store/useStore";
 import {
   Send,
   ChevronRight,
@@ -132,33 +133,27 @@ function MessageDetails({ sources, evaluation, latency }: MessageDetailsProps) {
   );
 }
 
-interface ChatPanelProps {
-  messages: Message[];
-  isGenerating: boolean;
-  streamResponse: boolean;
-  setStreamResponse: (checked: boolean) => void;
-  handleSendMessage: (e: React.FormEvent) => void;
-  input: string;
-  setInput: (value: string) => void;
-  messagesEndRef: React.RefObject<HTMLDivElement | null>;
-  pendingAttachments: Attachment[];
-  onAttachFiles: (files: File[]) => void;
-  onRemoveAttachment: (id: string) => void;
-}
+export function ChatPanel() {
+  const conversations = useStore((s) => s.conversations);
+  const activeConversationId = useStore((s) => s.activeConversationId);
+  const activeConversation = conversations.find(c => c.id === activeConversationId) || conversations[0] || { messages: [] };
+  const messages = activeConversation.messages;
 
-export function ChatPanel({
-  messages,
-  isGenerating,
-  streamResponse,
-  setStreamResponse,
-  handleSendMessage,
-  input,
-  setInput,
-  messagesEndRef,
-  pendingAttachments,
-  onAttachFiles,
-  onRemoveAttachment,
-}: ChatPanelProps) {
+  const isGenerating = useStore((s) => s.isGenerating);
+  const streamResponse = useStore((s) => s.streamResponse);
+  const setStreamResponse = useStore((s) => s.setStreamResponse);
+  const handleSendMessage = useStore((s) => s.handleSendMessage);
+  const input = useStore((s) => s.input);
+  const setInput = useStore((s) => s.setInput);
+  const pendingAttachments = useStore((s) => s.pendingAttachments);
+  const onAttachFiles = useStore((s) => s.handleAttachFiles);
+  const onRemoveAttachment = useStore((s) => s.handleRemovePendingAttachment);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isGenerating]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 

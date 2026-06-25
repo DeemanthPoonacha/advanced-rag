@@ -1,11 +1,11 @@
-import { RAGStatus } from "../types";
+import { useStore } from "../store/useStore";
+import { useRagStatus } from "../api/queries";
 
-interface HeaderProps {
-  activePage: "chat" | "ingest" | "config";
-  status: RAGStatus | null;
-}
+export function Header() {
+  const activePage = useStore((s) => s.activePage);
+  const { data: statusQuery } = useRagStatus();
+  const status = statusQuery || null;
 
-export function Header({ activePage, status }: HeaderProps) {
   return (
     <header className="h-16 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-8 z-10 shrink-0">
       <div>
