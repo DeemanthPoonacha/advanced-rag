@@ -1,4 +1,4 @@
-import { Eye, X, Info } from "lucide-react";
+import { Eye, X, Info, Loader2 } from "lucide-react";
 
 interface ChunkInspectorProps {
   selectedChunk: {
@@ -255,17 +255,29 @@ export function ChunkInspector({
               Searchable Summary (Vision LLM)
             </div>
             {selectedChunk.isRaw ? (
-              <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl text-emerald-600 dark:text-emerald-400 text-[11px] leading-relaxed flex gap-2">
-                <Info className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5 animate-pulse" />
-                <div>
-                  <span className="font-semibold block mb-1">
-                    No AI Summary needed
-                  </span>
-                  This chunk contains plain text, which is parsed and indexed
-                  directly in raw form to optimize latency, save token costs,
-                  and maintain high-fidelity accuracy.
+              (selectedChunk.type === "image" || selectedChunk.type === "table") ? (
+                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-600 dark:text-amber-400 text-[11px] leading-relaxed flex gap-2 animate-pulse">
+                  <Loader2 className="w-4 h-4 text-amber-500 shrink-0 mt-0.5 animate-spin" />
+                  <div>
+                    <span className="font-semibold block mb-1">
+                      AI Summary Pending Generation
+                    </span>
+                    This complex layout element ({selectedChunk.type}) requires an AI summary for vector grounding, but the summarizer is currently processing this document in the background. Chunks will be re-indexed as soon as it's completed.
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl text-emerald-600 dark:text-emerald-400 text-[11px] leading-relaxed flex gap-2">
+                  <Info className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5 animate-pulse" />
+                  <div>
+                    <span className="font-semibold block mb-1">
+                      No AI Summary needed
+                    </span>
+                    This chunk contains plain text, which is parsed and indexed
+                    directly in raw form to optimize latency, save token costs,
+                    and maintain high-fidelity accuracy.
+                  </div>
+                </div>
+              )
             ) : (
               <div className="bg-slate-50 dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-800/80 rounded-xl leading-relaxed text-slate-700 dark:text-slate-300 font-mono text-[11px] whitespace-pre-wrap select-text shadow-inner">
                 {selectedChunk.summaryText}
