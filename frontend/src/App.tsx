@@ -95,6 +95,11 @@ export default function App() {
   const [configData, setConfigData] = useState<PipelineConfig | null>(null);
   const [editMode, setEditMode] = useState<"visual" | "yaml">("visual");
   const [isUploading, setIsUploading] = useState(false);
+  const [wizardActive, setWizardActive] = useState(false);
+  const [wizardMinimized, setWizardMinimized] = useState(false);
+  const [activeStep, setActiveStep] = useState<number>(1);
+  const [maxStepReached, setMaxStepReached] = useState<number>(1);
+  const [realIngestStatus, setRealIngestStatus] = useState<Record<string, any>>({});
   const [uploadLogs, setUploadLogs] = useState<UploadLog[]>([]);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
@@ -143,14 +148,117 @@ export default function App() {
     });
   };
 
+  const checkRunningIngestion = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/ingest/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setRealIngestStatus(data);
+        const keys = Object.keys(data);
+        if (keys.length > 0) {
+          const isAnyRunning = keys.some(filename => {
+            const info = data[filename];
+            return info && info.status !== "completed" && info.status !== "failed";
+          });
+          if (isAnyRunning) {
+            setIsUploading(true);
+            setWizardActive(true);
+            setWizardMinimized(true);
+            
+            // Determine active step
+            let minStep = 3;
+            keys.forEach((filename) => {
+              const info = data[filename];
+              if (info && typeof info.step === "number") {
+                minStep = Math.min(minStep, info.step);
+              } else if (info) {
+                if (info.status === "uploading") {
+                  minStep = Math.min(minStep, 1);
+                } else if (info.status === "partitioning") {
+                  minStep = Math.min(minStep, 2);
+                } else if (info.status === "chunking" || info.status === "indexing") {
+                  minStep = Math.min(minStep, 3);
+                }
+              }
+            });
+            setActiveStep(minStep);
+            setMaxStepReached(minStep);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to check running ingestion status", e);
+    }
+  };
+
   // Initialize status & config
   useEffect(() => {
     fetchStatus();
     fetchConfig();
     fetchDocuments();
+    checkRunningIngestion();
     document.documentElement.classList.add("dark");
     document.documentElement.setAttribute("data-theme", "dark");
   }, []);
+
+  // Poll ingestion status when isUploading is active
+  useEffect(() => {
+    let intervalId: any;
+    if (isUploading) {
+      const pollStatus = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/api/ingest/status`);
+          if (res.ok) {
+            const data = await res.json();
+            setRealIngestStatus(data);
+            
+            const keys = Object.keys(data);
+            if (keys.length > 0) {
+              const isAnyRunning = keys.some(filename => {
+                const info = data[filename];
+                return info && info.status !== "completed" && info.status !== "failed";
+              });
+              
+              // Sync active step and max step reached based on api status
+              let minStep = 3;
+              keys.forEach((filename) => {
+                const info = data[filename];
+                if (info && typeof info.step === "number") {
+                  minStep = Math.min(minStep, info.step);
+                } else if (info) {
+                  if (info.status === "uploading") {
+                    minStep = Math.min(minStep, 1);
+                  } else if (info.status === "partitioning") {
+                    minStep = Math.min(minStep, 2);
+                  } else if (info.status === "chunking" || info.status === "indexing") {
+                    minStep = Math.min(minStep, 3);
+                  }
+                }
+              });
+              
+              setActiveStep(prev => Math.max(prev, minStep));
+              setMaxStepReached(prev => Math.max(prev, minStep));
+              
+              if (!isAnyRunning) {
+                setIsUploading(false);
+                showToast("Document ingestion completed!", "success");
+                await fetchDocuments();
+                fetchStatus();
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Failed to poll ingest status", e);
+        }
+      };
+      
+      pollStatus();
+      intervalId = setInterval(pollStatus, 800);
+    }
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [isUploading]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -289,6 +397,8 @@ export default function App() {
       showToast("Ingestion cancelled.", "warning");
     }
     setIsUploading(false);
+    setWizardActive(false);
+    setWizardMinimized(false);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -296,6 +406,10 @@ export default function App() {
     if (!files.length) return;
 
     setIsUploading(true);
+    setWizardActive(true);
+    setWizardMinimized(false);
+    setActiveStep(1);
+    setMaxStepReached(1);
     showToast(`Uploading ${files.length} document(s)...`, "success");
 
     const formData = new FormData();
@@ -320,14 +434,17 @@ export default function App() {
         fetchStatus();
       } else {
         showToast(data.detail || "Ingestion failed", "error");
+        setWizardActive(false);
       }
     } catch (e: any) {
       if (e.name === "AbortError") {
         return;
       }
       showToast("Upload failed due to connection error", "error");
+      setWizardActive(false);
     } finally {
-      setIsUploading(false);
+      // Note: we don't set isUploading to false here because status polling handles it
+      // when the background tasks in the API are fully completed!
       abortControllerRef.current = null;
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
@@ -744,6 +861,16 @@ export default function App() {
               handleCancelUpload={handleCancelUpload}
               fileInputRef={fileInputRef}
               handleDeleteFile={handleDeleteFile}
+              wizardActive={wizardActive}
+              setWizardActive={setWizardActive}
+              wizardMinimized={wizardMinimized}
+              setWizardMinimized={setWizardMinimized}
+              activeStep={activeStep}
+              setActiveStep={setActiveStep}
+              maxStepReached={maxStepReached}
+              setMaxStepReached={setMaxStepReached}
+              realIngestStatus={realIngestStatus}
+              setRealIngestStatus={setRealIngestStatus}
             />
           )}
 

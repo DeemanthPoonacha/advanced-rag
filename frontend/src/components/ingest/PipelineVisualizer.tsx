@@ -6,6 +6,8 @@ import {
   ChevronDown,
   ChevronRight,
   Sparkle,
+  Minus,
+  Maximize2,
 } from "lucide-react";
 
 interface PipelineVisualizerProps {
@@ -20,6 +22,8 @@ interface PipelineVisualizerProps {
   togglePartitionAccordion: (fileId: string) => void;
   openChunkFiles: Record<string, boolean>;
   toggleChunkAccordion: (fileId: string) => void;
+  minimized?: boolean;
+  setMinimized?: (val: boolean) => void;
 }
 
 export function PipelineVisualizer({
@@ -34,28 +38,127 @@ export function PipelineVisualizer({
   togglePartitionAccordion,
   openChunkFiles,
   toggleChunkAccordion,
+  minimized,
+  setMinimized,
 }: PipelineVisualizerProps) {
+  // Render minimized floating card view if specified
+  if (minimized) {
+    const totalFiles = wizardFiles.length;
+    const completedFiles = wizardFiles.filter(
+      (f) => f.status === "completed" || f.status === "failed"
+    ).length;
+    const percent =
+      totalFiles > 0 ? Math.round((completedFiles / totalFiles) * 100) : 0;
+
+    let statusText = "Ingesting documents...";
+    if (isUploading) {
+      if (activeStep === 1) statusText = "Uploading & Queuing...";
+      else if (activeStep === 2) statusText = "Partitioning Layout...";
+      else if (activeStep === 3) statusText = "AI Chunking & Summarizing...";
+    } else {
+      statusText = "Ingestion Complete";
+    }
+
+    return (
+      <div className="flex flex-col bg-[#0b0f19]/95 backdrop-blur-md border border-slate-800/80 shadow-2xl p-4 rounded-2xl w-full text-slate-200 select-none animate-fade-in transition-all duration-300">
+        {/* Top Header */}
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-1.5 bg-primary/10 border border-primary/20 rounded-lg shrink-0">
+              {isUploading ? (
+                <Loader2 className="w-4 h-4 text-primary animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs font-bold text-slate-100 truncate pr-1">
+                {statusText}
+              </h4>
+              <p className="text-[10px] text-slate-500 font-medium">
+                {completedFiles} of {totalFiles} processed
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            {setMinimized && (
+              <button
+                onClick={() => setMinimized(false)}
+                className="p-1 hover:bg-slate-800 rounded-md text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                title="Maximize Wizard"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button
+              onClick={closeWizard}
+              className="p-1 hover:bg-slate-800 rounded-md text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+              title="Close Panel"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="w-full bg-slate-900 border border-slate-850 h-2 rounded-full overflow-hidden mb-4">
+          <div
+            className="bg-primary h-full transition-all duration-500 rounded-full"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex justify-between items-center gap-2">
+          {isUploading && (
+            <button
+              onClick={handleCancelUpload}
+              className="flex-1 py-1.5 px-3 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-[10px] font-bold transition cursor-pointer flex items-center justify-center gap-1"
+            >
+              <X className="w-3 h-3" />
+              Cancel
+            </button>
+          )}
+          <button
+            onClick={closeWizard}
+            className="flex-1 py-1.5 px-3 bg-primary hover:bg-primary/95 text-white rounded-xl text-[10px] font-bold transition shadow-md cursor-pointer flex items-center justify-center gap-1"
+          >
+            {isUploading ? (
+              <span>Hide Wizard</span>
+            ) : (
+              <>
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                <span>Finish</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Aggregate stats from wizardFiles
   const totalUploaded = wizardFiles.length;
   const countFailed = wizardFiles.filter((f) => f.status === "failed").length;
   const countProgress = wizardFiles.filter(
-    (f) => f.status === "processing",
+    (f) => f.status === "processing"
   ).length;
   const countSuccess = wizardFiles.filter(
-    (f) => f.status === "completed",
+    (f) => f.status === "completed"
   ).length;
 
   const sumTotalElements = wizardFiles.reduce(
     (acc, f) => acc + (f.totalElements || 0),
-    0,
+    0
   );
   const sumTotalChunks = wizardFiles.reduce(
     (acc, f) => acc + (f.totalChunks || 0),
-    0,
+    0
   );
   const sumSummarizedChunks = wizardFiles.reduce(
     (acc, f) => acc + (f.summarizedChunks || 0),
-    0,
+    0
   );
   const sumRawChunks = sumTotalChunks - sumSummarizedChunks;
 
@@ -76,12 +179,24 @@ export function PipelineVisualizer({
             </p>
           </div>
         </div>
-        <button
-          onClick={closeWizard}
-          className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          {setMinimized && (
+            <button
+              onClick={() => setMinimized(true)}
+              className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+              title="Minimize to floating widget"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={closeWizard}
+            className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            title="Minimize and close wizard"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Simplified 3-Step Progress Navigation Header Bar */}

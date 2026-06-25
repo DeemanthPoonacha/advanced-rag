@@ -14,6 +14,16 @@ interface IngestPanelProps {
   handleCancelUpload: () => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   handleDeleteFile: (filename: string) => Promise<void>;
+  wizardActive: boolean;
+  setWizardActive: (val: boolean) => void;
+  wizardMinimized: boolean;
+  setWizardMinimized: (val: boolean) => void;
+  activeStep: number;
+  setActiveStep: (val: number | ((prev: number) => number)) => void;
+  maxStepReached: number;
+  setMaxStepReached: (val: number | ((prev: number) => number)) => void;
+  realIngestStatus: Record<string, any>;
+  setRealIngestStatus: (val: Record<string, any> | ((prev: Record<string, any>) => Record<string, any>)) => void;
 }
 
 interface ChunkData {
@@ -51,10 +61,17 @@ export function IngestPanel({
   handleCancelUpload,
   fileInputRef,
   handleDeleteFile,
+  wizardActive,
+  setWizardActive,
+  wizardMinimized,
+  setWizardMinimized,
+  activeStep,
+  setActiveStep,
+  maxStepReached,
+  setMaxStepReached,
+  realIngestStatus,
+  setRealIngestStatus,
 }: IngestPanelProps) {
-  const [wizardActive, setWizardActive] = useState(false);
-  const [activeStep, setActiveStep] = useState<number>(1);
-  const [maxStepReached, setMaxStepReached] = useState<number>(1);
   const [selectedChunk, setSelectedChunk] = useState<ChunkData | null>(null);
   const [inspectorTab, setInspectorTab] = useState<
     "original" | "summary" | "metadata"
@@ -286,32 +303,7 @@ export function IngestPanel({
   const [ragSearchResults, setRagSearchResults] = useState<any | null>(null);
   const [ragSearchError, setRagSearchError] = useState<string | null>(null);
 
-  const [realIngestStatus, setRealIngestStatus] = useState<Record<string, any>>(
-    {},
-  );
 
-  useEffect(() => {
-    let intervalId: any;
-    if (isUploading) {
-      const pollStatus = async () => {
-        try {
-          const res = await fetch("http://localhost:8000/api/ingest/status");
-          if (res.ok) {
-            const data = await res.json();
-            setRealIngestStatus(data);
-          }
-        } catch (e) {
-          console.error("Failed to fetch ingest status", e);
-        }
-      };
-
-      pollStatus();
-      intervalId = setInterval(pollStatus, 800);
-    }
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [isUploading]);
 
   // Unified files mapping and sorting/grouping
   const mockFilesList = files?.map((file) => ({
@@ -662,6 +654,7 @@ export function IngestPanel({
 
   const closeWizard = () => {
     setWizardActive(false);
+    setWizardMinimized(false);
     setRealIngestStatus({});
   };
 
@@ -702,6 +695,7 @@ export function IngestPanel({
 
   const startIngestionWizard = (targetFileId?: string) => {
     setWizardActive(true);
+    setWizardMinimized(false);
     setActiveStep(targetFileId ? 3 : 1);
     setMaxStepReached(targetFileId ? 3 : 1);
 
@@ -822,9 +816,9 @@ export function IngestPanel({
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {!wizardActive ? (
-        <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden relative">
+      {(!wizardActive || wizardMinimized) ? (
+        <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden relative">
           {/* Grouped file registry list (Left Column) */}
           <FileRegistryList
             sortedGroupKeys={sortedGroupKeys}
@@ -871,6 +865,27 @@ export function IngestPanel({
               />
             )}
           </div>
+
+          {/* Floating Minimized Wizard Overlay Widget */}
+          {wizardActive && wizardMinimized && (
+            <div className="fixed bottom-6 right-6 z-40 w-96 max-w-[calc(100vw-3rem)] animate-fade-in">
+              <PipelineVisualizer
+                activeStep={activeStep}
+                setActiveStep={setActiveStep}
+                maxStepReached={maxStepReached}
+                closeWizard={closeWizard}
+                isUploading={isUploading}
+                handleCancelUpload={handleCancelUpload}
+                wizardFiles={wizardFiles}
+                openPartitionFiles={openPartitionFiles}
+                togglePartitionAccordion={togglePartitionAccordion}
+                openChunkFiles={openChunkFiles}
+                toggleChunkAccordion={toggleChunkAccordion}
+                minimized={true}
+                setMinimized={setWizardMinimized}
+              />
+            </div>
+          )}
         </div>
       ) : (
         /* Multi-Step Wizard Pipeline (Visualizer modal active) */
@@ -886,6 +901,8 @@ export function IngestPanel({
           togglePartitionAccordion={togglePartitionAccordion}
           openChunkFiles={openChunkFiles}
           toggleChunkAccordion={toggleChunkAccordion}
+          minimized={false}
+          setMinimized={setWizardMinimized}
         />
       )}
     </div>

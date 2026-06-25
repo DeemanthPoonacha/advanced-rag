@@ -805,47 +805,74 @@ async def ingest_files(
     total_chunk_ids = []
     ingested_files_log = []
     
-    try:
-        for file in files:
-            current_filename = file.filename
-            try:
-                # Generate unique temp filename to prevent conflict
-                file_extension = Path(current_filename).suffix
-                temp_file_name = f"{uuid.uuid4()}{file_extension}"
-                temp_file_path = temp_dir / temp_file_name
-                
-                # Save file to temp path
+    async def ingest_single_file(file: UploadFile):
+        current_filename = file.filename
+        temp_file_path = None
+        try:
+            # Generate unique temp filename to prevent conflict
+            file_extension = Path(current_filename).suffix
+            temp_file_name = f"{uuid.uuid4()}{file_extension}"
+            temp_file_path = temp_dir / temp_file_name
+            
+            # Save file to temp path via run_in_executor to avoid blocking the event loop
+            loop = asyncio.get_running_loop()
+            def write_file():
                 with open(temp_file_path, "wb") as f:
                     shutil.copyfileobj(file.file, f)
-                    
-                # Run ingestion metadata
-                file_metadata = {**metadata, "filename": current_filename, "file_name": current_filename}
+            await loop.run_in_executor(None, write_file)
                 
-                # Call orchestrator ingest directly - status logic is now inside orchestrator!
-                chunk_ids = await orchestrator.ingest_source(
-                    source=str(temp_file_path),
-                    metadata=file_metadata
-                )
+            # Run ingestion metadata
+            file_metadata = {**metadata, "filename": current_filename, "file_name": current_filename}
+            
+            # Call orchestrator ingest directly - status logic is now inside orchestrator!
+            chunk_ids = await orchestrator.ingest_source(
+                source=str(temp_file_path),
+                metadata=file_metadata
+            )
+            return current_filename, chunk_ids, None
+        except Exception as file_err:
+            orchestrator.set_ingestion_failed(current_filename, str(file_err))
+            return current_filename, [], file_err
+        finally:
+            # Clean up temporary file
+            if temp_file_path and temp_file_path.exists():
+                try:
+                    temp_file_path.unlink()
+                except Exception:
+                    pass
+
+    try:
+        tasks = [ingest_single_file(f) for f in files]
+        results = await asyncio.gather(*tasks)
+        
+        failures = []
+        for filename, chunk_ids, error in results:
+            if error:
+                failures.append({"filename": filename, "error": str(error)})
+            else:
                 total_chunk_ids.extend(chunk_ids)
                 ingested_files_log.append({
-                    "filename": current_filename,
+                    "filename": filename,
                     "chunks_count": len(chunk_ids)
                 })
-                
-                # Delete temporary file
-                if temp_file_path.exists():
-                    temp_file_path.unlink()
-            except Exception as file_error:
-                orchestrator.set_ingestion_failed(current_filename, str(file_error))
-                raise file_error
-                
+
+        if failures and len(failures) == len(files):
+            # All files failed, raise error
+            raise HTTPException(
+                status_code=500,
+                detail=f"All file ingestions failed: {failures}"
+            )
+            
         return {
             "status": "success",
-            "message": f"Successfully ingested {len(files)} files.",
+            "message": f"Successfully ingested {len(ingested_files_log)} of {len(files)} files.",
             "files": ingested_files_log,
             "total_chunks_ingested": len(total_chunk_ids),
-            "chunk_ids": total_chunk_ids
+            "chunk_ids": total_chunk_ids,
+            "failures": failures
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
