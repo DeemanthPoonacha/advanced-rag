@@ -26,6 +26,7 @@ An enterprise-ready, async-first, and completely configuration-driven Generic Re
 *   ⚙️ **[Configuration Reference](docs/configuration.md):** Comprehensive parameter reference guide for `config.yaml` options.
 *   💻 **[Developer API Guide](docs/api_guide.md):** Code examples for custom implementations, streaming output, and system tracing.
 *   🖼️ **[Multi-Modal RAG Guide](docs/multimodal_rag.md):** Comprehensive guide to building a production-grade multi-modal RAG pipeline using Unstructured.io (extracting text, tables, and images) and vision LLMs.
+*   📚 **[Full Technical Documentation](docs/full_documentation.md):** Complete single-file reference covering architecture, all components, REST API, frontend dashboard, configuration, and deployment.
 
 ---
 
