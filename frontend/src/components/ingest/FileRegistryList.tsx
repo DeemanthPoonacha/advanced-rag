@@ -347,10 +347,17 @@ export function FileRegistryList({
                                     </span>
                                   )}
                                   {detailedStatus === "completed" && (
-                                    <span className="px-2 py-0.5 text-[9px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-md flex items-center gap-1">
-                                      <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
-                                      Done
-                                    </span>
+                                    file.isPending ? (
+                                      <span className="px-2 py-0.5 text-[9px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-md flex items-center gap-1">
+                                        <Loader2 className="w-2.5 h-2.5 text-amber-500 animate-spin" />
+                                        Summarizing (Bg)
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 text-[9px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-md flex items-center gap-1">
+                                        <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+                                        Done
+                                      </span>
+                                    )
                                   )}
                                 </>
                               );

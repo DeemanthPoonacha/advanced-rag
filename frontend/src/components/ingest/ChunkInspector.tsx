@@ -182,7 +182,7 @@ export function ChunkInspector({
                       <img
                         src={formatImageSrc(imgB64)}
                         alt={`Extracted Layout Image ${idx + 1}`}
-                        className="max-w-full max-h-[350px] object-contain rounded-lg border border-slate-100 dark:border-slate-900 shadow-sm"
+                        className="max-w-full max-h-87.5 object-contain rounded-lg border border-slate-100 dark:border-slate-900 shadow-sm"
                       />
                     </div>
                   ))}
@@ -325,7 +325,7 @@ export function ChunkInspector({
                                 <img
                                   src={formatImageSrc(img)}
                                   alt={`Extracted Layout Image ${key}`}
-                                  className="max-w-full max-h-[350px] object-contain rounded-lg border border-slate-100 dark:border-slate-900 shadow-sm"
+                                  className="max-w-full max-h-87.5 object-contain rounded-lg border border-slate-100 dark:border-slate-900 shadow-sm"
                                 />
                               ))
                             : typeof value === "object"

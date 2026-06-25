@@ -1,4 +1,4 @@
-import { Database, X } from "lucide-react";
+import { Database, X, Sparkle, Loader2 } from "lucide-react";
 
 interface FileMetricsInspectorProps {
   selectedFile: {
@@ -15,6 +15,8 @@ interface FileMetricsInspectorProps {
     totalElements: number;
     totalChunks: number;
     summarizedChunks: number;
+    needsSummaryCount?: number;
+    isPending?: boolean;
     chunks: any[];
   };
   setSelectedFileId: (id: string | null) => void;
@@ -75,6 +77,19 @@ export function FileMetricsInspector({
           </div>
         </div>
 
+        {/* Background Summarization Pending Banner */}
+        {selectedFile.isPending && (
+          <div className="bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 p-4 rounded-xl text-xs flex items-start gap-2.5 shadow-sm text-left animate-pulse">
+            <Loader2 className="w-4 h-4 shrink-0 text-amber-500 mt-0.5 animate-spin" />
+            <div>
+              <p className="font-bold">Background Summarization In Progress</p>
+              <p className="mt-1 text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+                {(selectedFile.needsSummaryCount || 0) - (selectedFile.summarizedChunks || 0)} complex elements (tables/images) are currently queued for AI summarization in the background. Chunks will update and re-index automatically.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Detailed layout metrics stats block */}
         <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800/60 rounded-xl p-4 shadow-sm space-y-4">
           <div className="text-[10px] font-bold text-primary uppercase tracking-wide">
@@ -98,12 +113,25 @@ export function FileMetricsInspector({
                 {selectedFile.totalChunks || 0}
               </div>
             </div>
-            <div className="p-2.5 bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800/40 rounded-lg">
-              <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
-                AI Summaries
+            <div className="p-2.5 bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800/40 rounded-lg relative overflow-hidden">
+              <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider flex justify-between items-center">
+                <span>AI Summaries</span>
+                {selectedFile.isPending && (
+                  <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-ping" />
+                )}
               </div>
-              <div className="text-sm font-extrabold text-yellow-600 dark:text-yellow-500 mt-0.5">
-                {selectedFile.summarizedChunks || 0}
+              <div className="text-sm font-extrabold text-yellow-600 dark:text-yellow-500 mt-0.5 flex items-baseline gap-1">
+                {selectedFile.isPending ? (
+                  <>
+                    <span>{selectedFile.summarizedChunks || 0}</span>
+                    <span className="text-[10px] text-slate-400 font-normal">/ {selectedFile.needsSummaryCount || 0}</span>
+                    <span className="text-[8px] text-amber-500 font-semibold ml-1.5 bg-amber-500/10 px-1 py-0.5 rounded border border-amber-500/10">
+                      Pending
+                    </span>
+                  </>
+                ) : (
+                  <span>{selectedFile.summarizedChunks || 0}</span>
+                )}
               </div>
             </div>
             <div className="p-2.5 bg-white dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800/40 rounded-lg">

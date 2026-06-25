@@ -71,7 +71,12 @@ class MockVectorStore(BaseVectorStore):
     async def initialize(self):
         self.initialized = True
     async def upsert(self, chunks):
-        self.chunks.extend(chunks)
+        for chunk in chunks:
+            existing_idx = next((i for i, c in enumerate(self.chunks) if c.id == chunk.id), None)
+            if existing_idx is not None:
+                self.chunks[existing_idx] = chunk
+            else:
+                self.chunks.append(chunk)
         return [c.id for c in chunks]
     async def search(self, query_embedding, top_k=10, filters=None):
         return []
@@ -274,3 +279,45 @@ async def test_orchestrator_close(orchestrator_config):
     orchestrator.vector_store.close.assert_called_once()
     orchestrator.llm.close.assert_called_once()
     orchestrator.reranker.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_update_missing_summaries(orchestrator_config):
+    orchestrator = RAGPipelineOrchestrator(orchestrator_config)
+
+    # 1. Create a chunk that is missing a summary but has tables_html
+    meta = DocumentMetadata(
+        source="doc_with_table.txt",
+        file_name="doc_with_table.txt",
+        custom={
+            "tables_html": ["<table></table>"],
+            "raw_text": "This is raw table text.",
+        }
+    )
+    chunk = Chunk(
+        id="chunk-1",
+        content="This is raw table text.",
+        document_id="doc-1",
+        metadata=meta,
+        chunk_index=0,
+        token_count=5
+    )
+
+    # Put it in the mock vector store
+    orchestrator.vector_store.chunks = [chunk]
+
+    # Mock embed to keep track of calls
+    orchestrator.embedding_model.embed = AsyncMock(return_value=[[0.9, 0.9, 0.9]])
+
+    # 2. Run update_missing_summaries
+    num_updated = await orchestrator.update_missing_summaries()
+
+    assert num_updated == 1
+    assert len(orchestrator.vector_store.chunks) == 1
+    
+    updated_chunk = orchestrator.vector_store.chunks[0]
+    assert updated_chunk.content == "LLM generated response"
+    assert updated_chunk.metadata.custom["summary_text"] == "LLM generated response"
+    assert updated_chunk.embedding == [0.9, 0.9, 0.9]
+    orchestrator.embedding_model.embed.assert_called_once_with(["LLM generated response"])
+

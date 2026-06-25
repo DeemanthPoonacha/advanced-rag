@@ -124,4 +124,6 @@ export interface UploadLog {
   filename: string;
   chunks_count: number;
   date: string;
+  summarized_count?: number;
+  needs_summary_count?: number;
 }

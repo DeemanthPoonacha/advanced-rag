@@ -23,7 +23,11 @@ interface IngestPanelProps {
   maxStepReached: number;
   setMaxStepReached: (val: number | ((prev: number) => number)) => void;
   realIngestStatus: Record<string, any>;
-  setRealIngestStatus: (val: Record<string, any> | ((prev: Record<string, any>) => Record<string, any>)) => void;
+  setRealIngestStatus: (
+    val:
+      | Record<string, any>
+      | ((prev: Record<string, any>) => Record<string, any>),
+  ) => void;
 }
 
 interface ChunkData {
@@ -97,14 +101,9 @@ export function IngestPanel({
     setOpenChunkFiles((prev) => ({ ...prev, [fileId]: !prev[fileId] }));
   };
 
-  // toggleRegistryAccordion is defined below selectedFile to avoid reference errors
-
-  const [searchQuery, setSearchQuery] = useState("");
   const [documentChunks, setDocumentChunks] = useState<
     Record<string, ChunkData[]>
   >({});
-
-  const [files, setFiles] = useState<ProcessingFile[]>([]);
 
   const fetchDocumentChunks = async (filename: string, fileId: string) => {
     try {
@@ -132,9 +131,6 @@ export function IngestPanel({
   const [isRagSearching, setIsRagSearching] = useState(false);
   const [ragSearchResults, setRagSearchResults] = useState<any | null>(null);
   const [ragSearchError, setRagSearchError] = useState<string | null>(null);
-
-
-
 
   const uploadedFilesList = useMemo(() => {
     const allUniqueFilenames = Array.from(
@@ -195,12 +191,21 @@ export function IngestPanel({
           ? textCount + tableCount + imageCount
           : activeInfo?.total_elements || totalChunks || 1;
 
-      const summarizedChunks =
+      const logSummarized = log?.summarized_count || 0;
+      const logNeedsSummary = log?.needs_summary_count || 0;
+
+      const finalSummarized =
         fileChunks.length > 0
           ? fileChunks.filter((c) => !c.isRaw).length
           : activeInfo?.chunks
             ? activeInfo.chunks.filter((c: any) => !c.isRaw).length
-            : 0;
+            : logSummarized;
+
+      const finalNeedsSummary =
+        fileChunks.length > 0
+          ? fileChunks.filter((c) => c.type === "image" || c.type === "table")
+              .length
+          : logNeedsSummary;
 
       const finalChunks =
         fileChunks.length > 0 ? fileChunks : activeInfo?.chunks || [];
@@ -210,6 +215,8 @@ export function IngestPanel({
         name: filename,
         size: "N/A",
         status: statusValue,
+        isPending:
+          statusValue === "completed" && finalNeedsSummary > finalSummarized,
         uploadTime: log ? log.date : "Database Ingested",
         textCount,
         tableCount,
@@ -218,7 +225,8 @@ export function IngestPanel({
         otherCount,
         totalElements,
         totalChunks,
-        summarizedChunks,
+        summarizedChunks: finalSummarized,
+        needsSummaryCount: finalNeedsSummary,
         chunks: finalChunks,
         isMock: false,
       };
@@ -541,10 +549,7 @@ export function IngestPanel({
             minStep = Math.min(minStep, 1);
           } else if (info.status === "partitioning") {
             minStep = Math.min(minStep, 2);
-          } else if (
-            info.status === "chunking" ||
-            info.status === "indexing"
-          ) {
+          } else if (info.status === "chunking" || info.status === "indexing") {
             minStep = Math.min(minStep, 3);
           }
         }
@@ -593,7 +598,7 @@ export function IngestPanel({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
-      {(!wizardActive || wizardMinimized) ? (
+      {!wizardActive || wizardMinimized ? (
         <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden relative">
           {/* Grouped file registry list (Left Column) */}
           <FileRegistryList
@@ -616,7 +621,7 @@ export function IngestPanel({
           />
 
           {/* Dynamic settings / Detail Inspector / Metrics Panel (Right Column) */}
-          <div className="w-full md:w-96 shrink-0 flex flex-col max-h-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm backdrop-blur-md bg-white/80 dark:bg-slate-900/80">
+          <div className="w-full md:w-96 shrink-0 flex flex-col max-h-full border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm backdrop-blur-md bg-white/80 dark:bg-slate-900/80">
             {selectedChunk ? (
               <ChunkInspector
                 selectedChunk={selectedChunk as any}

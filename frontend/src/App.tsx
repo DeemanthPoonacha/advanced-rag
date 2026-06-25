@@ -108,6 +108,7 @@ export default function App() {
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const prevUploadLogsRef = useRef<UploadLog[]>([]);
 
   // Sync state changes to localStorage
   useEffect(() => {
@@ -260,6 +261,24 @@ export default function App() {
     };
   }, [isUploading]);
 
+  // Poll documents list if any document is missing summaries in the background
+  useEffect(() => {
+    let intervalId: any;
+    const hasPending = uploadLogs.some(
+      (log) => (log.needs_summary_count || 0) > (log.summarized_count || 0)
+    );
+
+    if (hasPending && !isUploading) {
+      intervalId = setInterval(() => {
+        fetchDocuments();
+      }, 5000); // Check every 5 seconds
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [uploadLogs, isUploading]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isGenerating]);
@@ -297,7 +316,48 @@ export default function App() {
             filename: d.name,
             chunks_count: d.chunksCount,
             date: d.uploadTime,
+            summarized_count: d.summarizedCount || 0,
+            needs_summary_count: d.needsSummaryCount || 0,
           }));
+
+          // Compare with previous logs to notify about background summarization
+          const prev = prevUploadLogsRef.current;
+          if (prev.length > 0) {
+            let totalNewSummaries = 0;
+            let finishedDocs: string[] = [];
+
+            parsed.forEach((newLog) => {
+              const oldLog = prev.find((p) => p.filename === newLog.filename);
+              if (oldLog) {
+                const oldSum = oldLog.summarized_count || 0;
+                const newSum = newLog.summarized_count || 0;
+                const needs = newLog.needs_summary_count || 0;
+                
+                if (newSum > oldSum) {
+                  totalNewSummaries += (newSum - oldSum);
+                  if (newSum === needs && oldSum < needs) {
+                    finishedDocs.push(newLog.filename);
+                  }
+                }
+              }
+            });
+
+            if (totalNewSummaries > 0) {
+              if (finishedDocs.length > 0) {
+                showToast(
+                  `Background Summarizer: Finished generating summaries for ${finishedDocs.join(", ")}!`,
+                  "success"
+                );
+              } else {
+                showToast(
+                  `Background Summarizer: Generated ${totalNewSummaries} new summaries.`,
+                  "success"
+                );
+              }
+            }
+          }
+
+          prevUploadLogsRef.current = parsed;
           setUploadLogs(parsed);
         }
       }

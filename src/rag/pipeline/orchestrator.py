@@ -785,6 +785,141 @@ class RAGPipelineOrchestrator:
         ):
             yield token
 
+    async def update_missing_summaries(self) -> int:
+        """Scan vector store for chunks that are missing multimodal summaries and update them.
+
+        This handles healing chunks that were ingested while the local LLM server
+        was offline or had transient failures.
+
+        Returns:
+            The number of successfully updated chunks.
+        """
+        await self.initialize()
+        
+        try:
+            chunks = await self.vector_store.list_chunks(limit=10000)
+        except Exception as exc:
+            logger.error("background_summarizer_list_chunks_failed", error=str(exc))
+            return 0
+
+        # Filter chunks that need summaries (contain tables or images) but lack them
+        target_chunks = []
+        for c in chunks:
+            custom = c.metadata.custom if (c.metadata and hasattr(c.metadata, "custom") and c.metadata.custom) else {}
+            tables = custom.get("tables_html", [])
+            images = custom.get("images_base64", [])
+            if not tables and not images:
+                continue
+
+            summary_text = custom.get("summary_text", "")
+            # Missing summary or fallback message
+            is_missing = not summary_text or "[Local LLM Offline Fallback]" in summary_text
+            if is_missing:
+                target_chunks.append((c, tables, images))
+
+        if not target_chunks:
+            return 0
+
+        # Lazy initialize MultimodalSummarizerChunker configuration
+        try:
+            from ..ingestion.chunkers.multimodal_summarizer import MultimodalSummarizerChunker
+            cfg = self.config.ingestion.multimodal_summarizer
+            
+            summarizer_llm = None
+            if cfg.provider == "primary":
+                summarizer_llm = self.llm
+            else:
+                llm_config = {
+                    "model": cfg.model_name,
+                    "temperature": cfg.temperature,
+                }
+                if cfg.api_key:
+                    llm_config["api_key"] = cfg.api_key
+                if cfg.base_url:
+                    llm_config["base_url"] = cfg.base_url
+                summarizer_llm = self.factory._build("llm", cfg.provider, llm_config)
+            
+            summarizer = MultimodalSummarizerChunker(
+                llm=summarizer_llm,
+                model_name=cfg.model_name,
+                temperature=cfg.temperature,
+                api_key=cfg.api_key,
+                base_url=cfg.base_url
+            )
+        except Exception as init_err:
+            logger.error("background_summarizer_init_failed", error=str(init_err))
+            return 0
+
+        updated_count = 0
+        for chunk, tables, images in target_chunks:
+            custom = chunk.metadata.custom
+            raw_text = custom.get("raw_text", chunk.content)
+
+            # Re-construct chunker prompt structure
+            prompt = f"""You are creating a searchable description for document content retrieval.
+
+CONTENT TO ANALYZE:
+TEXT CONTENT:
+{raw_text}
+"""
+            if tables:
+                prompt += "\nTABLES:\n"
+                for idx, html in enumerate(tables):
+                    prompt += f"Table {idx+1}:\n{html}\n\n"
+
+            prompt += """
+YOUR TASK:
+Generate a comprehensive, searchable description that covers:
+1. Key facts, numbers, and data points from text and tables.
+2. Main topics and concepts discussed.
+3. Questions this content could answer.
+4. Visual content analysis (charts, diagrams, patterns in images).
+5. Alternative search terms users might use.
+
+Make it detailed and searchable - prioritize findability over brevity.
+
+SEARCHABLE DESCRIPTION:"""
+
+            try:
+                # Generate summary
+                summary = await summarizer._llm.generate(
+                    prompt,
+                    images=images,
+                    temperature=cfg.temperature,
+                    raise_on_error=True
+                )
+                if not summary or "[Local LLM Offline Fallback]" in summary:
+                    continue
+
+                # Update content and metadata custom summary
+                chunk.content = summary
+                chunk.metadata.custom["summary_text"] = summary
+                chunk.token_count = len(summary.split())
+
+                # Generate new embeddings
+                embeddings = await self.embedding_model.embed([summary])
+                chunk.embedding = embeddings[0]
+
+                # Generate new sparse embedding if supported
+                try:
+                    if hasattr(self.embedding_model, "embed_sparse"):
+                        sparse_embeddings = await self.embedding_model.embed_sparse([summary])
+                        s_vec = sparse_embeddings[0]
+                        chunk.sparse_embedding = dict(zip(s_vec.indices, s_vec.values))
+                except Exception:
+                    pass
+
+                # Upsert into vector store
+                await self.vector_store.upsert([chunk])
+                updated_count += 1
+                logger.info("background_summarizer_chunk_updated", chunk_id=chunk.id)
+            except Exception as gen_err:
+                logger.warning("background_summarization_generation_failed", chunk_id=chunk.id, error=str(gen_err))
+                # Break to avoid repeating connection errors for subsequent chunks
+                break
+
+        return updated_count
+
     async def close(self) -> None:
         """Gracefully release open HTTP/gRPC channels and database connection pools."""
         logger.info("pipeline_close_start")

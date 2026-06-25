@@ -23,6 +23,62 @@ from rag.core.interfaces import (
 # Global orchestrator and initialization status
 orchestrator: Optional[RAGPipelineOrchestrator] = None
 init_error: Optional[str] = None
+background_summarizer_task: Optional[asyncio.Task] = None
+summarizer_trigger_event = asyncio.Event()
+
+async def run_background_summarizer():
+    """Background task loop that processes missing summaries and goes to sleep when done."""
+    await asyncio.sleep(5)  # Wait for startup and other initializations to stabilize
+    
+    # Run once on startup to resolve any historical missing summaries
+    trigger_startup = True
+    
+    while True:
+        try:
+            if not trigger_startup:
+                # Wait until triggered by a new upload or other updates
+                await summarizer_trigger_event.wait()
+                summarizer_trigger_event.clear()
+            
+            trigger_startup = False
+            
+            if orchestrator:
+                num_updated = await orchestrator.update_missing_summaries()
+                if num_updated > 0:
+                    print(f"Background Summarizer: Successfully updated {num_updated} chunk summaries.")
+                
+                # Check if there are still missing summaries left in the database
+                try:
+                    chunks = await orchestrator.vector_store.list_chunks(limit=10000)
+                    has_missing = False
+                    for c in chunks:
+                        custom = c.metadata.custom if (c.metadata and hasattr(c.metadata, "custom") and c.metadata.custom) else {}
+                        tables = custom.get("tables_html", [])
+                        images = custom.get("images_base64", [])
+                        if not tables and not images:
+                            continue
+                        summary_text = custom.get("summary_text", "")
+                        is_missing = not summary_text or "[Local LLM Offline Fallback]" in summary_text
+                        if is_missing:
+                            has_missing = True
+                            break
+                    
+                    if has_missing:
+                        # Some are still missing (probably LLM is offline). Sleep and try again.
+                        await asyncio.sleep(15)
+                        trigger_startup = True  # retry immediately on next loop after sleep
+                except Exception as check_err:
+                    print(f"Error checking pending summaries count: {check_err}")
+                    await asyncio.sleep(15)
+                    trigger_startup = True
+                    
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"Error in background summarizer task: {e}")
+            await asyncio.sleep(15)
+            trigger_startup = True
+
 def init_orchestrator():
     global orchestrator, init_error
     try:
@@ -44,7 +100,15 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app_inst: FastAPI):
     init_orchestrator()
+    global background_summarizer_task
+    background_summarizer_task = asyncio.create_task(run_background_summarizer())
     yield
+    if background_summarizer_task:
+        background_summarizer_task.cancel()
+        try:
+            await background_summarizer_task
+        except asyncio.CancelledError:
+            pass
     global orchestrator
     if orchestrator:
         await orchestrator.close()
@@ -151,6 +215,9 @@ async def update_config(req: ConfigUpdateRequest):
         orchestrator = RAGPipelineOrchestrator(validated_config)
         init_error = None
         
+        # Trigger background summarization check in case LLM configurations were updated
+        summarizer_trigger_event.set()
+        
         return {
             "status": "success",
             "message": "Configuration updated and pipeline reloaded successfully."
@@ -185,6 +252,9 @@ async def update_config_json(req: Dict[str, Any]):
             
         orchestrator = RAGPipelineOrchestrator(validated_config)
         init_error = None
+        
+        # Trigger background summarization check in case LLM configurations were updated
+        summarizer_trigger_event.set()
         
         return {
             "status": "success",
@@ -686,6 +756,9 @@ async def ingest_files(
                 detail=f"All file ingestions failed: {failures}"
             )
             
+        # Trigger background summarization check
+        summarizer_trigger_event.set()
+        
         return {
             "status": "success",
             "message": f"Successfully ingested {len(ingested_files_log)} of {len(files)} files.",
@@ -766,6 +839,19 @@ async def get_documents():
                 
             total_tokens = sum(c.token_count for c in file_chunks)
             
+            # Calculate summarized count vs elements that need summaries
+            summarized_count = 0
+            needs_summary_count = 0
+            for c in file_chunks:
+                custom = c.metadata.custom if (c.metadata and hasattr(c.metadata, "custom") and c.metadata.custom) else {}
+                tables = custom.get("tables_html", [])
+                images = custom.get("images_base64", [])
+                if tables or images:
+                    needs_summary_count += 1
+                    summary_text = custom.get("summary_text", "")
+                    if summary_text and "[Local LLM Offline Fallback]" not in summary_text:
+                        summarized_count += 1
+
             docs_list.append({
                 "name": filename_clean,
                 "chunksCount": len(file_chunks),
@@ -773,7 +859,9 @@ async def get_documents():
                 "file_type": file_type,
                 "uploadTime": created_str,
                 "status": "completed",
-                "isMock": False
+                "isMock": False,
+                "summarizedCount": summarized_count,
+                "needsSummaryCount": needs_summary_count,
             })
             
         return {

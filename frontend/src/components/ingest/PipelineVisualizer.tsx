@@ -162,6 +162,12 @@ export function PipelineVisualizer({
   );
   const sumRawChunks = sumTotalChunks - sumSummarizedChunks;
 
+  const sumNeedsSummary = wizardFiles.reduce(
+    (acc, f) => acc + (f.tableCount || 0) + (f.imageCount || 0),
+    0
+  );
+  const hasPendingSummaries = sumNeedsSummary > sumSummarizedChunks;
+
   return (
     <div className="flex-1 flex flex-col bg-[#0b0f19] text-slate-200 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl animate-fade-in">
       {/* Header Panel */}
@@ -483,6 +489,18 @@ export function PipelineVisualizer({
                   </div>
                 </div>
               </div>
+
+              {hasPendingSummaries && (
+                <div className="bg-amber-500/10 border border-amber-500/25 text-amber-400 p-4 rounded-xl text-xs flex items-start gap-2.5 shadow-sm text-left">
+                  <Sparkle className="w-4 h-4 shrink-0 text-amber-500 mt-0.5 animate-pulse" />
+                  <div>
+                    <p className="font-bold">Pending Background Summaries</p>
+                    <p className="mt-1 text-slate-400 leading-relaxed">
+                      Some image or table elements were not summarized because the local LLM server was unreachable. These will be generated automatically in the background once the server is back online.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Enhanced Detailed Uploaded & Ingested Document Compilation Summary */}
               <div className="bg-[#111728] border border-slate-800/80 rounded-2xl p-5 shadow-xl space-y-3">
