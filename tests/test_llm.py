@@ -300,3 +300,30 @@ async def test_local_llm():
     # Test close
     await llm.close()
     mock_client.aclose.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_local_llm_offline_fallback():
+    # Setup mock client that raises connection error
+    mock_client = MagicMock()
+    import httpx
+    mock_client.post = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
+    mock_client.aclose = AsyncMock()
+
+    llm = LocalLLM(base_url="http://localhost:11434/v1", model="llama3")
+    llm._client = mock_client
+
+    # 1. Without raise_on_error: should return fallback string
+    result = await llm.generate("Hello")
+    assert "[Local LLM Offline Fallback]" in result
+
+    # 2. With raise_on_error: should raise the httpx.ConnectError exception
+    with pytest.raises(httpx.ConnectError):
+        await llm.generate("Hello", raise_on_error=True)
+
+    # 3. Test generate_stream with raise_on_error: should raise exception
+    mock_client.stream = MagicMock(side_effect=httpx.ConnectError("Connection refused"))
+    with pytest.raises(httpx.ConnectError):
+        async for chunk in llm.generate_stream("Hello", raise_on_error=True):
+            pass
+

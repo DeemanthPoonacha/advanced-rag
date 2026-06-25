@@ -121,6 +121,8 @@ class LocalLLM(BaseLLM):
             return content
         except Exception as e:
             logger.warning("local_llm_generate_failed_using_offline_fallback", error=str(e))
+            if kwargs.get("raise_on_error", False):
+                raise
             # Parse prompt
             context = ""
             query = ""
@@ -184,6 +186,8 @@ class LocalLLM(BaseLLM):
                         continue
         except Exception as e:
             logger.warning("local_llm_stream_failed_using_offline_fallback", error=str(e))
+            if kwargs.get("raise_on_error", False):
+                raise
             context = ""
             query = ""
             if "Context:" in prompt:

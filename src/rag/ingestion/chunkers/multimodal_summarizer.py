@@ -98,7 +98,8 @@ SEARCHABLE DESCRIPTION:"""
             summary_text = await self._llm.generate(
                 prompt,
                 images=images,
-                temperature=self._temperature
+                temperature=self._temperature,
+                raise_on_error=True
             )
             enhanced_content = summary_text or raw_text
         except Exception as e:
