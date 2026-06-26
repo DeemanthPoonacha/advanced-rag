@@ -10,7 +10,9 @@ import {
   ChevronRight,
   CheckCircle2,
   Trash2,
+  Eye,
 } from "lucide-react";
+import { useStore } from "../../store/useStore";
 
 interface FileRegistryListProps {
   sortedGroupKeys: string[];
@@ -372,6 +374,19 @@ export function FileRegistryList({
                               title="Toggle Document Details"
                             >
                               {isExpanded ? "Hide Details" : "Details"}
+                            </button>
+
+                            {/* View Original Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                useStore.getState().setPreviewDocName(file.name);
+                              }}
+                              className="ml-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-bold transition-all duration-200 active:scale-95 cursor-pointer flex items-center gap-1 shrink-0"
+                              title="View original document"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span className="hidden sm:inline">View</span>
                             </button>
 
                             {/* Delete Button */}

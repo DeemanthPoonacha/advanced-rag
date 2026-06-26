@@ -266,3 +266,71 @@ export function useDeleteDocument() {
     },
   });
 }
+
+// --- Presets API & Hooks ---
+
+export async function fetchPresets(): Promise<{ presets: any[]; active_preset: string | null }> {
+  const res = await fetch(`${API_BASE}/api/presets`);
+  if (!res.ok) throw new Error("Failed to fetch presets");
+  return res.json();
+}
+
+export function usePresets() {
+  return useQuery<{ presets: any[]; active_preset: string | null }>({
+    queryKey: ["presets"],
+    queryFn: fetchPresets,
+  });
+}
+
+export function useActivatePreset() {
+  const queryClient = useQueryClient();
+  const showToast = useStore((s) => s.showToast);
+
+  return useMutation({
+    mutationFn: async (name: string) => {
+      const res = await fetch(`${API_BASE}/api/presets/${name}/activate`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || "Failed to activate preset");
+      }
+      return name;
+    },
+    onSuccess: (name) => {
+      queryClient.invalidateQueries({ queryKey: ["presets"] });
+      queryClient.invalidateQueries({ queryKey: ["pipelineConfig"] });
+      queryClient.invalidateQueries({ queryKey: ["ragStatus"] });
+      showToast(`Preset '${name}' activated successfully!`, "success");
+    },
+    onError: (err: any) => {
+      showToast(err.message || "Failed to activate preset due to connection error", "error");
+    },
+  });
+}
+
+export function useDeletePreset() {
+  const queryClient = useQueryClient();
+  const showToast = useStore((s) => s.showToast);
+
+  return useMutation({
+    mutationFn: async (name: string) => {
+      const res = await fetch(`${API_BASE}/api/presets/${name}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || "Failed to delete preset");
+      }
+      return name;
+    },
+    onSuccess: (name) => {
+      queryClient.invalidateQueries({ queryKey: ["presets"] });
+      showToast(`Preset '${name}' deleted successfully.`, "success");
+    },
+    onError: (err: any) => {
+      showToast(err.message || "Failed to delete preset due to connection error", "error");
+    },
+  });
+}
+

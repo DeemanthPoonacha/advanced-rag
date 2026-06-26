@@ -287,67 +287,26 @@ export function ConfigPanel() {
   };
 
   return (
-    <div className="flex-1 flex flex-col gap-6 max-w-7xl w-full mx-auto overflow-hidden">
-      {/* Editor Switcher (Form vs YAML) */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shrink-0">
-        <div className="flex gap-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-xl shadow-sm self-start">
-          <button
-            onClick={handleSetEditMode.bind(null, "visual")}
-            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-              editMode === "visual"
-                ? "bg-primary text-white shadow-sm"
-                : "text-slate-600 dark:text-slate-400 hover:bg-slate-250 dark:hover:bg-slate-800"
-            }`}
-          >
-            Visual Config Grid
-          </button>
-          <button
-            onClick={handleSetEditMode.bind(null, "yaml")}
-            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
-              editMode === "yaml"
-                ? "bg-primary text-white shadow-sm"
-                : "text-slate-600 dark:text-slate-400 hover:bg-slate-250 dark:hover:bg-slate-800"
-            }`}
-          >
-            Raw YAML Block
-          </button>
-        </div>
-
-        <div className="flex gap-3 justify-end">
-          <button
-            onClick={handleResetConfig}
-            className="px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition active:scale-95 cursor-pointer"
-          >
-            Reset Changes
-          </button>
-          <button
-            onClick={handleSaveConfig}
-            className="px-5 py-2 rounded-xl text-xs font-semibold bg-primary hover:bg-primary/95 text-white shadow-md shadow-primary/20 transition hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-          >
-            Apply & Rebuild Pipeline
-          </button>
-        </div>
-      </div>
-
-      {/* Settings Presets & Templates Grid */}
-      <div className="bg-slate-50/50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4 backdrop-blur-md bg-white/80 dark:bg-slate-900/80 shrink-0">
-        <div className="flex items-center justify-between">
+    <div className="flex-1 flex flex-col md:flex-row gap-6 max-w-7xl w-full mx-auto overflow-hidden h-full">
+      {/* Left Column: Configurations & Presets */}
+      <div className="w-full md:w-80 shrink-0 flex flex-col gap-4 overflow-y-auto pr-0 md:pr-4 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 pb-6 md:pb-0 scrollbar-thin">
+        <div className="flex items-center justify-between gap-2 border-b border-slate-200/50 dark:border-slate-800/60 pb-3 shrink-0">
           <div className="flex items-center gap-2">
             <Bookmark className="w-4 h-4 text-primary animate-pulse" />
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              Pipeline Configurations & Presets
+              Pipeline Presets
             </h3>
           </div>
           <button
             onClick={() => setShowSaveModal(true)}
-            className="flex items-center gap-1 px-3 py-1.5 bg-primary/10 border border-primary/20 hover:bg-primary/20 text-primary rounded-xl text-xs font-bold cursor-pointer transition active:scale-95"
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-primary/10 border border-primary/20 hover:bg-primary/20 text-primary rounded-xl text-[10px] font-bold cursor-pointer transition active:scale-95"
           >
-            <Plus className="w-3.5 h-3.5" />
-            Save Current as Preset
+            <Plus className="w-3 h-3" />
+            Save Preset
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="flex flex-col gap-3">
           {presets.map((preset) => {
             const isActive = activePreset === preset.name;
             const isPending = isActivating === preset.name;
@@ -357,7 +316,7 @@ export function ConfigPanel() {
                 onClick={() =>
                   !isActive && !isPending && handleActivatePreset(preset.name)
                 }
-                className={`p-4 rounded-xl border transition-all duration-300 flex flex-col justify-between text-left cursor-pointer group hover:scale-[1.01] relative overflow-hidden ${
+                className={`p-3.5 rounded-xl border transition-all duration-300 flex flex-col justify-between text-left cursor-pointer group hover:scale-[1.01] relative overflow-hidden ${
                   isActive
                     ? "bg-primary/5 border-primary/50 shadow-sm"
                     : "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800/80 hover:border-slate-350 dark:hover:border-slate-700/80 hover:bg-slate-50/30 dark:hover:bg-slate-900/10"
@@ -368,16 +327,16 @@ export function ConfigPanel() {
                   <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
                 )}
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       {getPresetIcon(preset.name)}
                       <span className="text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate max-w-[130px]">
                         {preset.label}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1 shrink-0">
                       {isActive && (
                         <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-[8px] font-bold text-emerald-500 uppercase tracking-wider">
                           Active
@@ -399,11 +358,11 @@ export function ConfigPanel() {
                   </p>
                 </div>
 
-                <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-900/60 flex items-center justify-between text-[9px] font-bold text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">
+                <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-900/60 flex items-center justify-between text-[9px] font-bold text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">
                   <span>
                     {preset.is_predefined
-                      ? "Predefined Preset"
-                      : "Custom Settings"}
+                      ? "Predefined"
+                      : "Custom"}
                   </span>
                   {!isActive && (
                     <span className="text-primary opacity-0 group-hover:opacity-100 transition duration-200">
@@ -417,88 +376,132 @@ export function ConfigPanel() {
         </div>
       </div>
 
-      {/* Sub-window */}
-      <div className="flex-1 overflow-hidden">
-        {editMode === "visual" ? (
-          configData ? (
-            <div className="h-full overflow-y-auto pr-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-6 scrollbar-thin">
-              <GeneralSettingsCard
-                configData={configData}
-                expandedSections={expandedSections}
-                toggleSection={toggleSection}
-                handleUpdateConfigValue={handleUpdateConfigValue}
-              />
-
-              <LlmConfigCard
-                configData={configData}
-                expandedSections={expandedSections}
-                toggleSection={toggleSection}
-                handleUpdateConfigValue={handleUpdateConfigValue}
-              />
-
-              <SplitterConfigCard
-                configData={configData}
-                expandedSections={expandedSections}
-                toggleSection={toggleSection}
-                handleUpdateConfigValue={handleUpdateConfigValue}
-              />
-
-              <EmbeddingsConfigCard
-                configData={configData}
-                expandedSections={expandedSections}
-                toggleSection={toggleSection}
-                handleUpdateConfigValue={handleUpdateConfigValue}
-              />
-
-              <VectorDbConfigCard
-                configData={configData}
-                expandedSections={expandedSections}
-                toggleSection={toggleSection}
-                handleUpdateConfigValue={handleUpdateConfigValue}
-              />
-
-              <RetrievalConfigCard
-                configData={configData}
-                expandedSections={expandedSections}
-                toggleSection={toggleSection}
-                handleUpdateConfigValue={handleUpdateConfigValue}
-              />
-
-              <GenerationConfigCard
-                configData={configData}
-                expandedSections={expandedSections}
-                toggleSection={toggleSection}
-                handleUpdateConfigValue={handleUpdateConfigValue}
-              />
-
-              <ObservabilityConfigCard
-                configData={configData}
-                expandedSections={expandedSections}
-                toggleSection={toggleSection}
-                handleUpdateConfigValue={handleUpdateConfigValue}
-              />
-
-              <SafetyConfigCard
-                configData={configData}
-                expandedSections={expandedSections}
-                toggleSection={toggleSection}
-                handleUpdateConfigValue={handleUpdateConfigValue}
-              />
-            </div>
-          ) : (
-            <div className="h-full flex items-center justify-center text-slate-400 text-sm">
-              Loading configuration settings...
-            </div>
-          )
-        ) : (
-          <div className="h-full flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-            <textarea
-              value={rawYaml}
-              onChange={(e) => setRawYaml(e.target.value)}
-              className="flex-1 w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-xs font-mono focus:outline-none focus:border-primary resize-none leading-relaxed"
-            />
+      {/* Right Column: Config Editor */}
+      <div className="flex-1 flex flex-col gap-4 overflow-hidden h-full">
+        {/* Editor Switcher (Form vs YAML) */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shrink-0">
+          <div className="flex gap-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-xl shadow-sm self-start">
+            <button
+              onClick={handleSetEditMode.bind(null, "visual")}
+              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                editMode === "visual"
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-slate-650 dark:text-slate-400 hover:bg-slate-250 dark:hover:bg-slate-805"
+              }`}
+            >
+              Visual Config Grid
+            </button>
+            <button
+              onClick={handleSetEditMode.bind(null, "yaml")}
+              className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 cursor-pointer ${
+                editMode === "yaml"
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-slate-650 dark:text-slate-400 hover:bg-slate-250 dark:hover:bg-slate-805"
+              }`}
+            >
+              Raw YAML Block
+            </button>
           </div>
-        )}
+
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={handleResetConfig}
+              className="px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition active:scale-95 cursor-pointer"
+            >
+              Reset Changes
+            </button>
+            <button
+              onClick={handleSaveConfig}
+              className="px-5 py-2 rounded-xl text-xs font-semibold bg-primary hover:bg-primary/95 text-white shadow-md shadow-primary/20 transition hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            >
+              Apply & Rebuild Pipeline
+            </button>
+          </div>
+        </div>
+
+        {/* Config Content */}
+        <div className="flex-1 overflow-hidden">
+          {editMode === "visual" ? (
+            configData ? (
+              <div className="h-full overflow-y-auto pr-2 grid grid-cols-1 xl:grid-cols-2 gap-6 pb-6 scrollbar-thin">
+                <GeneralSettingsCard
+                  configData={configData}
+                  expandedSections={expandedSections}
+                  toggleSection={toggleSection}
+                  handleUpdateConfigValue={handleUpdateConfigValue}
+                />
+
+                <LlmConfigCard
+                  configData={configData}
+                  expandedSections={expandedSections}
+                  toggleSection={toggleSection}
+                  handleUpdateConfigValue={handleUpdateConfigValue}
+                />
+
+                <SplitterConfigCard
+                  configData={configData}
+                  expandedSections={expandedSections}
+                  toggleSection={toggleSection}
+                  handleUpdateConfigValue={handleUpdateConfigValue}
+                />
+
+                <EmbeddingsConfigCard
+                  configData={configData}
+                  expandedSections={expandedSections}
+                  toggleSection={toggleSection}
+                  handleUpdateConfigValue={handleUpdateConfigValue}
+                />
+
+                <VectorDbConfigCard
+                  configData={configData}
+                  expandedSections={expandedSections}
+                  toggleSection={toggleSection}
+                  handleUpdateConfigValue={handleUpdateConfigValue}
+                />
+
+                <RetrievalConfigCard
+                  configData={configData}
+                  expandedSections={expandedSections}
+                  toggleSection={toggleSection}
+                  handleUpdateConfigValue={handleUpdateConfigValue}
+                />
+
+                <GenerationConfigCard
+                  configData={configData}
+                  expandedSections={expandedSections}
+                  toggleSection={toggleSection}
+                  handleUpdateConfigValue={handleUpdateConfigValue}
+                />
+
+                <ObservabilityConfigCard
+                  configData={configData}
+                  expandedSections={expandedSections}
+                  toggleSection={toggleSection}
+                  handleUpdateConfigValue={handleUpdateConfigValue}
+                />
+
+                <SafetyConfigCard
+                  configData={configData}
+                  expandedSections={expandedSections}
+                  toggleSection={toggleSection}
+                  handleUpdateConfigValue={handleUpdateConfigValue}
+                />
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 text-sm">
+                Loading configuration settings...
+              </div>
+            )
+          ) : (
+            <div className="h-full flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+              <textarea
+                value={rawYaml}
+                onChange={(e) => setRawYaml(e.target.value)}
+                className="flex-1 w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-xs font-mono focus:outline-none focus:border-primary resize-none leading-relaxed"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Save Preset Dialog Modal */}

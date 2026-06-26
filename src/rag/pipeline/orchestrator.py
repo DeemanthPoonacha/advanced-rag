@@ -567,7 +567,8 @@ class RAGPipelineOrchestrator:
 
         # Cache lookup — return cached result for identical queries within TTL
         if not ground_truth and not attachments:
-            cache_key = hashlib.sha256(user_query.encode()).hexdigest()
+            cache_input = user_query + str(metadata or {})
+            cache_key = hashlib.sha256(cache_input.encode()).hexdigest()
             cached = self._query_cache.get(cache_key)
             if cached:
                 cached_result, cached_at = cached
@@ -749,7 +750,8 @@ class RAGPipelineOrchestrator:
 
         # Store in cache (only for non-evaluation, non-attachment queries)
         if not ground_truth and not attachments:
-            cache_key = hashlib.sha256(user_query.encode()).hexdigest()
+            cache_input = user_query + str(metadata or {})
+            cache_key = hashlib.sha256(cache_input.encode()).hexdigest()
             self._query_cache[cache_key] = (result, time.perf_counter())
 
         return result

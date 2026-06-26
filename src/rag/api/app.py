@@ -933,6 +933,47 @@ async def get_document_chunks(filename: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch document chunks: {str(e)}")
 
+@app.get("/api/documents/{filename}/raw")
+async def get_raw_document(filename: str):
+    """Retrieve the original uploaded file for a document using metadata stored in Qdrant."""
+    from fastapi.responses import FileResponse
+    global orchestrator
+    if not orchestrator:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Orchestrator not initialized."
+        )
+        
+    try:
+        await orchestrator.initialize()
+        db = orchestrator.vector_store
+        
+        # Get chunks for this specific document to find the source path on disk
+        chunks = await db.list_chunks_by_metadata("file_name", filename)
+        if not chunks:
+            # Fallback: get unique filenames and find the matching one
+            unique_fnames = await db.get_unique_metadata_values("file_name")
+            for raw_fname in unique_fnames:
+                if os.path.basename(raw_fname).lower() == filename.lower():
+                    chunks = await db.list_chunks_by_metadata("file_name", raw_fname)
+                    break
+        
+        if not chunks:
+            raise HTTPException(status_code=404, detail="Document not found in vector store.")
+            
+        first_chunk = chunks[0]
+        meta_dict = first_chunk.metadata.model_dump() if hasattr(first_chunk.metadata, "model_dump") else first_chunk.metadata
+        source_path = meta_dict.get("source")
+        
+        if not source_path or not os.path.exists(source_path):
+            raise HTTPException(status_code=404, detail="Original document file not found on disk.")
+            
+        return FileResponse(source_path, filename=filename)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch raw document: {str(e)}")
+
 @app.post("/api/parse-attachment")
 async def parse_attachment(file: UploadFile = File(...)):
     global orchestrator

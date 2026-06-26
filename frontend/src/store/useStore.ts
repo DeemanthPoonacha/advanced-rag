@@ -27,6 +27,10 @@ interface State {
   streamResponse: boolean;
   isGenerating: boolean;
   abortController: AbortController | null;
+  previewImageUrl: string | null;
+  selectedDocumentFilter: string | null;
+  previewDocName: string | null;
+  showSavePresetModal: boolean;
 }
 
 interface Actions {
@@ -62,6 +66,10 @@ interface Actions {
   handleAttachFiles: (files: File[]) => Promise<void>;
   handleRemovePendingAttachment: (id: string) => void;
   handleSendMessage: (e?: React.FormEvent) => Promise<void>;
+  setPreviewImageUrl: (url: string | null) => void;
+  setSelectedDocumentFilter: (doc: string | null) => void;
+  setPreviewDocName: (name: string | null) => void;
+  setShowSavePresetModal: (val: boolean) => void;
 }
 
 const getInitialConversations = (): Conversation[] => {
@@ -118,6 +126,10 @@ export const useStore = create<State & Actions>((set, get) => ({
   input: "",
   streamResponse: true,
   isGenerating: false,
+  previewImageUrl: null,
+  selectedDocumentFilter: null,
+  previewDocName: null,
+  showSavePresetModal: false,
 
   // Navigation & Theme Actions
   setActivePage: (activePage) => set({ activePage }),
@@ -173,6 +185,10 @@ export const useStore = create<State & Actions>((set, get) => ({
   setInput: (input) => set({ input }),
   setStreamResponse: (streamResponse) => set({ streamResponse }),
   setIsGenerating: (isGenerating) => set({ isGenerating }),
+  setPreviewImageUrl: (previewImageUrl) => set({ previewImageUrl }),
+  setSelectedDocumentFilter: (selectedDocumentFilter) => set({ selectedDocumentFilter }),
+  setPreviewDocName: (previewDocName) => set({ previewDocName }),
+  setShowSavePresetModal: (showSavePresetModal) => set({ showSavePresetModal }),
   setActiveConversationId: (activeConversationId) => set({ activeConversationId, pendingAttachments: [], input: "" }),
 
   updateActiveMessages: (updateFn) => {
@@ -402,6 +418,10 @@ export const useStore = create<State & Actions>((set, get) => ({
       extracted_images: att.extracted_images || [],
     }));
 
+    const bodyMetadata = state.selectedDocumentFilter
+      ? { filters: { file_name: state.selectedDocumentFilter } }
+      : undefined;
+
     if (state.streamResponse) {
       try {
         const response = await fetch(`${API_BASE}/api/query/stream`, {
@@ -410,6 +430,7 @@ export const useStore = create<State & Actions>((set, get) => ({
           body: JSON.stringify({
             query: queryText || `[Query with attachments]`,
             attachments: backendAttachments.length > 0 ? backendAttachments : undefined,
+            metadata: bodyMetadata,
           }),
         });
 
@@ -478,6 +499,7 @@ export const useStore = create<State & Actions>((set, get) => ({
           body: JSON.stringify({
             query: queryText || `[Query with attachments]`,
             attachments: backendAttachments.length > 0 ? backendAttachments : undefined,
+            metadata: bodyMetadata,
           }),
         });
         const data = await response.json();

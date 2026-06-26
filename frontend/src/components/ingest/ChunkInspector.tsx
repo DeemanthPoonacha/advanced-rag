@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Eye, X, Info, Loader2 } from "lucide-react";
+import { useStore } from "../../store/useStore";
 import "./ChunkInspector.css";
 
 interface ChunkInspectorProps {
@@ -24,6 +25,8 @@ export function ChunkInspector({
   inspectorTab,
   setInspectorTab,
 }: ChunkInspectorProps) {
+  const setPreviewImageUrl = useStore((s) => s.setPreviewImageUrl);
+
   const parseMarkdownTable = (markdown: string): string | null => {
     const lines = markdown.trim().split("\n");
     const tableLines = lines.filter(
@@ -161,7 +164,8 @@ export function ChunkInspector({
                       <img
                         src={formatImageSrc(imgB64)}
                         alt={`Extracted Layout Image ${idx + 1}`}
-                        className="max-w-full max-h-87.5 object-contain rounded-lg border border-slate-100 dark:border-slate-900 shadow-sm"
+                        className="max-w-full max-h-87.5 object-contain rounded-lg border border-slate-100 dark:border-slate-900 shadow-sm cursor-zoom-in hover:opacity-90 transition-opacity"
+                        onClick={() => setPreviewImageUrl(formatImageSrc(imgB64))}
                       />
                     </div>
                   ))}
@@ -312,11 +316,13 @@ export function ChunkInspector({
                         </td>
                         <td className="p-2.5 text-slate-700 dark:text-slate-200 break-all select-text font-mono">
                           {key === "images_base64"
-                            ? (value as string[]).map((img) => (
+                            ? (value as string[]).map((img, imgIdx) => (
                                 <img
+                                  key={imgIdx}
                                   src={formatImageSrc(img)}
                                   alt={`Extracted Layout Image ${key}`}
-                                  className="max-w-full max-h-87.5 object-contain rounded-lg border border-slate-100 dark:border-slate-900 shadow-sm"
+                                  className="max-w-full max-h-87.5 object-contain rounded-lg border border-slate-100 dark:border-slate-900 shadow-sm cursor-zoom-in hover:opacity-90 transition-opacity"
+                                  onClick={() => setPreviewImageUrl(formatImageSrc(img))}
                                 />
                               ))
                             : typeof value === "object"
@@ -329,7 +335,7 @@ export function ChunkInspector({
               </table>
             </div>
 
-            {selectedChunk.metadata.custom?.tables_html?.length && (
+            {!!selectedChunk.metadata.custom?.tables_html?.length && (
               <div className="animate-fade-in space-y-2">
                 <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">
                   Tables ({selectedChunk.metadata.custom?.tables_html.length})
