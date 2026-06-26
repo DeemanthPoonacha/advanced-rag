@@ -459,6 +459,7 @@ export function IngestPanel() {
           id: `real-ingest-${idx}-${filename}`,
           name: filename,
           size: "N/A",
+          step: info.step,
           status:
             info.status === "completed"
               ? ("completed" as const)

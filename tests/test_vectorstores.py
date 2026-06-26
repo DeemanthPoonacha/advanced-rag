@@ -109,6 +109,28 @@ async def test_qdrant_store(sample_chunks):
     mock_client.get_collection = AsyncMock(return_value=mock_collection_info)
     assert await store.count() == 5
 
+    # 5b. list_chunks_by_metadata
+    mock_record = MagicMock(
+        id="chunk-1",
+        payload={
+            "content": "Hello world",
+            "document_id": "doc-1",
+            "source": "doc.txt",
+            "file_name": "doc.txt"
+        }
+    )
+    mock_client.scroll = AsyncMock(return_value=([mock_record], None))
+    filtered_chunks = await store.list_chunks_by_metadata("file_name", "doc.txt")
+    assert len(filtered_chunks) == 1
+    assert filtered_chunks[0].content == "Hello world"
+    mock_client.scroll.assert_called_once()
+
+    # 5c. get_unique_metadata_values
+    mock_client.scroll = AsyncMock(return_value=([mock_record], None))
+    unique_vals = await store.get_unique_metadata_values("file_name")
+    assert unique_vals == ["doc.txt"]
+
+
     # 6. delete & close
     mock_client.delete = AsyncMock()
     mock_client.close = AsyncMock()

@@ -39,7 +39,7 @@ ingestion:
 llm:
   config:
     base_url: http://localhost:11434/v1
-    model: gemma4:31b-cloud
+    model: gemma3:12b-cloud
     temperature: 0.1
   provider: local
 observability:
@@ -72,6 +72,7 @@ retrieval:
 vector_store:
   config:
     collection_name: documents
+    on_disk: false
     url: data/qdrant_db
     vector_size: 384
   provider: qdrant

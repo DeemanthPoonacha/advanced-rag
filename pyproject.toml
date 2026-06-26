@@ -57,6 +57,8 @@ trulens = ["trulens>=0.32"]
 api = [
     "fastapi>=0.110.0",
     "uvicorn>=0.28.0",
+    "uvloop>=0.19",
+    "httptools>=0.6",
     "python-multipart>=0.0.9",
     "sse-starlette>=2.0.0",
 ]

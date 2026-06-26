@@ -381,6 +381,104 @@ class QdrantVectorStore(BaseVectorStore):
                 
         return chunks_list
 
+    @trace_operation(LifecycleStage.RETRIEVE, "qdrant_list_chunks_by_metadata")
+    async def list_chunks_by_metadata(
+        self, key: str, value: Any, limit: int = 1000
+    ) -> list[Chunk]:
+        """List chunks matching a specific metadata filter using server-side filtering.
+
+        Pushes filtering to Qdrant instead of loading all chunks and filtering in Python.
+
+        Args:
+            key: Metadata field name to filter on.
+            value: Expected value for the metadata field.
+            limit: Maximum number of chunks to return.
+
+        Returns:
+            List of matching chunks.
+        """
+        from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+        client = self._get_client()
+        chunks_list: list[Chunk] = []
+        offset = None
+        has_more = True
+
+        scroll_filter = Filter(must=[
+            FieldCondition(key=key, match=MatchValue(value=value))
+        ])
+
+        while has_more:
+            scroll_limit = min(limit - len(chunks_list), 1000) if limit else 1000
+            if scroll_limit <= 0:
+                break
+
+            records, offset = await client.scroll(
+                collection_name=self._collection_name,
+                scroll_filter=scroll_filter,
+                limit=scroll_limit,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False,
+            )
+
+            for record in records:
+                class DummyHit:
+                    id = record.id
+                    payload = record.payload
+                    score = 0.0
+
+                res = self._point_to_result(DummyHit(), "scroll_filtered")
+                chunks_list.append(res.chunk)
+
+            if not offset or len(records) < scroll_limit or (limit and len(chunks_list) >= limit):
+                has_more = False
+
+        return chunks_list
+
+    async def get_unique_metadata_values(self, key: str, limit: int = 10000) -> list[str]:
+        """Get unique values for a metadata field by scrolling through all records.
+
+        Used by /api/documents to get the list of unique filenames without
+        loading full payloads for grouping.
+
+        Args:
+            key: Metadata field name to collect unique values from.
+            limit: Safety cap on total records scanned.
+
+        Returns:
+            List of unique string values.
+        """
+        client = self._get_client()
+        unique_values: set[str] = set()
+        offset = None
+        has_more = True
+        scanned = 0
+
+        while has_more:
+            scroll_limit = min(limit - scanned, 1000)
+            if scroll_limit <= 0:
+                break
+
+            records, offset = await client.scroll(
+                collection_name=self._collection_name,
+                limit=scroll_limit,
+                offset=offset,
+                with_payload=[key],  # Only fetch the one field we need
+                with_vectors=False,
+            )
+
+            for record in records:
+                val = (record.payload or {}).get(key)
+                if val:
+                    unique_values.add(str(val))
+
+            scanned += len(records)
+            if not offset or len(records) < scroll_limit:
+                has_more = False
+
+        return list(unique_values)
+
     @trace_operation(LifecycleStage.RETRIEVE, "qdrant_get_by_id")
     async def get_by_id(self, id: str) -> Chunk | None:
         """Retrieve a single chunk by its unique ID."""

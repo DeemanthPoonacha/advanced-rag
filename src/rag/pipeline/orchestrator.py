@@ -7,6 +7,7 @@ guardrails, and evaluation into a single unified execution loop.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import time
 import uuid
 from pathlib import Path
@@ -58,6 +59,9 @@ class RAGPipelineOrchestrator:
         self.chunker = self.factory.create_chunker()
         self.embedding_model = self.factory.create_embedding_model()
         
+        # Pre-warm embedding model at startup to avoid first-request latency
+        self.embedding_model._get_model()
+        
         if hasattr(self.chunker, "set_embedding_model"):
             self.chunker.set_embedding_model(self.embedding_model)
 
@@ -81,6 +85,10 @@ class RAGPipelineOrchestrator:
 
         self.ingestion_status: dict[str, Any] = {}
         self._initialized = False
+
+        # Query response cache: sha256(query) -> (GenerationResult, timestamp)
+        self._query_cache: dict[str, tuple[GenerationResult, float]] = {}
+        self._cache_ttl: float = 300.0  # 5 minutes
 
     def start_ingestion(self, filenames: list[str]) -> None:
         """Clear and initialize the ingestion status tracking for a list of filenames."""
@@ -142,6 +150,9 @@ class RAGPipelineOrchestrator:
             List of generated chunk IDs stored in the vector database.
         """
         await self.initialize()
+
+        # Invalidate query cache since new data may change answers
+        self._query_cache.clear()
 
         # Resolve filename for progress status tracking
         filename = (metadata or {}).get("filename") if metadata else None
@@ -361,7 +372,11 @@ class RAGPipelineOrchestrator:
             raise file_error
 
     async def _chunk_documents(self, documents: list[Document]) -> list[Chunk]:
-        """Chunk a list of documents, routing tables/images to MultimodalSummarizerChunker."""
+        """Chunk a list of documents, routing tables/images to MultimodalSummarizerChunker.
+
+        Standard text and multimodal documents are processed in parallel via
+        ``asyncio.gather`` for faster ingestion of mixed-content documents.
+        """
         standard_docs = []
         multimodal_docs = []
         for doc in documents:
@@ -380,10 +395,9 @@ class RAGPipelineOrchestrator:
             else:
                 standard_docs.append(doc)
 
-        chunks = []
-        if standard_docs:
-            chunks.extend(await self.chunker.chunk_batch(standard_docs))
-        
+        # Eagerly prepare the multimodal summarizer before the gather so both
+        # branches can start concurrently.
+        summarizer = None
         if multimodal_docs:
             try:
                 from ..ingestion.chunkers.multimodal_summarizer import MultimodalSummarizerChunker
@@ -425,12 +439,31 @@ class RAGPipelineOrchestrator:
                             custom["images_base64"] = [image_b64]
                         else:
                             custom["images_base64"] = []
-                            
-                mm_chunks = await summarizer.chunk_batch(multimodal_docs)
-                chunks.extend(mm_chunks)
             except Exception as mm_err:
-                logger.error("multimodal_chunker_failed_falling_back_to_text", error=str(mm_err))
-                chunks.extend(await self.chunker.chunk_batch(multimodal_docs))
+                logger.error("multimodal_chunker_init_failed_falling_back_to_text", error=str(mm_err))
+                # Fall back: treat multimodal docs as standard
+                standard_docs.extend(multimodal_docs)
+                multimodal_docs = []
+                summarizer = None
+
+        # Run standard and multimodal chunking in parallel
+        tasks = []
+        if standard_docs:
+            tasks.append(self.chunker.chunk_batch(standard_docs))
+        if multimodal_docs and summarizer:
+            tasks.append(summarizer.chunk_batch(multimodal_docs))
+        elif multimodal_docs:
+            # Summarizer init failed — fallback to text chunker
+            tasks.append(self.chunker.chunk_batch(multimodal_docs))
+
+        chunks = []
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for result in results:
+                if isinstance(result, Exception):
+                    logger.error("chunking_task_failed", error=str(result))
+                else:
+                    chunks.extend(result)
 
         return chunks
 
@@ -529,6 +562,26 @@ class RAGPipelineOrchestrator:
         await self.initialize()
 
         logger.info("pipeline_query_start", query=user_query, trace_id=trace_id)
+
+        # Cache lookup — return cached result for identical queries within TTL
+        if not ground_truth and not attachments:
+            cache_key = hashlib.sha256(user_query.encode()).hexdigest()
+            cached = self._query_cache.get(cache_key)
+            if cached:
+                cached_result, cached_at = cached
+                if (time.perf_counter() - cached_at) < self._cache_ttl:
+                    latency = (time.perf_counter() - start_time) * 1000.0
+                    logger.info("pipeline_query_cache_hit", query=user_query, trace_id=trace_id)
+                    return GenerationResult(
+                        answer=cached_result.answer,
+                        sources=cached_result.sources,
+                        token_usage=cached_result.token_usage,
+                        latency_ms=latency,
+                        trace_id=trace_id,
+                        metadata={**cached_result.metadata, "cached": True},
+                    )
+                else:
+                    del self._query_cache[cache_key]
 
         # 1. Input Guardrail
         if self.input_guardrail:
@@ -683,7 +736,7 @@ class RAGPipelineOrchestrator:
         if eval_res_dict:
             res_metadata["evaluation"] = eval_res_dict
 
-        return GenerationResult(
+        result = GenerationResult(
             answer=answer,
             sources=reranked_results if self.config.generation.include_sources else [],
             token_usage=TokenUsage(model=self.config.llm.config.get("model", "")),
@@ -691,6 +744,13 @@ class RAGPipelineOrchestrator:
             trace_id=trace_id,
             metadata=res_metadata,
         )
+
+        # Store in cache (only for non-evaluation, non-attachment queries)
+        if not ground_truth and not attachments:
+            cache_key = hashlib.sha256(user_query.encode()).hexdigest()
+            self._query_cache[cache_key] = (result, time.perf_counter())
+
+        return result
 
     async def query_stream(
         self,
@@ -785,14 +845,15 @@ class RAGPipelineOrchestrator:
         ):
             yield token
 
-    async def update_missing_summaries(self) -> int:
+    async def update_missing_summaries(self) -> tuple[int, int]:
         """Scan vector store for chunks that are missing multimodal summaries and update them.
 
         This handles healing chunks that were ingested while the local LLM server
         was offline or had transient failures.
 
         Returns:
-            The number of successfully updated chunks.
+            Tuple of (updated_count, remaining_count) so the caller can decide
+            whether to retry without needing a second full scan.
         """
         await self.initialize()
         
@@ -800,7 +861,7 @@ class RAGPipelineOrchestrator:
             chunks = await self.vector_store.list_chunks(limit=10000)
         except Exception as exc:
             logger.error("background_summarizer_list_chunks_failed", error=str(exc))
-            return 0
+            return 0, 0
 
         # Filter chunks that need summaries (contain tables or images) but lack them
         target_chunks = []
@@ -818,7 +879,7 @@ class RAGPipelineOrchestrator:
                 target_chunks.append((c, tables, images))
 
         if not target_chunks:
-            return 0
+            return 0, 0
 
         # Lazy initialize MultimodalSummarizerChunker configuration
         try:
@@ -848,7 +909,7 @@ class RAGPipelineOrchestrator:
             )
         except Exception as init_err:
             logger.error("background_summarizer_init_failed", error=str(init_err))
-            return 0
+            return 0, len(target_chunks)
 
         updated_count = 0
         for chunk, tables, images in target_chunks:
@@ -918,7 +979,8 @@ SEARCHABLE DESCRIPTION:"""
                 # Break to avoid repeating connection errors for subsequent chunks
                 break
 
-        return updated_count
+        remaining = len(target_chunks) - updated_count
+        return updated_count, remaining
 
     async def close(self) -> None:
         """Gracefully release open HTTP/gRPC channels and database connection pools."""

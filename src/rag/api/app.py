@@ -27,7 +27,11 @@ background_summarizer_task: Optional[asyncio.Task] = None
 summarizer_trigger_event = asyncio.Event()
 
 async def run_background_summarizer():
-    """Background task loop that processes missing summaries and goes to sleep when done."""
+    """Background task loop that processes missing summaries and goes to sleep when done.
+    
+    Uses the (updated_count, remaining_count) tuple returned by
+    update_missing_summaries() to avoid a redundant full-scan of the vector store.
+    """
     await asyncio.sleep(5)  # Wait for startup and other initializations to stabilize
     
     # Run once on startup to resolve any historical missing summaries
@@ -43,32 +47,12 @@ async def run_background_summarizer():
             trigger_startup = False
             
             if orchestrator:
-                num_updated = await orchestrator.update_missing_summaries()
+                num_updated, remaining = await orchestrator.update_missing_summaries()
                 if num_updated > 0:
                     print(f"Background Summarizer: Successfully updated {num_updated} chunk summaries.")
                 
-                # Check if there are still missing summaries left in the database
-                try:
-                    chunks = await orchestrator.vector_store.list_chunks(limit=10000)
-                    has_missing = False
-                    for c in chunks:
-                        custom = c.metadata.custom if (c.metadata and hasattr(c.metadata, "custom") and c.metadata.custom) else {}
-                        tables = custom.get("tables_html", [])
-                        images = custom.get("images_base64", [])
-                        if not tables and not images:
-                            continue
-                        summary_text = custom.get("summary_text", "")
-                        is_missing = not summary_text or "[Local LLM Offline Fallback]" in summary_text
-                        if is_missing:
-                            has_missing = True
-                            break
-                    
-                    if has_missing:
-                        # Some are still missing (probably LLM is offline). Sleep and try again.
-                        await asyncio.sleep(15)
-                        trigger_startup = True  # retry immediately on next loop after sleep
-                except Exception as check_err:
-                    print(f"Error checking pending summaries count: {check_err}")
+                if remaining > 0:
+                    # Some are still missing (probably LLM is offline). Sleep and retry.
                     await asyncio.sleep(15)
                     trigger_startup = True
                     
@@ -506,7 +490,8 @@ async def delete_preset(name: str):
         raise HTTPException(status_code=500, detail=f"Failed to delete preset: {str(e)}")
 
 @app.get("/api/chunks")
-async def get_all_chunks(limit: int = 10000):
+async def get_all_chunks(limit: int = 100, offset: int = 0):
+    """List chunks with pagination (default 100 per page, not 10000)."""
     global orchestrator
     if not orchestrator:
         raise HTTPException(
@@ -518,6 +503,7 @@ async def get_all_chunks(limit: int = 10000):
         await orchestrator.initialize()
         db = orchestrator.vector_store
         
+        # Fetch one page of chunks with a reasonable default limit
         chunks = await db.list_chunks(limit=limit)
         
         chunks_list = []
@@ -689,28 +675,29 @@ async def ingest_files(
             pass
 
     # Initialize ingestion status at the class level
-    orchestrator.start_ingestion([file.filename for file in files])
+    orchestrator.start_ingestion([str(file.filename) for file in files])
 
-    # Create temporary directory inside workspace
-    temp_dir = Path("data/temp_uploads")
-    temp_dir.mkdir(parents=True, exist_ok=True)
+    # Create uploads directory inside workspace
+    uploads_dir = Path("data/uploads")
+    uploads_dir.mkdir(parents=True, exist_ok=True)
     
     total_chunk_ids = []
     ingested_files_log = []
     
     async def ingest_single_file(file: UploadFile):
         current_filename = file.filename
-        temp_file_path = None
+        uploads_file_path = None
         try:
-            # Generate unique temp filename to prevent conflict
-            file_extension = Path(current_filename).suffix
-            temp_file_name = f"{uuid.uuid4()}{file_extension}"
-            temp_file_path = temp_dir / temp_file_name
+            # Generate unique uploads filename to prevent conflict
+            file_extension = Path(str(current_filename)).suffix
+            uploads_file_name = f"{current_filename}{uuid.uuid4()}{file_extension}"
+            # uploads_file_name = f"{uuid.uuid4()}{file_extension}"
+            uploads_file_path = uploads_dir / uploads_file_name
             
-            # Save file to temp path via run_in_executor to avoid blocking the event loop
+            # Save file to uploads path via run_in_executor to avoid blocking the event loop
             loop = asyncio.get_running_loop()
             def write_file():
-                with open(temp_file_path, "wb") as f:
+                with open(uploads_file_path, "wb") as f:
                     shutil.copyfileobj(file.file, f)
             await loop.run_in_executor(None, write_file)
                 
@@ -719,20 +706,21 @@ async def ingest_files(
             
             # Call orchestrator ingest directly - status logic is now inside orchestrator!
             chunk_ids = await orchestrator.ingest_source(
-                source=str(temp_file_path),
+                source=str(uploads_file_path),
                 metadata=file_metadata
             )
             return current_filename, chunk_ids, None
         except Exception as file_err:
-            orchestrator.set_ingestion_failed(current_filename, str(file_err))
+            orchestrator.set_ingestion_failed(str(current_filename), str(file_err))
             return current_filename, [], file_err
         finally:
+            pass
             # Clean up temporary file
-            if temp_file_path and temp_file_path.exists():
-                try:
-                    temp_file_path.unlink()
-                except Exception:
-                    pass
+            # if uploads_file_path and uploads_file_path.exists():
+            #     try:
+            #         uploads_file_path.unlink()
+            #     except Exception:
+            #         pass
 
     try:
         tasks = [ingest_single_file(f) for f in files]
@@ -772,13 +760,14 @@ async def ingest_files(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        # Cleanup any remaining files in temp uploads
-        if temp_dir.exists():
-            for f in temp_dir.glob("*"):
-                try:
-                    f.unlink()
-                except Exception:
-                    pass
+        pass
+        # # Cleanup any remaining files in temp uploads
+        # if uploads_dir.exists():
+        #     for f in uploads_dir.glob("*"):
+        #         try:
+        #             f.unlink()
+        #         except Exception:
+        #             pass
 
 @app.delete("/api/documents/{filename}")
 async def delete_document(filename: str):
@@ -805,6 +794,7 @@ async def delete_document(filename: str):
 
 @app.get("/api/documents")
 async def get_documents():
+    """List documents using server-side metadata filtering instead of full scan."""
     global orchestrator
     if not orchestrator:
         raise HTTPException(
@@ -816,17 +806,18 @@ async def get_documents():
         await orchestrator.initialize()
         db = orchestrator.vector_store
         
-        chunks = await db.list_chunks(limit=10000)
+        # Get unique filenames using lightweight server-side query
+        unique_filenames = await db.get_unique_metadata_values("file_name")
         
-        from collections import defaultdict
-        grouped = defaultdict(list)
-        for chunk in chunks:
-            fname = chunk.metadata.file_name or chunk.metadata.source or "unknown"
-            filename_clean = os.path.basename(fname)
-            grouped[filename_clean].append(chunk)
-            
         docs_list = []
-        for filename_clean, file_chunks in grouped.items():
+        for raw_fname in unique_filenames:
+            filename_clean = os.path.basename(raw_fname)
+            
+            # Fetch only chunks for this specific document via server-side filter
+            file_chunks = await db.list_chunks_by_metadata("file_name", raw_fname)
+            if not file_chunks:
+                continue
+            
             first_chunk = file_chunks[0]
             file_type = first_chunk.metadata.file_type
             if not file_type and "." in filename_clean:
@@ -873,6 +864,7 @@ async def get_documents():
 
 @app.get("/api/documents/{filename}/chunks")
 async def get_document_chunks(filename: str):
+    """Get chunks for a specific document using server-side filtering."""
     global orchestrator
     if not orchestrator:
         raise HTTPException(
@@ -884,45 +876,51 @@ async def get_document_chunks(filename: str):
         await orchestrator.initialize()
         db = orchestrator.vector_store
         
-        chunks = await db.list_chunks(limit=10000)
+        # Server-side filtered query — no more loading all 10K chunks
+        chunks = await db.list_chunks_by_metadata("file_name", filename)
+        
+        # Also try matching by basename in case stored filenames include paths
+        if not chunks:
+            # Fallback: get unique filenames and find the matching one
+            unique_fnames = await db.get_unique_metadata_values("file_name")
+            for raw_fname in unique_fnames:
+                if os.path.basename(raw_fname).lower() == filename.lower():
+                    chunks = await db.list_chunks_by_metadata("file_name", raw_fname)
+                    break
         
         filtered = []
         for c in chunks:
-            c_fname = c.metadata.file_name or c.metadata.source or ""
-            c_clean = os.path.basename(c_fname)
+            meta_dict = c.metadata.model_dump() if hasattr(c.metadata, "model_dump") else c.metadata
+            custom = meta_dict.get("custom", {}) or {}
             
-            if c_clean.lower() == filename.lower():
-                meta_dict = c.metadata.model_dump() if hasattr(c.metadata, "model_dump") else c.metadata
-                custom = meta_dict.get("custom", {}) or {}
+            c_type = "text"
+            file_type = meta_dict.get("file_type", "")
+            if (
+                file_type == "image" 
+                or custom.get("image_extracted") 
+                or custom.get("image_base64")
+                or (isinstance(custom.get("images_base64"), list) and len(custom["images_base64"]) > 0)
+            ):
+                c_type = "image"
+            elif (
+                custom.get("table_extracted")
+                or (isinstance(custom.get("tables_html"), list) and len(custom["tables_html"]) > 0)
+            ):
+                c_type = "table"
                 
-                c_type = "text"
-                file_type = meta_dict.get("file_type", "")
-                if (
-                    file_type == "image" 
-                    or custom.get("image_extracted") 
-                    or custom.get("image_base64")
-                    or (isinstance(custom.get("images_base64"), list) and len(custom["images_base64"]) > 0)
-                ):
-                    c_type = "image"
-                elif (
-                    custom.get("table_extracted")
-                    or (isinstance(custom.get("tables_html"), list) and len(custom["tables_html"]) > 0)
-                ):
-                    c_type = "table"
-                    
-                summary = custom.get("summary_text", "")
-                
-                filtered.append({
-                    "id": c.id,
-                    "page": meta_dict.get("page_number", 1) or 1,
-                    "type": c_type,
-                    "snippet": c.content[:120] + "..." if len(c.content) > 120 else c.content,
-                    "originalText": c.content,
-                    "summaryText": summary,
-                    "isRaw": not summary,
-                    "chunk_index": c.chunk_index,
-                    "metadata": meta_dict
-                })
+            summary = custom.get("summary_text", "")
+            
+            filtered.append({
+                "id": c.id,
+                "page": meta_dict.get("page_number", 1) or 1,
+                "type": c_type,
+                "snippet": c.content[:120] + "..." if len(c.content) > 120 else c.content,
+                "originalText": c.content,
+                "summaryText": summary,
+                "isRaw": not summary,
+                "chunk_index": c.chunk_index,
+                "metadata": meta_dict
+            })
                 
         filtered.sort(key=lambda x: (x.get("page") or 1, x.get("chunk_index") or 0, x.get("id")))
         

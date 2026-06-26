@@ -44,6 +44,8 @@ def test_api_endpoints():
         )
     ]
     mock_db.list_chunks = AsyncMock(return_value=dummy_chunks)
+    mock_db.list_chunks_by_metadata = AsyncMock(return_value=dummy_chunks)
+    mock_db.get_unique_metadata_values = AsyncMock(return_value=["test_doc.txt"])
     mock_db.delete_by_metadata = AsyncMock()
     mock_orchestrator.vector_store = mock_db
     

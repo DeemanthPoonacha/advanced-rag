@@ -13,7 +13,7 @@ echo "============================================="
 
 # 1. Start FastAPI Backend in background
 echo "-> Starting FastAPI backend on http://localhost:8000..."
-.venv/bin/uvicorn src.rag.api.app:app --host 0.0.0.0 --port 8000 &
+.venv/bin/uvicorn src.rag.api.app:app --host 0.0.0.0 --port 8000 --loop uvloop --http httptools --timeout-keep-alive 30 &
 BACKEND_PID=$!
 
 # Ensure backend stops when this script is interrupted

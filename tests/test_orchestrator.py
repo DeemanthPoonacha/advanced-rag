@@ -50,6 +50,9 @@ class MockEmbeddingModel(BaseEmbeddingModel):
         return [0.1, 0.2, 0.3]
     async def embed_sparse(self, texts):
         return [SparseVector(indices=[1], values=[1.0]) for _ in texts]
+    def _get_model(self):
+        """No-op for testing — satisfies pre-warm call in orchestrator __init__."""
+        pass
     @property
     def dimensions(self):
         return 3
@@ -90,6 +93,17 @@ class MockVectorStore(BaseVectorStore):
         self.chunks = [c for c in self.chunks if getattr(c.metadata, key, None) != value]
     async def list_chunks(self, limit: int = 10000):
         return self.chunks[:limit]
+    async def list_chunks_by_metadata(self, key: str, value: Any, limit: int = 1000):
+        """Server-side filtered chunk listing."""
+        return [c for c in self.chunks if getattr(c.metadata, key, None) == value][:limit]
+    async def get_unique_metadata_values(self, key: str, limit: int = 10000):
+        """Get unique values for a metadata field."""
+        values = set()
+        for c in self.chunks:
+            val = getattr(c.metadata, key, None)
+            if val:
+                values.add(str(val))
+        return list(values)
     async def get_by_id(self, id: str):
         found = [c for c in self.chunks if c.id == id]
         return found[0] if found else None
@@ -310,9 +324,10 @@ async def test_orchestrator_update_missing_summaries(orchestrator_config):
     orchestrator.embedding_model.embed = AsyncMock(return_value=[[0.9, 0.9, 0.9]])
 
     # 2. Run update_missing_summaries
-    num_updated = await orchestrator.update_missing_summaries()
+    num_updated, remaining = await orchestrator.update_missing_summaries()
 
     assert num_updated == 1
+    assert remaining == 0
     assert len(orchestrator.vector_store.chunks) == 1
     
     updated_chunk = orchestrator.vector_store.chunks[0]

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { RAGStatus, PipelineConfig, UploadLog } from "../types";
 import { useStore } from "../store/useStore";
@@ -81,50 +82,55 @@ export function useIngestStatus() {
   const setIsUploading = useStore((s) => s.setIsUploading);
   const queryClient = useQueryClient();
 
-  return useQuery<Record<string, any>>({
+  const queryResult = useQuery<Record<string, any>>({
     queryKey: ["ingestStatus"],
     queryFn: fetchIngestStatus,
     enabled: isUploading,
     refetchInterval: isUploading ? 800 : false,
-    onSuccess: (data) => {
-      if (!data) return;
-      setRealIngestStatus(data);
-      const keys = Object.keys(data);
-      if (keys.length > 0) {
-        const isAnyRunning = keys.some((filename) => {
-          const info = data[filename];
-          return info && info.status !== "completed" && info.status !== "failed";
-        });
-
-        // Determine active step
-        let minStep = 3;
-        keys.forEach((filename) => {
-          const info = data[filename];
-          if (info && typeof info.step === "number") {
-            minStep = Math.min(minStep, info.step);
-          } else if (info) {
-            if (info.status === "uploading") {
-              minStep = Math.min(minStep, 1);
-            } else if (info.status === "partitioning") {
-              minStep = Math.min(minStep, 2);
-            } else if (info.status === "chunking" || info.status === "indexing") {
-              minStep = Math.min(minStep, 3);
-            }
-          }
-        });
-
-        setActiveStep((prev) => Math.max(prev, minStep));
-        setMaxStepReached((prev) => Math.max(prev, minStep));
-
-        if (!isAnyRunning) {
-          setIsUploading(false);
-          useStore.getState().showToast("Document ingestion completed!", "success");
-          queryClient.invalidateQueries(["documents"]);
-          queryClient.invalidateQueries(["ragStatus"]);
-        }
-      }
-    },
   });
+
+  const { data } = queryResult;
+
+  useEffect(() => {
+    if (!data) return;
+    setRealIngestStatus(data);
+    const keys = Object.keys(data);
+    if (keys.length > 0) {
+      const isAnyRunning = keys.some((filename) => {
+        const info = data[filename];
+        return info && info.status !== "completed" && info.status !== "failed";
+      });
+
+      // Determine active step
+      let minStep = 3;
+      keys.forEach((filename) => {
+        const info = data[filename];
+        if (info && typeof info.step === "number") {
+          minStep = Math.min(minStep, info.step);
+        } else if (info) {
+          if (info.status === "uploading") {
+            minStep = Math.min(minStep, 1);
+          } else if (info.status === "partitioning") {
+            minStep = Math.min(minStep, 2);
+          } else if (info.status === "chunking" || info.status === "indexing") {
+            minStep = Math.min(minStep, 3);
+          }
+        }
+      });
+
+      setActiveStep((prev) => Math.max(prev, minStep));
+      setMaxStepReached((prev) => Math.max(prev, minStep));
+
+      if (!isAnyRunning) {
+        setIsUploading(false);
+        useStore.getState().showToast("Document ingestion completed!", "success");
+        queryClient.invalidateQueries({ queryKey: ["documents"] });
+        queryClient.invalidateQueries({ queryKey: ["ragStatus"] });
+      }
+    }
+  }, [data, setRealIngestStatus, setActiveStep, setMaxStepReached, setIsUploading, queryClient]);
+
+  return queryResult;
 }
 
 // --- Mutation Hooks ---
@@ -171,8 +177,8 @@ export function useUpdateConfig() {
     },
     onSuccess: () => {
       showToast("Configuration applied and pipeline reloaded!", "success");
-      queryClient.invalidateQueries(["pipelineConfig"]);
-      queryClient.invalidateQueries(["ragStatus"]);
+      queryClient.invalidateQueries({ queryKey: ["pipelineConfig"] });
+      queryClient.invalidateQueries({ queryKey: ["ragStatus"] });
     },
     onError: (err: any) => {
       showToast(err.message || "Failed to update configuration", "error");
@@ -221,8 +227,8 @@ export function useUploadDocuments() {
     },
     onSuccess: (data) => {
       showToast(`Ingested successfully! Created ${data.total_chunks_ingested} chunks.`, "success");
-      queryClient.invalidateQueries(["documents"]);
-      queryClient.invalidateQueries(["ragStatus"]);
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      queryClient.invalidateQueries({ queryKey: ["ragStatus"] });
     },
     onError: (err: any) => {
       if (err.name === "AbortError") return;
@@ -252,8 +258,8 @@ export function useDeleteDocument() {
     },
     onSuccess: (data) => {
       showToast(data.message || `Deleted successfully!`, "success");
-      queryClient.invalidateQueries(["documents"]);
-      queryClient.invalidateQueries(["ragStatus"]);
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      queryClient.invalidateQueries({ queryKey: ["ragStatus"] });
     },
     onError: (err: any) => {
       showToast(err.message || "Delete failed due to connection error", "error");

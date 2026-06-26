@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import { Eye, X, Info, Loader2 } from "lucide-react";
+import "./ChunkInspector.css";
 
 interface ChunkInspectorProps {
   selectedChunk: {
@@ -60,7 +62,7 @@ export function ChunkInspector({
     }
     return imgs.filter(Boolean);
   };
-  const imagesList = getImages();
+  const imagesList = useMemo(() => getImages(), [selectedChunk]);
 
   const getTables = () => {
     const tbls: string[] = [];
@@ -81,7 +83,7 @@ export function ChunkInspector({
     }
     return tbls.filter(Boolean);
   };
-  const tablesList = getTables();
+  const tablesList = useMemo(() => getTables(), [selectedChunk]);
 
   const formatImageSrc = (b64: string) => {
     if (b64.startsWith("data:image/")) {
@@ -134,29 +136,6 @@ export function ChunkInspector({
         {/* ORIGINAL TEXT VIEW */}
         {inspectorTab === "original" && (
           <div className="space-y-4 animate-fade-in">
-            <style>{`
-              .table-render-container table {
-                width: 100%;
-                border-collapse: collapse;
-                margin: 0.5rem 0;
-                font-size: 11px;
-                line-height: 1.4;
-              }
-              .table-render-container th {
-                background-color: rgba(120, 120, 120, 0.1);
-                border: 1px solid rgba(120, 120, 120, 0.2);
-                padding: 6px 10px;
-                font-weight: 600;
-                text-align: left;
-              }
-              .table-render-container td {
-                border: 1px solid rgba(120, 120, 120, 0.15);
-                padding: 6px 10px;
-              }
-              .table-render-container tr:nth-child(even) {
-                background-color: rgba(120, 120, 120, 0.03);
-              }
-            `}</style>
 
             <div>
               <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-2 tracking-wide">

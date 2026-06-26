@@ -7,6 +7,7 @@ Supports any HuggingFace model compatible with sentence-transformers.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 from typing import Any
 
 import numpy as np
@@ -18,6 +19,12 @@ from ..core.types import LifecycleStage
 from ..observability.tracing import trace_operation
 
 logger = structlog.get_logger(__name__)
+
+# Dedicated thread pool for embedding work — avoids contention
+# with the default executor (max 5 threads) under concurrent requests.
+_EMBED_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+    max_workers=2, thread_name_prefix="embed"
+)
 
 
 @ComponentRegistry.register("embedding_model", "local")
@@ -114,7 +121,7 @@ class LocalEmbeddingModel(BaseEmbeddingModel):
         prefixed = [self._document_prefix + t for t in texts]
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
-            None, self._encode_sync, prefixed
+            _EMBED_EXECUTOR, self._encode_sync, prefixed
         )
 
         logger.info(
@@ -137,7 +144,7 @@ class LocalEmbeddingModel(BaseEmbeddingModel):
         prefixed = self._query_prefix + query
         loop = asyncio.get_running_loop()
         embeddings = await loop.run_in_executor(
-            None, self._encode_sync, [prefixed]
+            _EMBED_EXECUTOR, self._encode_sync, [prefixed]
         )
         return embeddings[0]
 
