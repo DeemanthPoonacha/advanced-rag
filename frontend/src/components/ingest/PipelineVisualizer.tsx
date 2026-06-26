@@ -45,7 +45,7 @@ export function PipelineVisualizer({
   if (minimized) {
     const totalFiles = wizardFiles.length;
     const completedFiles = wizardFiles.filter(
-      (f) => f.status === "completed" || f.status === "failed"
+      (f) => f.status === "completed" || f.status === "failed",
     ).length;
     const percent =
       totalFiles > 0 ? Math.round((completedFiles / totalFiles) * 100) : 0;
@@ -141,30 +141,26 @@ export function PipelineVisualizer({
   // Aggregate stats from wizardFiles
   const totalUploaded = wizardFiles.length;
   const countFailed = wizardFiles.filter((f) => f.status === "failed").length;
-  const countProgress = wizardFiles.filter(
-    (f) => f.status === "processing"
-  ).length;
-  const countSuccess = wizardFiles.filter(
-    (f) => f.status === "completed"
-  ).length;
+  const countProgress = wizardFiles.filter((f) => f.step === 1).length;
+  const countSuccess = wizardFiles.filter((f) => f.step > 1).length;
 
   const sumTotalElements = wizardFiles.reduce(
     (acc, f) => acc + (f.totalElements || 0),
-    0
+    0,
   );
   const sumTotalChunks = wizardFiles.reduce(
     (acc, f) => acc + (f.totalChunks || 0),
-    0
+    0,
   );
   const sumSummarizedChunks = wizardFiles.reduce(
     (acc, f) => acc + (f.summarizedChunks || 0),
-    0
+    0,
   );
   const sumRawChunks = sumTotalChunks - sumSummarizedChunks;
 
   const sumNeedsSummary = wizardFiles.reduce(
     (acc, f) => acc + (f.tableCount || 0) + (f.imageCount || 0),
-    0
+    0,
   );
   const hasPendingSummaries = sumNeedsSummary > sumSummarizedChunks;
 
@@ -496,7 +492,10 @@ export function PipelineVisualizer({
                   <div>
                     <p className="font-bold">Pending Background Summaries</p>
                     <p className="mt-1 text-slate-400 leading-relaxed">
-                      Some image or table elements were not summarized because the local LLM server was unreachable. These will be generated automatically in the background once the server is back online.
+                      Some image or table elements were not summarized because
+                      the local LLM server was unreachable. These will be
+                      generated automatically in the background once the server
+                      is back online.
                     </p>
                   </div>
                 </div>

@@ -332,6 +332,8 @@ class RAGPipelineOrchestrator:
                 ):
                     c_type = "table"
                     
+                original_text = custom.get("raw_text", c.content)
+                
                 summary = custom.get("summary_text", "")
                 
                 formatted_chunks.append({
@@ -339,7 +341,7 @@ class RAGPipelineOrchestrator:
                     "page": c_m.get("page_number", 1),
                     "type": c_type,
                     "snippet": c.content[:120] + "..." if len(c.content) > 120 else c.content,
-                    "originalText": c.content,
+                    "originalText": original_text,
                     "summaryText": summary,
                     "isRaw": not summary,
                     "metadata": c_m

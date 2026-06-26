@@ -907,15 +907,17 @@ async def get_document_chunks(filename: str):
                 or (isinstance(custom.get("tables_html"), list) and len(custom["tables_html"]) > 0)
             ):
                 c_type = "table"
-                
+
+            original_text = custom.get("raw_text", c.content)
             summary = custom.get("summary_text", "")
+
             
             filtered.append({
                 "id": c.id,
                 "page": meta_dict.get("page_number", 1) or 1,
                 "type": c_type,
                 "snippet": c.content[:120] + "..." if len(c.content) > 120 else c.content,
-                "originalText": c.content,
+                "originalText": original_text,
                 "summaryText": summary,
                 "isRaw": not summary,
                 "chunk_index": c.chunk_index,

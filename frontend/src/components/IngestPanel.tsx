@@ -608,7 +608,7 @@ export function IngestPanel() {
           />
 
           {/* Dynamic settings / Detail Inspector / Metrics Panel (Right Column) */}
-          <div className="w-full md:w-96 shrink-0 flex flex-col max-h-full border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm backdrop-blur-md bg-white/80 dark:bg-slate-900/80">
+          <div className="w-full md:w-1/2 shrink-0 flex flex-col max-h-full border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm backdrop-blur-md bg-white/80 dark:bg-slate-900/80">
             {selectedChunk ? (
               <ChunkInspector
                 selectedChunk={selectedChunk as any}
