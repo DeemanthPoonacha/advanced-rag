@@ -5,7 +5,12 @@ import { FileMetricsInspector } from "./ingest/FileMetricsInspector";
 import { IngestOverview } from "./ingest/IngestOverview";
 import { PipelineVisualizer } from "./ingest/PipelineVisualizer";
 import { useStore } from "../store/useStore";
-import { useRagStatus, useDocuments, useUploadDocuments, useDeleteDocument } from "../api/queries";
+import {
+  useRagStatus,
+  useDocuments,
+  useUploadDocuments,
+  useDeleteDocument,
+} from "../api/queries";
 
 interface ChunkData {
   id: string;
@@ -216,7 +221,7 @@ export function IngestPanel() {
         totalChunks,
         summarizedChunks: finalSummarized,
         needsSummaryCount: finalNeedsSummary,
-        chunks: finalChunks,
+        chunks: finalChunks as ChunkData[],
         isMock: false,
       };
     });
