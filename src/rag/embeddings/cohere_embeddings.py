@@ -48,7 +48,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
         input_type: str = "search_document",
         **kwargs: Any,
     ) -> None:
-        self._model = model
+        self._model = kwargs.pop("model_name", model)
         self._api_key = api_key
         self._dimensions_val = dimensions
         self._batch_size = min(batch_size, 96)  # Cohere hard limit

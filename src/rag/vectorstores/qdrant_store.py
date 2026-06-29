@@ -51,7 +51,7 @@ class QdrantVectorStore(BaseVectorStore):
         distance: str = "cosine",
         sparse_vector_name: str = "sparse",
         on_disk: bool = False,
-        prefer_grpc: bool = True,
+        prefer_grpc: bool = False,
         **kwargs: Any,
     ) -> None:
         self._url = url

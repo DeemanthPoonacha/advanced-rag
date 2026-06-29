@@ -60,7 +60,8 @@ class RAGPipelineOrchestrator:
         self.embedding_model = self.factory.create_embedding_model()
         
         # Pre-warm embedding model at startup to avoid first-request latency
-        self.embedding_model._get_model()
+        if hasattr(self.embedding_model, "_get_model"):
+            self.embedding_model._get_model()
         
         if hasattr(self.chunker, "set_embedding_model"):
             self.chunker.set_embedding_model(self.embedding_model)

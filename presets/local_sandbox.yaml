@@ -4,54 +4,94 @@ project:
   version: "1.0.0"
 
 ingestion:
-  parser:
-    provider: "unstructured"
-    config: {}
+  batch_size: 10
   chunker:
-    provider: "semantic"
     config:
       target_chunk_size: 500
-  batch_size: 10
+    provider: "semantic"
+  docling:
+    export_format: markdown
+  enable_multimodal_enrichment: false
+  gcp_documentai:
+    location: us
+    processor_id: null
+    project_id: null
+  markdown_header:
+    chunk_overlap: 200
+    max_chunk_size: 1024
+    prepend_headers: true
+  multimodal_enricher:
+    api_key: null
+    base_url: null
+    image_prompt: "Describe this image in detail."
+    model_name: "gpt-4o"
+    provider: "primary"
+    table_prompt: "Analyze this HTML table."
+    temperature: 0
+  parser:
+    config: {}
+    provider: "unstructured"
+  pymupdf:
+    extract_images: false
+  unstructured_api:
+    api_key: null
+    api_url: "https://api.unstructured.io/general/v0/general"
+    strategy: "hi_res"
 
 embeddings:
-  provider: "local"
   config:
-    model_name: "sentence-transformers/all-MiniLM-L6-v2"
     device: "cpu"
+    model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  provider: "local"
 
 llm:
-  provider: "local"
   config:
     base_url: "http://localhost:11434/v1"
     model: "gemma2"
     temperature: 0.1
+  provider: "local"
 
 vector_store:
-  provider: "qdrant"
   config:
-    url: "data/qdrant_db"
     collection_name: "documents"
+    url: "data/qdrant_db"
     vector_size: 384
+  provider: "qdrant"
 
 retrieval:
+  config: {}
+  reranker: null
+  similarity_threshold: 0.0
   strategy: "simple"
   top_k: 3
-  similarity_threshold: 0.0
 
 generation:
-  system_prompt: "You are a helpful assistant. Keep your responses concise and accurate."
-  prompt_template: "Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
-  max_context_chunks: 3
   include_sources: true
+  max_context_chunks: 3
+  prompt_template: "Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
+  system_prompt: "You are a helpful assistant. Keep your responses concise and accurate."
 
 guardrails:
   enabled: false
+  input: null
+  output: null
 
 observability:
   logging:
-    level: "INFO"
+    file_path: null
     format: "json"
+    level: "INFO"
+    output: "stdout"
   metrics:
     enabled: false
+    port: 9090
+    provider: "prometheus"
   tracing:
+    api_key: null
     enabled: false
+    endpoint: "http://localhost:4317"
+    provider: "opentelemetry"
+    sample_rate: 1
+    service_name: "rag-pipeline"
+
+evaluation: null

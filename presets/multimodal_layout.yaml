@@ -4,62 +4,97 @@ project:
   version: "1.0.0"
 
 ingestion:
+  batch_size: 20
+  chunker:
+    config:
+      target_chunk_size: 1000
+    provider: "semantic"
+  docling:
+    export_format: markdown
+  enable_multimodal_enrichment: true
+  gcp_documentai:
+    location: us
+    processor_id: null
+    project_id: null
+  markdown_header:
+    chunk_overlap: 200
+    max_chunk_size: 1024
+    prepend_headers: true
+  multimodal_enricher:
+    api_key: "${OPENAI_API_KEY}"
+    base_url: null
+    image_prompt: "Describe this image in detail."
+    model_name: "gpt-4o"
+    provider: "primary"
+    table_prompt: "Analyze this HTML table."
+    temperature: 0.0
   parser:
-    provider: "unstructured"
     config:
       strategy: "hi_res"
       extract_images: true
       extract_tables: true
-  chunker:
-    provider: "semantic"
-    config:
-      target_chunk_size: 1000
-  multimodal_summarizer:
-    provider: "primary"
-    model_name: "gpt-4o"
-    temperature: 0.0
-    api_key: "${OPENAI_API_KEY}"
-  batch_size: 20
+    provider: "unstructured"
+  pymupdf:
+    extract_images: false
+  unstructured_api:
+    api_key: null
+    api_url: "https://api.unstructured.io/general/v0/general"
+    strategy: "hi_res"
 
 embeddings:
-  provider: "openai"
   config:
-    model: "text-embedding-3-small"
+    model_name: "text-embedding-3-small"
     api_key: "${OPENAI_API_KEY}"
+  provider: "openai"
 
 llm:
-  provider: "openai"
   config:
     model: "gpt-4o"
     temperature: 0.1
     api_key: "${OPENAI_API_KEY}"
+  provider: "openai"
 
 vector_store:
-  provider: "qdrant"
   config:
-    url: "http://localhost:6333"
     collection_name: "multimodal_kb"
+    url: "http://localhost:6333"
     vector_size: 1536
+  provider: "qdrant"
 
 retrieval:
+  config: {}
+  reranker: null
+  similarity_threshold: 0.4
   strategy: "simple"
   top_k: 6
-  similarity_threshold: 0.4
 
 generation:
-  system_prompt: "You are an assistant trained to interpret structured pages containing tables, charts, and descriptions. Answer the question using the layout information provided in the context."
-  prompt_template: "Layout & Text Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
-  max_context_chunks: 4
   include_sources: true
+  max_context_chunks: 4
+  prompt_template: "Layout & Text Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
+  system_prompt: "You are an assistant trained to interpret structured pages containing tables, charts, and descriptions. Answer the question using the layout information provided in the context."
 
 guardrails:
   enabled: false
+  input: null
+  output: null
 
 observability:
   logging:
-    level: "INFO"
+    file_path: null
     format: "json"
+    level: "INFO"
+    output: "stdout"
   metrics:
     enabled: true
+    port: 9090
+    provider: "prometheus"
   tracing:
+    api_key: null
     enabled: false
+    endpoint: "http://localhost:4317"
+    provider: "opentelemetry"
+    sample_rate: 1
+    service_name: "rag-pipeline"
+
+evaluation: null

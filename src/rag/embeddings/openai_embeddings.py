@@ -52,7 +52,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         base_url: str | None = None,
         **kwargs: Any,
     ) -> None:
-        self._model = model
+        self._model = kwargs.pop("model_name", model)
         self._api_key = api_key
         self._dimensions_override = dimensions
         self._batch_size = batch_size

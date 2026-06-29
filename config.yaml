@@ -1,57 +1,105 @@
-project:
-  name: "local-sandbox-pipeline"
-  environment: "development"
-  version: "1.0.0"
-
-ingestion:
-  parser:
-    provider: "unstructured"
-    config: {}
-  chunker:
-    provider: "semantic"
-    config:
-      target_chunk_size: 500
-  batch_size: 10
-
 embeddings:
-  provider: "local"
   config:
-    model_name: "sentence-transformers/all-MiniLM-L6-v2"
-    device: "cpu"
-
-llm:
-  provider: "local"
-  config:
-    base_url: "http://localhost:11434/v1"
-    model: "gemma2"
-    temperature: 0.1
-
-vector_store:
-  provider: "qdrant"
-  config:
-    url: "data/qdrant_db"
-    collection_name: "documents"
-    vector_size: 384
-
-retrieval:
-  strategy: "simple"
-  top_k: 3
-  similarity_threshold: 0.0
-
+    device: cuda
+    model_name: sentence-transformers/all-MiniLM-L6-v2
+  provider: local
+evaluation: null
 generation:
-  system_prompt: "You are a helpful assistant. Keep your responses concise and accurate."
-  prompt_template: "Context:\n{context}\n\nQuestion: {query}\n\nAnswer:"
-  max_context_chunks: 3
   include_sources: true
+  max_context_chunks: 3
+  prompt_template: 'Context:
 
+    {context}
+
+
+    Question: {query}
+
+
+    Answer:'
+  system_prompt: You are a helpful assistant. Keep your responses concise and accurate.
 guardrails:
   enabled: false
-
+  input: null
+  output: null
+ingestion:
+  batch_size: 10
+  chunker:
+    config:
+      target_chunk_size: 500
+    provider: by_title
+  docling:
+    export_format: markdown
+  enable_multimodal_enrichment: true
+  gcp_documentai:
+    location: us
+    processor_id: null
+    project_id: null
+  markdown_header:
+    chunk_overlap: 200
+    max_chunk_size: 1024
+    prepend_headers: true
+  multimodal_enricher:
+    api_key: null
+    base_url: null
+    image_prompt: 'You are a visual assistant analyzing documents.\nDescribe this
+      image in detail. Generate a comprehensive, searchable description that covers:\n1.
+      Main topics, charts, diagrams, or patterns.\n2. Key labels, text values, numbers,
+      and data points shown in the image.\n3. Logical conclusions or answers this
+      image could provide.\nMake it detailed and searchable - prioritize findability
+      over brevity.\n\nIMAGE DESCRIPTION:'
+    model_name: gpt-4o
+    provider: primary
+    table_prompt: 'You are a structured data assistant.\nAnalyze this HTML table.
+      Translate it into a clean, searchable Markdown table.\nEnsure all data points,
+      headers, values, and relations are preserved accurately.\nDo not write conversational
+      preamble.\n\nTABLE CONTENT:'
+    temperature: 0
+  parser:
+    config:
+      extract_images: true
+    provider: unstructured
+  pymupdf:
+    extract_images: false
+  unstructured_api:
+    api_key: null
+    api_url: https://api.unstructured.io/general/v0/general
+    strategy: hi_res
+llm:
+  config:
+    base_url: http://localhost:11434/v1
+    model: gemma3:12b-cloud
+    temperature: 0.1
+  provider: local
 observability:
   logging:
-    level: "INFO"
-    format: "json"
+    file_path: null
+    format: json
+    level: INFO
+    output: stdout
   metrics:
     enabled: false
+    port: 9090
+    provider: prometheus
   tracing:
+    api_key: null
     enabled: false
+    endpoint: http://localhost:4317
+    provider: opentelemetry
+    sample_rate: 1
+    service_name: rag-pipeline
+project:
+  environment: development
+  name: local-multimodal-pipeline
+  version: 1.0.0
+retrieval:
+  config: {}
+  reranker: null
+  similarity_threshold: 0
+  strategy: simple
+  top_k: 3
+vector_store:
+  config:
+    collection_name: documents
+    url: data/qdrant_db
+    vector_size: 384
+  provider: qdrant

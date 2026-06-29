@@ -335,7 +335,6 @@ export function ConfigPanel() {
           type="text"
           value={presetDraftName}
           onChange={(e) => setPresetDraftName(e.target.value)}
-          disabled={isPredefined}
           className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           placeholder="e.g. production_v1"
         />
@@ -349,7 +348,13 @@ export function ConfigPanel() {
         {/* Save / Save As New */}
         <button
           onClick={handleSavePreset}
-          disabled={isSavingPreset || !presetDraftName.trim()}
+          disabled={
+            isSavingPreset ||
+            !presetDraftName.trim() ||
+            (isPredefined &&
+              presetDraftName.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_") ===
+                activePresetName)
+          }
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold bg-primary hover:bg-primary/90 text-white shadow-sm transition active:scale-95 cursor-pointer disabled:opacity-40 shrink-0"
         >
           {isSavingPreset ? (
