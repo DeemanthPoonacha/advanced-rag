@@ -31,6 +31,11 @@ import {
   Check,
 } from "lucide-react";
 
+const TABLE_SUMMARIZER_PROMPT =
+  "You are a structured data assistant.\nAnalyze this HTML table. Translate it into a clean, searchable Markdown table.\nEnsure all data points, headers, values, and relations are preserved accurately.\nDo not write conversational preamble.\n\nTABLE CONTENT:";
+const IMAGE_DESCRIPTION_PROMPT =
+  "You are a visual assistant analyzing documents.\nDescribe this image in detail. Generate a comprehensive, searchable description that covers:\n1. Main topics, charts, diagrams, or patterns.\n2. Key labels, text values, numbers, and data points shown in the image.\n3. Logical conclusions or answers this image could provide.\nMake it detailed and searchable - prioritize findability over brevity.\n\nIMAGE DESCRIPTION:";
+
 function jsonToYaml(obj: any, indent = 0): string {
   if (obj === null || obj === undefined) return "null";
   if (typeof obj !== "object") {
@@ -512,10 +517,18 @@ export function ConfigPanel() {
                     >
                       <option value="pymupdf">PyMuPDF (Fast Local Text)</option>
                       <option value="docling">Docling (Local Layout)</option>
-                      <option value="unstructured">Unstructured (Local Full)</option>
-                      <option value="unstructured_api">Unstructured API (Cloud)</option>
-                      <option value="llamaparse">LlamaParse (Cloud Markdown)</option>
-                      <option value="gcp_documentai">Google Cloud Document AI (Cloud)</option>
+                      <option value="unstructured">
+                        Unstructured (Local Full)
+                      </option>
+                      <option value="unstructured_api">
+                        Unstructured API (Cloud)
+                      </option>
+                      <option value="llamaparse">
+                        LlamaParse (Cloud Markdown)
+                      </option>
+                      <option value="gcp_documentai">
+                        Google Cloud Document AI (Cloud)
+                      </option>
                     </select>
                   </div>
 
@@ -530,7 +543,9 @@ export function ConfigPanel() {
                       <Toggle
                         label="Extract Images"
                         description="Attempt to extract inline images (experimental)"
-                        checked={configData.ingestion?.pymupdf?.extract_images ?? false}
+                        checked={
+                          configData.ingestion?.pymupdf?.extract_images ?? false
+                        }
                         onChange={(v) =>
                           handleUpdateConfigValue(
                             ["ingestion", "pymupdf", "extract_images"],
@@ -548,7 +563,10 @@ export function ConfigPanel() {
                           <InfoTooltip text="Docling document export format target." />
                         </label>
                         <select
-                          value={configData.ingestion?.docling?.export_format || "markdown"}
+                          value={
+                            configData.ingestion?.docling?.export_format ||
+                            "markdown"
+                          }
                           onChange={(e) =>
                             handleUpdateConfigValue(
                               ["ingestion", "docling", "export_format"],
@@ -564,7 +582,8 @@ export function ConfigPanel() {
                     )}
 
                     {/* GCP Document AI config */}
-                    {configData.ingestion?.parser?.provider === "gcp_documentai" && (
+                    {configData.ingestion?.parser?.provider ===
+                      "gcp_documentai" && (
                       <>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-semibold flex items-center gap-1">
@@ -574,7 +593,10 @@ export function ConfigPanel() {
                           <input
                             type="text"
                             placeholder="my-gcp-project-123"
-                            value={configData.ingestion?.gcp_documentai?.project_id || ""}
+                            value={
+                              configData.ingestion?.gcp_documentai
+                                ?.project_id || ""
+                            }
                             onChange={(e) =>
                               handleUpdateConfigValue(
                                 ["ingestion", "gcp_documentai", "project_id"],
@@ -593,7 +615,10 @@ export function ConfigPanel() {
                           <input
                             type="text"
                             placeholder="us"
-                            value={configData.ingestion?.gcp_documentai?.location || "us"}
+                            value={
+                              configData.ingestion?.gcp_documentai?.location ||
+                              "us"
+                            }
                             onChange={(e) =>
                               handleUpdateConfigValue(
                                 ["ingestion", "gcp_documentai", "location"],
@@ -612,7 +637,10 @@ export function ConfigPanel() {
                           <input
                             type="text"
                             placeholder="a12b34c5678d90ef"
-                            value={configData.ingestion?.gcp_documentai?.processor_id || ""}
+                            value={
+                              configData.ingestion?.gcp_documentai
+                                ?.processor_id || ""
+                            }
                             onChange={(e) =>
                               handleUpdateConfigValue(
                                 ["ingestion", "gcp_documentai", "processor_id"],
@@ -626,7 +654,8 @@ export function ConfigPanel() {
                     )}
 
                     {/* Unstructured API config */}
-                    {configData.ingestion?.parser?.provider === "unstructured_api" && (
+                    {configData.ingestion?.parser?.provider ===
+                      "unstructured_api" && (
                       <>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-semibold flex items-center gap-1">
@@ -635,7 +664,10 @@ export function ConfigPanel() {
                           </label>
                           <input
                             type="text"
-                            value={configData.ingestion?.unstructured_api?.api_url || ""}
+                            value={
+                              configData.ingestion?.unstructured_api?.api_url ||
+                              ""
+                            }
                             onChange={(e) =>
                               handleUpdateConfigValue(
                                 ["ingestion", "unstructured_api", "api_url"],
@@ -654,7 +686,10 @@ export function ConfigPanel() {
                           <input
                             type="password"
                             placeholder="••••••••••••••••"
-                            value={configData.ingestion?.unstructured_api?.api_key || ""}
+                            value={
+                              configData.ingestion?.unstructured_api?.api_key ||
+                              ""
+                            }
                             onChange={(e) =>
                               handleUpdateConfigValue(
                                 ["ingestion", "unstructured_api", "api_key"],
@@ -671,7 +706,10 @@ export function ConfigPanel() {
                             <InfoTooltip text="hi_res partitions layout; fast extracts plain text; ocr_only scans files." />
                           </label>
                           <select
-                            value={configData.ingestion?.unstructured_api?.strategy || "hi_res"}
+                            value={
+                              configData.ingestion?.unstructured_api
+                                ?.strategy || "hi_res"
+                            }
                             onChange={(e) =>
                               handleUpdateConfigValue(
                                 ["ingestion", "unstructured_api", "strategy"],
@@ -680,7 +718,9 @@ export function ConfigPanel() {
                             }
                             className={inputSmCls}
                           >
-                            <option value="hi_res">Hi-Res Layout Extract</option>
+                            <option value="hi_res">
+                              Hi-Res Layout Extract
+                            </option>
                             <option value="fast">Fast Raw Text</option>
                             <option value="ocr_only">OCR Only (Scans)</option>
                           </select>
@@ -689,7 +729,8 @@ export function ConfigPanel() {
                     )}
 
                     {/* Local Unstructured config */}
-                    {configData.ingestion?.parser?.provider === "unstructured" && (
+                    {configData.ingestion?.parser?.provider ===
+                      "unstructured" && (
                       <>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-semibold flex items-center gap-1">
@@ -721,7 +762,8 @@ export function ConfigPanel() {
                           label="Extract Images"
                           description="Attempt to partition and extract inline images"
                           checked={
-                            configData.ingestion?.parser?.config?.extract_images ?? false
+                            configData.ingestion?.parser?.config
+                              ?.extract_images ?? false
                           }
                           onChange={(v) =>
                             handleUpdateConfigValue(
@@ -744,7 +786,8 @@ export function ConfigPanel() {
                           <input
                             type="text"
                             value={(
-                              configData.ingestion?.parser?.config?.languages || ["en"]
+                              configData.ingestion?.parser?.config
+                                ?.languages || ["en"]
                             ).join(", ")}
                             onChange={(e) => {
                               const list = e.target.value
@@ -763,7 +806,8 @@ export function ConfigPanel() {
                     )}
 
                     {/* LlamaParse config */}
-                    {configData.ingestion?.parser?.provider === "llamaparse" && (
+                    {configData.ingestion?.parser?.provider ===
+                      "llamaparse" && (
                       <>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-semibold flex items-center gap-1">
@@ -791,7 +835,8 @@ export function ConfigPanel() {
                           label="Premium Mode"
                           description="Run premium parsing algorithms for highest quality"
                           checked={
-                            configData.ingestion?.parser?.config?.premium_mode ?? false
+                            configData.ingestion?.parser?.config
+                              ?.premium_mode ?? false
                           }
                           onChange={(v) =>
                             handleUpdateConfigValue(
@@ -809,7 +854,8 @@ export function ConfigPanel() {
                           <textarea
                             rows={2}
                             value={
-                              configData.ingestion?.parser?.config?.parsing_instruction || ""
+                              configData.ingestion?.parser?.config
+                                ?.parsing_instruction || ""
                             }
                             onChange={(e) =>
                               handleUpdateConfigValue(
@@ -828,6 +874,231 @@ export function ConfigPanel() {
                       </>
                     )}
                   </AdvancedToggle>
+                </Subsection>
+
+                <Subsection
+                  title="Multimodal Processing"
+                  icon={<Sparkle size={10} />}
+                >
+                  {/* Multimodal AI Enrichment settings */}
+
+                  <Toggle
+                    label="Enable Visual & Table Enrichment"
+                    description="Enrich tables into Markdown and generate textual visual descriptions for images prior to chunking"
+                    checked={
+                      configData.ingestion?.enable_multimodal_enrichment ??
+                      false
+                    }
+                    onChange={(v) =>
+                      handleUpdateConfigValue(
+                        ["ingestion", "enable_multimodal_enrichment"],
+                        v,
+                      )
+                    }
+                  />
+
+                  {(configData.ingestion?.enable_multimodal_enrichment ??
+                    false) && (
+                    <>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-semibold flex items-center gap-1">
+                          LLM Provider
+                          <InfoTooltip text="LLM client provider for multimodal enrichment. Select 'Use Primary LLM' to reuse the main completions model config." />
+                        </label>
+                        <select
+                          value={
+                            configData.ingestion?.multimodal_enricher
+                              ?.provider || "primary"
+                          }
+                          onChange={(e) =>
+                            handleUpdateConfigValue(
+                              ["ingestion", "multimodal_enricher", "provider"],
+                              e.target.value,
+                            )
+                          }
+                          className={inputSmCls}
+                        >
+                          <option value="primary">Use Primary LLM</option>
+                          <option value="openai">OpenAI GPT</option>
+                          <option value="anthropic">Anthropic Claude</option>
+                          <option value="cohere">Cohere Command</option>
+                          <option value="local">Local LLM / Ollama</option>
+                        </select>
+                      </div>
+
+                      {configData.ingestion?.multimodal_enricher?.provider !==
+                        "primary" && (
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-semibold flex items-center gap-1">
+                            LLM Model Name
+                            <InfoTooltip text="Model identifier used to enrich tables and images." />
+                          </label>
+                          <input
+                            type="text"
+                            value={
+                              configData.ingestion?.multimodal_enricher
+                                ?.model_name || "gpt-4o"
+                            }
+                            onChange={(e) =>
+                              handleUpdateConfigValue(
+                                [
+                                  "ingestion",
+                                  "multimodal_enricher",
+                                  "model_name",
+                                ],
+                                e.target.value,
+                              )
+                            }
+                            className={inputSmCls}
+                          />
+                        </div>
+                      )}
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-semibold flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            Temperature
+                            <InfoTooltip text="Generation temperature settings for enrichment." />
+                          </span>
+                          <RangeValue
+                            value={(
+                              configData.ingestion?.multimodal_enricher
+                                ?.temperature ?? 0.0
+                            ).toFixed(2)}
+                          />
+                        </label>
+                        <input
+                          type="range"
+                          min="0.0"
+                          max="1.0"
+                          step="0.05"
+                          value={
+                            configData.ingestion?.multimodal_enricher
+                              ?.temperature ?? 0.0
+                          }
+                          onChange={(e) =>
+                            handleUpdateConfigValue(
+                              [
+                                "ingestion",
+                                "multimodal_enricher",
+                                "temperature",
+                              ],
+                              parseFloat(e.target.value),
+                            )
+                          }
+                          className={rangeThinCls}
+                        />
+                      </div>
+
+                      {configData.ingestion?.multimodal_enricher?.provider !==
+                        "primary" && (
+                        <>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-semibold flex items-center gap-1">
+                              API Key (optional)
+                              <InfoTooltip text="Model authorization API Key." />
+                            </label>
+                            <input
+                              type="password"
+                              placeholder="••••••••••••••••"
+                              value={
+                                configData.ingestion?.multimodal_enricher
+                                  ?.api_key || ""
+                              }
+                              onChange={(e) =>
+                                handleUpdateConfigValue(
+                                  [
+                                    "ingestion",
+                                    "multimodal_enricher",
+                                    "api_key",
+                                  ],
+                                  e.target.value,
+                                )
+                              }
+                              className={inputSmCls}
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-semibold flex items-center gap-1">
+                              API Base URL (optional)
+                              <InfoTooltip text="Model connection endpoint URL base." />
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="https://api.openai.com/v1"
+                              value={
+                                configData.ingestion?.multimodal_enricher
+                                  ?.base_url || ""
+                              }
+                              onChange={(e) =>
+                                handleUpdateConfigValue(
+                                  [
+                                    "ingestion",
+                                    "multimodal_enricher",
+                                    "base_url",
+                                  ],
+                                  e.target.value,
+                                )
+                              }
+                              className={inputSmCls}
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {/* Table Summary Prompt */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-semibold flex items-center gap-1">
+                          Table Enrichment Prompt
+                          <InfoTooltip text="Instructions for summarization of extracted tables." />
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={
+                            configData.ingestion?.multimodal_enricher
+                              ?.table_prompt || TABLE_SUMMARIZER_PROMPT
+                          }
+                          onChange={(e) =>
+                            handleUpdateConfigValue(
+                              [
+                                "ingestion",
+                                "multimodal_enricher",
+                                "table_prompt",
+                              ],
+                              e.target.value,
+                            )
+                          }
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 resize-none font-sans transition-colors"
+                        />
+                      </div>
+
+                      {/* Image Description Prompt */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-semibold flex items-center gap-1">
+                          Image Enrichment Prompt
+                          <InfoTooltip text="Instructions for analyzing and describing extracted images." />
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={
+                            configData.ingestion?.multimodal_enricher
+                              ?.image_prompt || IMAGE_DESCRIPTION_PROMPT
+                          }
+                          onChange={(e) =>
+                            handleUpdateConfigValue(
+                              [
+                                "ingestion",
+                                "multimodal_enricher",
+                                "image_prompt",
+                              ],
+                              e.target.value,
+                            )
+                          }
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 resize-none font-sans transition-colors"
+                        />
+                      </div>
+                    </>
+                  )}
                 </Subsection>
 
                 {/* <div className="border-t border-slate-100 dark:border-slate-800/50" /> */}
@@ -858,9 +1129,6 @@ export function ConfigPanel() {
                         Hierarchical Parent-Child
                       </option>
                       <option value="by_title">By Title Chunker</option>
-                      <option value="multimodal_summarizer">
-                        Multimodal Summarizer Chunker
-                      </option>
                       <option value="markdown_header">
                         Markdown Header Splitter
                       </option>
@@ -1184,14 +1452,6 @@ export function ConfigPanel() {
                     </>
                   )}
 
-                  {chunkerProvider === "multimodal_summarizer" && (
-                    <p className="text-xs text-slate-500 leading-normal border border-dashed border-slate-200 dark:border-slate-800 p-2.5 rounded-lg bg-slate-50/50 dark:bg-slate-950/20">
-                      Summarizes all document elements using vision language
-                      models. Configure the multimodal LLM in the advanced
-                      section below.
-                    </p>
-                  )}
-
                   {/* Markdown Header splitter controls */}
                   {chunkerProvider === "markdown_header" && (
                     <>
@@ -1203,7 +1463,8 @@ export function ConfigPanel() {
                           </span>
                           <RangeValue
                             value={
-                              configData.ingestion?.markdown_header?.max_chunk_size ?? 1024
+                              configData.ingestion?.markdown_header
+                                ?.max_chunk_size ?? 1024
                             }
                           />
                         </label>
@@ -1213,7 +1474,8 @@ export function ConfigPanel() {
                           max="4096"
                           step="64"
                           value={
-                            configData.ingestion?.markdown_header?.max_chunk_size ?? 1024
+                            configData.ingestion?.markdown_header
+                              ?.max_chunk_size ?? 1024
                           }
                           onChange={(e) =>
                             handleUpdateConfigValue(
@@ -1236,7 +1498,8 @@ export function ConfigPanel() {
                           </span>
                           <RangeValue
                             value={
-                              configData.ingestion?.markdown_header?.chunk_overlap ?? 200
+                              configData.ingestion?.markdown_header
+                                ?.chunk_overlap ?? 200
                             }
                           />
                         </label>
@@ -1246,15 +1509,12 @@ export function ConfigPanel() {
                           max="1000"
                           step="20"
                           value={
-                            configData.ingestion?.markdown_header?.chunk_overlap ?? 200
+                            configData.ingestion?.markdown_header
+                              ?.chunk_overlap ?? 200
                           }
                           onChange={(e) =>
                             handleUpdateConfigValue(
-                              [
-                                "ingestion",
-                                "markdown_header",
-                                "chunk_overlap",
-                              ],
+                              ["ingestion", "markdown_header", "chunk_overlap"],
                               parseInt(e.target.value),
                             )
                           }
@@ -1265,15 +1525,12 @@ export function ConfigPanel() {
                         label="Prepend Headers Hierarchy"
                         description="Prepend preceding heading hierarchy context to each sub-chunk text content"
                         checked={
-                          configData.ingestion?.markdown_header?.prepend_headers ?? true
+                          configData.ingestion?.markdown_header
+                            ?.prepend_headers ?? true
                         }
                         onChange={(v) =>
                           handleUpdateConfigValue(
-                            [
-                              "ingestion",
-                              "markdown_header",
-                              "prepend_headers",
-                            ],
+                            ["ingestion", "markdown_header", "prepend_headers"],
                             v,
                           )
                         }
@@ -1282,7 +1539,7 @@ export function ConfigPanel() {
                   )}
 
                   <AdvancedToggle
-                    label="Chunker & Multimodal Advanced"
+                    label="Chunker Advanced"
                     sectionKey="chunker-advanced"
                     expandedSections={expandedSections}
                     toggleSection={toggleSection}
@@ -1448,166 +1705,6 @@ export function ConfigPanel() {
                         </div>
                       </>
                     )}
-
-                    {/* Multimodal summarizer settings */}
-                    <div className="border-t border-dashed border-slate-250 dark:border-slate-800/80 pt-3 space-y-3">
-                      <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                        <Sparkle
-                          size={10}
-                          className="text-primary animate-pulse"
-                        />
-                        Vision summarizer settings
-                      </h4>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[11px] font-semibold flex items-center gap-1">
-                          LLM Provider
-                          <InfoTooltip text="LLM client provider for the vision summarizer. Select 'Use Primary LLM' to reuse the main completions model config." />
-                        </label>
-                        <select
-                          value={
-                            configData.ingestion?.multimodal_summarizer
-                              ?.provider || "primary"
-                          }
-                          onChange={(e) =>
-                            handleUpdateConfigValue(
-                              [
-                                "ingestion",
-                                "multimodal_summarizer",
-                                "provider",
-                              ],
-                              e.target.value,
-                            )
-                          }
-                          className={inputSmCls}
-                        >
-                          <option value="primary">Use Primary LLM</option>
-                          <option value="openai">OpenAI GPT</option>
-                          <option value="anthropic">Anthropic Claude</option>
-                          <option value="cohere">Cohere Command</option>
-                          <option value="local">Local LLM / Ollama</option>
-                        </select>
-                      </div>
-
-                      {configData.ingestion?.multimodal_summarizer?.provider !==
-                        "primary" && (
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-[11px] font-semibold flex items-center gap-1">
-                            LLM Model Name
-                            <InfoTooltip text="Vision Model identifier used to summarize tables and images." />
-                          </label>
-                          <input
-                            type="text"
-                            value={
-                              configData.ingestion?.multimodal_summarizer
-                                ?.model_name || "gpt-4o"
-                            }
-                            onChange={(e) =>
-                              handleUpdateConfigValue(
-                                [
-                                  "ingestion",
-                                  "multimodal_summarizer",
-                                  "model_name",
-                                ],
-                                e.target.value,
-                              )
-                            }
-                            className={inputSmCls}
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[11px] font-semibold flex items-center justify-between">
-                          <span className="flex items-center gap-1">
-                            Temperature
-                            <InfoTooltip text="Generation temperature settings for Vision summaries." />
-                          </span>
-                          <RangeValue
-                            value={(
-                              configData.ingestion?.multimodal_summarizer
-                                ?.temperature ?? 0.0
-                            ).toFixed(2)}
-                          />
-                        </label>
-                        <input
-                          type="range"
-                          min="0.0"
-                          max="1.0"
-                          step="0.05"
-                          value={
-                            configData.ingestion?.multimodal_summarizer
-                              ?.temperature ?? 0.0
-                          }
-                          onChange={(e) =>
-                            handleUpdateConfigValue(
-                              [
-                                "ingestion",
-                                "multimodal_summarizer",
-                                "temperature",
-                              ],
-                              parseFloat(e.target.value),
-                            )
-                          }
-                          className={rangeThinCls}
-                        />
-                      </div>
-
-                      {configData.ingestion?.multimodal_summarizer?.provider !==
-                        "primary" && (
-                        <>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-[11px] font-semibold flex items-center gap-1">
-                              API Key (optional)
-                              <InfoTooltip text="Vision Model authorization API Key." />
-                            </label>
-                            <input
-                              type="password"
-                              placeholder="••••••••••••••••"
-                              value={
-                                configData.ingestion?.multimodal_summarizer
-                                  ?.api_key || ""
-                              }
-                              onChange={(e) =>
-                                handleUpdateConfigValue(
-                                  [
-                                    "ingestion",
-                                    "multimodal_summarizer",
-                                    "api_key",
-                                  ],
-                                  e.target.value,
-                                )
-                              }
-                              className={inputSmCls}
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-[11px] font-semibold flex items-center gap-1">
-                              API Base URL (optional)
-                              <InfoTooltip text="Vision Model connection endpoint URL base." />
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="https://api.openai.com/v1"
-                              value={
-                                configData.ingestion?.multimodal_summarizer
-                                  ?.base_url || ""
-                              }
-                              onChange={(e) =>
-                                handleUpdateConfigValue(
-                                  [
-                                    "ingestion",
-                                    "multimodal_summarizer",
-                                    "base_url",
-                                  ],
-                                  e.target.value,
-                                )
-                              }
-                              className={inputSmCls}
-                            />
-                          </div>
-                        </>
-                      )}
-                    </div>
 
                     {/* Batch size (was in GeneralSettingsCard advanced) */}
                     <div className="border-t border-dashed border-slate-250 dark:border-slate-800/80 pt-3">

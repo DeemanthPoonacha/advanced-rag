@@ -374,100 +374,15 @@ class RAGPipelineOrchestrator:
             raise file_error
 
     async def _chunk_documents(self, documents: list[Document]) -> list[Chunk]:
-        """Chunk a list of documents, routing tables/images to MultimodalSummarizerChunker.
-
-        Standard text and multimodal documents are processed in parallel via
-        ``asyncio.gather`` for faster ingestion of mixed-content documents.
-        """
-        standard_docs = []
-        multimodal_docs = []
-        for doc in documents:
-            m_dict = {}
-            if doc.metadata:
-                if hasattr(doc.metadata, "model_dump"):
-                    m_dict = doc.metadata.model_dump()
-                elif isinstance(doc.metadata, dict):
-                    m_dict = doc.metadata
-            custom = m_dict.get("custom", {}) or {}
-            if not isinstance(custom, dict):
-                custom = {}
-            el_type = custom.get("element_type", "text")
-            if el_type in ("table", "image"):
-                multimodal_docs.append(doc)
-            else:
-                standard_docs.append(doc)
-
-        # Eagerly prepare the multimodal summarizer before the gather so both
-        # branches can start concurrently.
-        summarizer = None
-        if multimodal_docs:
+        """Chunk a list of documents, optionally running visual LLM enrichment first."""
+        if self.config.ingestion.enable_multimodal_enrichment:
             try:
-                from ..ingestion.chunkers.multimodal_summarizer import MultimodalSummarizerChunker
-                cfg = self.config.ingestion.multimodal_summarizer
-                
-                summarizer_llm = None
-                if cfg.provider == "primary":
-                    summarizer_llm = self.llm
-                else:
-                    llm_config = {
-                        "model": cfg.model_name,
-                        "temperature": cfg.temperature,
-                    }
-                    if cfg.api_key:
-                        llm_config["api_key"] = cfg.api_key
-                    if cfg.base_url:
-                        llm_config["base_url"] = cfg.base_url
-                    summarizer_llm = self.factory._build("llm", cfg.provider, llm_config)
+                enricher = self.factory.create_multimodal_enricher()
+                documents = await enricher.enrich_batch(documents)
+            except Exception as enrich_err:
+                logger.error("multimodal_enrichment_initialization_failed", error=str(enrich_err))
 
-                summarizer = MultimodalSummarizerChunker(
-                    llm=summarizer_llm,
-                    model_name=cfg.model_name,
-                    temperature=cfg.temperature,
-                    api_key=cfg.api_key,
-                    base_url=cfg.base_url
-                )
-                
-                # Prepare each document with the tables_html or images_base64 list structure expected by the summarizer
-                for doc in multimodal_docs:
-                    custom = doc.metadata.custom
-                    if not isinstance(custom, dict):
-                        custom = {}
-                        doc.metadata.custom = custom
-                    if custom.get("element_type") == "table":
-                        custom["tables_html"] = [doc.content]
-                    elif custom.get("element_type") == "image":
-                        image_b64 = custom.get("image_base64")
-                        if image_b64:
-                            custom["images_base64"] = [image_b64]
-                        else:
-                            custom["images_base64"] = []
-            except Exception as mm_err:
-                logger.error("multimodal_chunker_init_failed_falling_back_to_text", error=str(mm_err))
-                # Fall back: treat multimodal docs as standard
-                standard_docs.extend(multimodal_docs)
-                multimodal_docs = []
-                summarizer = None
-
-        # Run standard and multimodal chunking in parallel
-        tasks = []
-        if standard_docs:
-            tasks.append(self.chunker.chunk_batch(standard_docs))
-        if multimodal_docs and summarizer:
-            tasks.append(summarizer.chunk_batch(multimodal_docs))
-        elif multimodal_docs:
-            # Summarizer init failed — fallback to text chunker
-            tasks.append(self.chunker.chunk_batch(multimodal_docs))
-
-        chunks = []
-        if tasks:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            for result in results:
-                if isinstance(result, Exception):
-                    logger.error("chunking_task_failed", error=str(result))
-                else:
-                    chunks.extend(result)
-
-        return chunks
+        return await self.chunker.chunk_batch(documents)
 
     @trace_operation(LifecycleStage.INGEST, "pipeline_ingest_batch")
     async def ingest_batch(
@@ -885,34 +800,11 @@ class RAGPipelineOrchestrator:
         if not target_chunks:
             return 0, 0
 
-        # Lazy initialize MultimodalSummarizerChunker configuration
+        # Lazy initialize MultimodalEnricher configuration
         try:
-            from ..ingestion.chunkers.multimodal_summarizer import MultimodalSummarizerChunker
-            cfg = self.config.ingestion.multimodal_summarizer
-            
-            summarizer_llm = None
-            if cfg.provider == "primary":
-                summarizer_llm = self.llm
-            else:
-                llm_config = {
-                    "model": cfg.model_name,
-                    "temperature": cfg.temperature,
-                }
-                if cfg.api_key:
-                    llm_config["api_key"] = cfg.api_key
-                if cfg.base_url:
-                    llm_config["base_url"] = cfg.base_url
-                summarizer_llm = self.factory._build("llm", cfg.provider, llm_config)
-            
-            summarizer = MultimodalSummarizerChunker(
-                llm=summarizer_llm,
-                model_name=cfg.model_name,
-                temperature=cfg.temperature,
-                api_key=cfg.api_key,
-                base_url=cfg.base_url
-            )
+            enricher = self.factory.create_multimodal_enricher()
         except Exception as init_err:
-            logger.error("background_summarizer_init_failed", error=str(init_err))
+            logger.error("background_enricher_init_failed", error=str(init_err))
             return 0, len(target_chunks)
 
         updated_count = 0
@@ -947,10 +839,10 @@ SEARCHABLE DESCRIPTION:"""
 
             try:
                 # Generate summary
-                summary = await summarizer._llm.generate(
+                summary = await enricher._llm.generate(
                     prompt,
                     images=images,
-                    temperature=cfg.temperature,
+                    temperature=enricher._temperature,
                     raise_on_error=True
                 )
                 if not summary or "[Local LLM Offline Fallback]" in summary:

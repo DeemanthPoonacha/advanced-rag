@@ -60,7 +60,6 @@ _IMPLEMENTATION_MODULES: list[str] = [
     "rag.ingestion.chunkers.recursive_chunker",
     "rag.ingestion.chunkers.hierarchical_chunker",
     "rag.ingestion.chunkers.by_title_chunker",
-    "rag.ingestion.chunkers.multimodal_summarizer",
     "rag.ingestion.chunkers.markdown_header_chunker",
     # Embedding models
     "rag.embeddings.openai_embeddings",

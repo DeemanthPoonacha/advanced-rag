@@ -67,12 +67,14 @@ export interface ParserSettings {
   config: Record<string, any>;
 }
 
-export interface MultimodalSummarizerConfig {
+export interface MultimodalEnricherConfig {
   provider: "primary" | "openai" | "anthropic" | "cohere" | "local";
   model_name: string;
   temperature: number;
   api_key?: string | null;
   base_url?: string | null;
+  table_prompt?: string;
+  image_prompt?: string;
   [key: string]: any;
 }
 
@@ -80,7 +82,8 @@ export interface IngestionSettings {
   batch_size?: number;
   chunker?: ChunkerSettings;
   parser?: ParserSettings;
-  multimodal_summarizer?: MultimodalSummarizerConfig;
+  enable_multimodal_enrichment?: boolean;
+  multimodal_enricher?: MultimodalEnricherConfig;
 }
 
 export interface ProjectSettings {

@@ -105,22 +105,40 @@ class ChunkerConfig(ProviderConfig):
         "hierarchical",
         "by_title",
         "fixed_size",
-        "multimodal_summarizer",
         "markdown_header",
     ] = "semantic"
 
 
+TABLE_SUMMARIZER_PROMPT =(
+                "You are a structured data assistant.\n"
+                "Analyze this HTML table. Translate it into a clean, searchable Markdown table.\n"
+                "Ensure all data points, headers, values, and relations are preserved accurately.\n"
+                "Do not write conversational preamble.\n\n"
+                "TABLE CONTENT:"
+            )
+
+IMAGE_SUMMARIZER_PROMPT=(
+                "You are a visual assistant analyzing documents.\n"
+                "Describe this image in detail. Generate a comprehensive, searchable description that covers:\n"
+                "1. Main topics, charts, diagrams, or patterns.\n"
+                "2. Key labels, text values, numbers, and data points shown in the image.\n"
+                "3. Logical conclusions or answers this image could provide.\n"
+                "Make it detailed and searchable - prioritize findability over brevity.\n\n"
+                "IMAGE DESCRIPTION:"
+            )
 class IngestionConfig(BaseModel):
     """Full ingestion pipeline configuration."""
 
-    class MultimodalSummarizerConfig(BaseModel):
-        """Configuration for the multimodal summarizer."""
+    class MultimodalEnricherConfig(BaseModel):
+        """Configuration for the multimodal enricher."""
         model_config = {"extra": "allow"}
         provider: Literal["primary", "openai", "anthropic", "cohere", "local"] = "primary"
         model_name: str = "gpt-4o"
         temperature: float = 0.0
         api_key: str | None = None
         base_url: str | None = None
+        table_prompt: str = TABLE_SUMMARIZER_PROMPT
+        image_prompt: str = IMAGE_SUMMARIZER_PROMPT
 
     class PyMuPDFConfig(BaseModel):
         """Configuration for PyMuPDF parser."""
@@ -159,8 +177,9 @@ class IngestionConfig(BaseModel):
     chunker: ChunkerConfig = Field(
         default_factory=lambda: ChunkerConfig(provider="semantic")
     )
-    multimodal_summarizer: MultimodalSummarizerConfig = Field(
-        default_factory=MultimodalSummarizerConfig
+    enable_multimodal_enrichment: bool = False
+    multimodal_enricher: MultimodalEnricherConfig = Field(
+        default_factory=MultimodalEnricherConfig
     )
     pymupdf: PyMuPDFConfig = Field(default_factory=PyMuPDFConfig)
     docling: DoclingConfig = Field(default_factory=DoclingConfig)

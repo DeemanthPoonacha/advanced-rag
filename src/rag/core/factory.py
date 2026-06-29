@@ -118,6 +118,33 @@ class ComponentFactory:
             
         return self._build("chunker", cfg.provider, chunker_config)
 
+    def create_multimodal_enricher(self) -> Any:
+        """Build the MultimodalEnricher specified in ``ingestion.multimodal_enricher``."""
+        from ..ingestion.enricher import MultimodalEnricher
+
+        cfg = self._config.ingestion.multimodal_enricher
+        
+        # Resolve LLM
+        if cfg.provider == "primary":
+            enricher_llm = self.create_llm()
+        else:
+            llm_config = {
+                "model": cfg.model_name,
+                "temperature": cfg.temperature,
+            }
+            if cfg.api_key:
+                llm_config["api_key"] = cfg.api_key
+            if cfg.base_url:
+                llm_config["base_url"] = cfg.base_url
+            enricher_llm = self._build("llm", cfg.provider, llm_config)
+
+        return MultimodalEnricher(
+            llm=enricher_llm,
+            temperature=cfg.temperature,
+            table_prompt=cfg.table_prompt,
+            image_prompt=cfg.image_prompt,
+        )
+
     def create_embedding_model(self) -> BaseEmbeddingModel:
         """Build the embedding model specified in ``embeddings``."""
         cfg = self._config.embeddings
