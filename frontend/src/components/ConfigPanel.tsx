@@ -861,6 +861,9 @@ export function ConfigPanel() {
                       <option value="multimodal_summarizer">
                         Multimodal Summarizer Chunker
                       </option>
+                      <option value="markdown_header">
+                        Markdown Header Splitter
+                      </option>
                     </select>
                   </div>
 
@@ -1187,6 +1190,95 @@ export function ConfigPanel() {
                       models. Configure the multimodal LLM in the advanced
                       section below.
                     </p>
+                  )}
+
+                  {/* Markdown Header splitter controls */}
+                  {chunkerProvider === "markdown_header" && (
+                    <>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            Max Chunk Size (Chars)
+                            <InfoTooltip text="Maximum character size of a chunk." />
+                          </span>
+                          <RangeValue
+                            value={
+                              configData.ingestion?.markdown_header?.max_chunk_size ?? 1024
+                            }
+                          />
+                        </label>
+                        <input
+                          type="range"
+                          min="100"
+                          max="4096"
+                          step="64"
+                          value={
+                            configData.ingestion?.markdown_header?.max_chunk_size ?? 1024
+                          }
+                          onChange={(e) =>
+                            handleUpdateConfigValue(
+                              [
+                                "ingestion",
+                                "markdown_header",
+                                "max_chunk_size",
+                              ],
+                              parseInt(e.target.value),
+                            )
+                          }
+                          className={rangeBaseCls}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            Chunk Overlap (Chars)
+                            <InfoTooltip text="Overlap characters between splits to maintain continuity." />
+                          </span>
+                          <RangeValue
+                            value={
+                              configData.ingestion?.markdown_header?.chunk_overlap ?? 200
+                            }
+                          />
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1000"
+                          step="20"
+                          value={
+                            configData.ingestion?.markdown_header?.chunk_overlap ?? 200
+                          }
+                          onChange={(e) =>
+                            handleUpdateConfigValue(
+                              [
+                                "ingestion",
+                                "markdown_header",
+                                "chunk_overlap",
+                              ],
+                              parseInt(e.target.value),
+                            )
+                          }
+                          className={rangeBaseCls}
+                        />
+                      </div>
+                      <Toggle
+                        label="Prepend Headers Hierarchy"
+                        description="Prepend preceding heading hierarchy context to each sub-chunk text content"
+                        checked={
+                          configData.ingestion?.markdown_header?.prepend_headers ?? true
+                        }
+                        onChange={(v) =>
+                          handleUpdateConfigValue(
+                            [
+                              "ingestion",
+                              "markdown_header",
+                              "prepend_headers",
+                            ],
+                            v,
+                          )
+                        }
+                      />
+                    </>
                   )}
 
                   <AdvancedToggle

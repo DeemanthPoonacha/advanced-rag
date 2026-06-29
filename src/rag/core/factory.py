@@ -109,7 +109,14 @@ class ComponentFactory:
     def create_chunker(self) -> BaseChunker:
         """Build the chunker specified in ``ingestion.chunker``."""
         cfg = self._config.ingestion.chunker
-        return self._build("chunker", cfg.provider, cfg.config)
+        
+        # Route sub-configs dynamically based on provider type
+        if cfg.provider == "markdown_header":
+            chunker_config = self._config.ingestion.markdown_header.model_dump()
+        else:
+            chunker_config = cfg.config
+            
+        return self._build("chunker", cfg.provider, chunker_config)
 
     def create_embedding_model(self) -> BaseEmbeddingModel:
         """Build the embedding model specified in ``embeddings``."""

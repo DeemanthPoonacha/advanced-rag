@@ -115,6 +115,9 @@ class RecursiveChunker(BaseChunker):
 
     def _split_text(self, text: str, separators: list[str]) -> list[str]:
         """Recursively split text using the separator hierarchy."""
+        if len(text) <= self._max_chunk_size:
+            return [text]
+
         final_chunks: list[str] = []
 
         # Find the appropriate separator

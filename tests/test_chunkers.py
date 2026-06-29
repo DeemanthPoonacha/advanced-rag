@@ -6,6 +6,7 @@ from rag.ingestion.chunkers.recursive_chunker import RecursiveChunker
 from rag.ingestion.chunkers.semantic_chunker import SemanticChunker, _cosine_similarity, _split_sentences
 from rag.ingestion.chunkers.hierarchical_chunker import HierarchicalChunker
 from rag.ingestion.chunkers.multimodal_summarizer import MultimodalSummarizerChunker
+from rag.ingestion.chunkers.markdown_header_chunker import MarkdownHeaderChunker
 
 
 class MockEmbeddingModel(BaseEmbeddingModel):
@@ -205,3 +206,33 @@ async def test_multimodal_summarizer_chunker_grouping():
     # Chunk 2 should bypass LLM (since Section 2 contains no tables/images) and be the raw text
     assert "Text block 2." in chunks[1].content
     assert chunks[1].metadata.custom["section_title"] == "Section Title 2"
+
+
+@pytest.mark.asyncio
+async def test_markdown_header_chunker():
+    doc = Document(
+        content="# Intro\nWelcome.\n## Setup\nFirst step.\nSecond step.\n# Details\nComplete details."
+    )
+    chunker = MarkdownHeaderChunker(max_chunk_size=100, chunk_overlap=10, prepend_headers=True)
+    
+    chunks = await chunker.chunk(doc)
+    
+    # We expect 3 sections (Intro, Setup, Details)
+    assert len(chunks) == 3
+    
+    # Section 1: Intro
+    assert "# Intro" in chunks[0].content
+    assert "Welcome." in chunks[0].content
+    assert chunks[0].metadata.custom["markdown_headers"] == {1: "Intro"}
+    
+    # Section 2: Setup
+    assert "# Intro" in chunks[1].content
+    assert "## Setup" in chunks[1].content
+    assert "First step." in chunks[1].content
+    assert chunks[1].metadata.custom["markdown_headers"] == {1: "Intro", 2: "Setup"}
+    
+    # Section 3: Details
+    assert "# Details" in chunks[2].content
+    assert "Complete details." in chunks[2].content
+    assert chunks[2].metadata.custom["markdown_headers"] == {1: "Details"}
+

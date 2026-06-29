@@ -99,7 +99,15 @@ class ParserConfig(ProviderConfig):
 class ChunkerConfig(ProviderConfig):
     """Chunking strategy selection."""
 
-    provider: Literal["semantic", "recursive", "hierarchical", "by_title", "fixed_size", "multimodal_summarizer"] = "semantic"
+    provider: Literal[
+        "semantic",
+        "recursive",
+        "hierarchical",
+        "by_title",
+        "fixed_size",
+        "multimodal_summarizer",
+        "markdown_header",
+    ] = "semantic"
 
 
 class IngestionConfig(BaseModel):
@@ -138,6 +146,13 @@ class IngestionConfig(BaseModel):
         api_key: str | None = None
         strategy: str = "hi_res"
 
+    class MarkdownHeaderConfig(BaseModel):
+        """Configuration for Markdown Header Splitter."""
+        model_config = {"extra": "allow"}
+        max_chunk_size: int = Field(default=1024, ge=100, le=8192)
+        chunk_overlap: int = Field(default=200, ge=0, le=4096)
+        prepend_headers: bool = True
+
     parser: ParserConfig = Field(
         default_factory=lambda: ParserConfig(provider="unstructured")
     )
@@ -151,6 +166,7 @@ class IngestionConfig(BaseModel):
     docling: DoclingConfig = Field(default_factory=DoclingConfig)
     gcp_documentai: GCPDocumentAIConfig = Field(default_factory=GCPDocumentAIConfig)
     unstructured_api: UnstructuredAPIConfig = Field(default_factory=UnstructuredAPIConfig)
+    markdown_header: MarkdownHeaderConfig = Field(default_factory=MarkdownHeaderConfig)
     batch_size: int = Field(default=50, ge=1, le=1000)
 
 
