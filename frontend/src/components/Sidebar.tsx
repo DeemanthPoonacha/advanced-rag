@@ -28,6 +28,7 @@ import {
   usePresets,
   useActivatePreset,
   useDeletePreset,
+  useDuplicatePreset,
 } from "../api/queries";
 import { Conversation } from "../types";
 
@@ -66,12 +67,12 @@ export function Sidebar() {
 
   const { data: statusQuery } = useRagStatus();
   const status = statusQuery || null;
-  const setShowSavePresetModal = useStore((s) => s.setShowSavePresetModal);
   const { data: presetsData } = usePresets();
   const presets = presetsData?.presets || [];
   const activePreset = presetsData?.active_preset || null;
   const activatePresetMutation = useActivatePreset();
   const deletePresetMutation = useDeletePreset();
+  const duplicatePresetMutation = useDuplicatePreset();
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem("sidebar_width");
     return saved ? parseInt(saved, 10) : 240;
@@ -264,9 +265,9 @@ export function Sidebar() {
               Pipeline Presets
             </span>
             <button
-              onClick={() => setShowSavePresetModal(true)}
+              onClick={() => duplicatePresetMutation.mutate()}
               className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-primary hover:text-primary-hover transition-colors cursor-pointer"
-              title="Save Preset"
+              title="Duplicate current config as new preset"
             >
               <Plus size={14} />
             </button>
@@ -339,9 +340,9 @@ export function Sidebar() {
       {activePage === "config" && sidebarCollapsed && (
         <div className="py-2 flex flex-col items-center shrink-0 border-b border-slate-200/50 dark:border-slate-800/60">
           <button
-            onClick={() => setShowSavePresetModal(true)}
+            onClick={() => duplicatePresetMutation.mutate()}
             className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-805 flex items-center justify-center text-primary hover:text-primary-hover shadow-sm transition-all cursor-pointer"
-            title="Save Preset"
+            title="Duplicate current config as new preset"
           >
             <Plus size={16} />
           </button>

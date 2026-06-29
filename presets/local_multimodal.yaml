@@ -61,7 +61,7 @@ observability:
     service_name: rag-pipeline
 project:
   environment: development
-  name: local-sandbox-pipeline
+  name: local-multimodal
   version: 1.0.0
 retrieval:
   config: {}

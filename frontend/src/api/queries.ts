@@ -334,3 +334,102 @@ export function useDeletePreset() {
   });
 }
 
+export function useDuplicatePreset() {
+  const queryClient = useQueryClient();
+  const showToast = useStore((s) => s.showToast);
+
+  return useMutation({
+    mutationFn: async () => {
+      const configRes = await fetch(`${API_BASE}/api/config`);
+      if (!configRes.ok) throw new Error("Failed to fetch current config");
+      const { raw_yaml } = await configRes.json();
+
+      const presetsRes = await fetch(`${API_BASE}/api/presets`);
+      if (!presetsRes.ok) throw new Error("Failed to fetch presets");
+      const { presets } = await presetsRes.json();
+
+      const existing = new Set(presets.map((p: any) => p.name));
+      let name = "custom_1";
+      let i = 1;
+      while (existing.has(name)) {
+        i++;
+        name = `custom_${i}`;
+      }
+
+      const saveRes = await fetch(`${API_BASE}/api/presets/${name}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ yaml_content: raw_yaml }),
+      });
+      if (!saveRes.ok) {
+        const data = await saveRes.json();
+        throw new Error(data.detail?.message || data.detail || "Failed to save preset");
+      }
+      return name;
+    },
+    onSuccess: (name) => {
+      queryClient.invalidateQueries({ queryKey: ["presets"] });
+      showToast(`Created new preset '${name}'`, "success");
+    },
+    onError: (err: any) => {
+      showToast(err.message || "Failed to duplicate preset", "error");
+    },
+  });
+}
+
+export function useSavePreset() {
+  const queryClient = useQueryClient();
+  const showToast = useStore((s) => s.showToast);
+
+  return useMutation({
+    mutationFn: async ({ name, yaml_content }: { name: string; yaml_content: string }) => {
+      const res = await fetch(`${API_BASE}/api/presets/${name}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ yaml_content }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail?.message || data.detail || "Failed to save preset");
+      }
+      return name;
+    },
+    onSuccess: (name) => {
+      queryClient.invalidateQueries({ queryKey: ["presets"] });
+      queryClient.invalidateQueries({ queryKey: ["pipelineConfig"] });
+      showToast(`Preset '${name}' saved successfully!`, "success");
+    },
+    onError: (err: any) => {
+      showToast(err.message || "Failed to save preset", "error");
+    },
+  });
+}
+
+export function useSavePresetJson() {
+  const queryClient = useQueryClient();
+  const showToast = useStore((s) => s.showToast);
+
+  return useMutation({
+    mutationFn: async ({ name, config }: { name: string; config: any }) => {
+      const res = await fetch(`${API_BASE}/api/presets/${name}/json`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail?.message || data.detail || "Failed to save preset");
+      }
+      return name;
+    },
+    onSuccess: (name) => {
+      queryClient.invalidateQueries({ queryKey: ["presets"] });
+      queryClient.invalidateQueries({ queryKey: ["pipelineConfig"] });
+      showToast(`Preset '${name}' saved successfully!`, "success");
+    },
+    onError: (err: any) => {
+      showToast(err.message || "Failed to save preset", "error");
+    },
+  });
+}
+

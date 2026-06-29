@@ -30,7 +30,6 @@ interface State {
   previewImageUrl: string | null;
   selectedDocumentFilter: string | null;
   previewDocName: string | null;
-  showSavePresetModal: boolean;
 }
 
 interface Actions {
@@ -69,7 +68,6 @@ interface Actions {
   setPreviewImageUrl: (url: string | null) => void;
   setSelectedDocumentFilter: (doc: string | null) => void;
   setPreviewDocName: (name: string | null) => void;
-  setShowSavePresetModal: (val: boolean) => void;
 }
 
 const getInitialConversations = (): Conversation[] => {
@@ -129,7 +127,6 @@ export const useStore = create<State & Actions>((set, get) => ({
   previewImageUrl: null,
   selectedDocumentFilter: null,
   previewDocName: null,
-  showSavePresetModal: false,
 
   // Navigation & Theme Actions
   setActivePage: (activePage) => set({ activePage }),
@@ -188,7 +185,6 @@ export const useStore = create<State & Actions>((set, get) => ({
   setPreviewImageUrl: (previewImageUrl) => set({ previewImageUrl }),
   setSelectedDocumentFilter: (selectedDocumentFilter) => set({ selectedDocumentFilter }),
   setPreviewDocName: (previewDocName) => set({ previewDocName }),
-  setShowSavePresetModal: (showSavePresetModal) => set({ showSavePresetModal }),
   setActiveConversationId: (activeConversationId) => set({ activeConversationId, pendingAttachments: [], input: "" }),
 
   updateActiveMessages: (updateFn) => {

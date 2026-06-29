@@ -1,6 +1,14 @@
 import { useState, useEffect } from "react";
 import { PipelineConfig } from "../types";
-import { usePipelineConfig, useUpdateConfig } from "../api/queries";
+import {
+  usePipelineConfig,
+  useUpdateConfig,
+  usePresets,
+  useSavePreset,
+  useSavePresetJson,
+  useDeletePreset,
+  useActivatePreset,
+} from "../api/queries";
 import {
   ConfigSection,
   AdvancedToggle,
@@ -19,12 +27,8 @@ import {
   Settings as SettingsIcon,
   Loader2,
   Bookmark,
-  BookmarkPlus,
-  Plus,
   Trash2,
-  Cpu,
-  Layers,
-  ShieldCheck,
+  Check,
 } from "lucide-react";
 
 function jsonToYaml(obj: any, indent = 0): string {
@@ -232,113 +236,68 @@ export function ConfigPanel() {
     Record<string, boolean>
   >({});
 
-  // Preset management states
-  const [presets, setPresets] = useState<any[]>([]);
-  const [activePreset, setActivePreset] = useState<string | null>(null);
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [newPresetName, setNewPresetName] = useState("");
-  const [isSavingPreset, setIsSavingPreset] = useState(false);
-  const [isActivating, setIsActivating] = useState<string | null>(null);
+  // ── Preset management via TanStack Query ──
+  const { data: presetsData } = usePresets();
+  const presets = presetsData?.presets || [];
+  const activePresetName = presetsData?.active_preset || null;
+  const activePresetObj = presets.find((p: any) => p.name === activePresetName);
+  const isPredefined = activePresetObj?.is_predefined ?? false;
 
-  const fetchPresets = async () => {
-    try {
-      const res = await fetch("http://localhost:8000/api/presets");
-      if (res.ok) {
-        const data = await res.json();
-        setPresets(data.presets || []);
-        setActivePreset(data.active_preset || null);
-      }
-    } catch (e) {
-      console.error("Failed to fetch presets", e);
-    }
-  };
+  const savePresetMutation = useSavePreset();
+  const savePresetJsonMutation = useSavePresetJson();
+  const deletePresetMutation = useDeletePreset();
+  const activatePresetMutation = useActivatePreset();
 
+  // Editable draft name for the active preset
+  const [presetDraftName, setPresetDraftName] = useState("");
+
+  // Sync draft name when active preset changes
   useEffect(() => {
-    fetchPresets();
-  }, [configData, rawYaml]);
-
-  const handleActivatePreset = async (name: string) => {
-    setIsActivating(name);
-    try {
-      const res = await fetch(
-        `http://localhost:8000/api/presets/${name}/activate`,
-        {
-          method: "POST",
-        },
-      );
-      if (res.ok) {
-        await fetchConfig();
-        await fetchPresets();
-      } else {
-        const data = await res.json();
-        alert(data.detail || "Failed to activate preset.");
-      }
-    } catch (e) {
-      alert("Failed to activate preset due to network error.");
-    } finally {
-      setIsActivating(null);
+    if (activePresetName) {
+      setPresetDraftName(activePresetName);
+    } else {
+      setPresetDraftName("custom_1");
     }
-  };
+  }, [activePresetName]);
 
-  const handleCreatePreset = async () => {
-    if (!newPresetName.trim()) {
-      alert("Please enter a valid preset name.");
-      return;
-    }
-    const cleanName = newPresetName
+  const handleSavePreset = async () => {
+    const cleanName = presetDraftName
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9_]/g, "_");
-    setIsSavingPreset(true);
-    try {
-      let res;
-      if (editMode === "yaml") {
-        res = await fetch(`http://localhost:8000/api/presets/${cleanName}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ yaml_content: rawYaml }),
-        });
-      } else {
-        res = await fetch(
-          `http://localhost:8000/api/presets/${cleanName}/json`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(configData),
-          },
-        );
-      }
-      if (res.ok) {
-        setNewPresetName("");
-        setShowSaveModal(false);
-        await fetchPresets();
-      } else {
-        const data = await res.json();
-        alert(data.detail?.message || data.detail || "Failed to save preset.");
-      }
-    } catch (e) {
-      alert("Connection error when saving preset.");
-    } finally {
-      setIsSavingPreset(false);
+    if (!cleanName) return;
+
+    const nameChanged = cleanName !== activePresetName;
+
+    if (editMode === "yaml") {
+      await savePresetMutation.mutateAsync({
+        name: cleanName,
+        yaml_content: rawYaml,
+      });
+    } else {
+      await savePresetJsonMutation.mutateAsync({
+        name: cleanName,
+        config: configData,
+      });
+    }
+
+    // If the name changed, activate the new preset and delete the old one
+    if (nameChanged && activePresetName && !isPredefined) {
+      await deletePresetMutation.mutateAsync(activePresetName);
+    }
+    if (nameChanged) {
+      await activatePresetMutation.mutateAsync(cleanName);
     }
   };
 
-  const handleDeletePreset = async (e: React.MouseEvent, name: string) => {
-    e.stopPropagation();
-    if (!window.confirm(`Are you sure you want to delete preset '${name}'?`)) {
-      return;
-    }
-    try {
-      const res = await fetch(`http://localhost:8000/api/presets/${name}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        await fetchPresets();
-      }
-    } catch (e) {
-      console.error("Failed to delete preset", e);
-    }
+  const handleDeleteActivePreset = async () => {
+    if (!activePresetName || isPredefined) return;
+    if (!window.confirm(`Delete preset '${activePresetName}'?`)) return;
+    await deletePresetMutation.mutateAsync(activePresetName);
   };
+
+  const isSavingPreset =
+    savePresetMutation.isPending || savePresetJsonMutation.isPending;
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
@@ -359,49 +318,55 @@ export function ConfigPanel() {
   const vectorProvider = configData?.vector_store?.provider || "qdrant";
 
   return (
-    <div className="flex-1 flex flex-col gap-6 max-w-7xl w-full mx-auto overflow-hidden">
-      {/* ── Project Settings ── */}
-      {!!configData && (
-        <Subsection title="Project Settings" icon={<SettingsIcon size={10} />}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold flex items-center gap-1">
-                Pipeline Project Name
-                <InfoTooltip text="Unique name identifying this RAG pipeline in logs and metrics." />
-              </label>
-              <input
-                type="text"
-                value={configData.project?.name || ""}
-                onChange={(e) =>
-                  handleUpdateConfigValue(["project", "name"], e.target.value)
-                }
-                className={inputCls}
-              />
-            </div>
+    <div className="flex-1 flex flex-col gap-4 max-w-7xl w-full mx-auto overflow-hidden">
+      {/* ── Preset Name Toolbar ── */}
+      <div className="flex items-center gap-3 px-5 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm shrink-0">
+        <Bookmark className="w-4 h-4 text-primary shrink-0" />
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 shrink-0">
+          Preset
+        </span>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold flex items-center gap-1">
-                Environment Tier
-                <InfoTooltip text="System runtime environment tier (determines tracing levels)." />
-              </label>
-              <select
-                value={configData.project?.environment || "development"}
-                onChange={(e) =>
-                  handleUpdateConfigValue(
-                    ["project", "environment"],
-                    e.target.value,
-                  )
-                }
-                className={inputCls}
-              >
-                <option value="development">Development</option>
-                <option value="staging">Staging</option>
-                <option value="production">Production</option>
-              </select>
-            </div>
-          </div>
-        </Subsection>
-      )}
+        <input
+          type="text"
+          value={presetDraftName}
+          onChange={(e) => setPresetDraftName(e.target.value)}
+          disabled={isPredefined}
+          className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          placeholder="e.g. production_v1"
+        />
+
+        {isPredefined && (
+          <span className="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-[9px] font-bold text-amber-500 uppercase tracking-wider shrink-0">
+            Predefined
+          </span>
+        )}
+
+        {/* Save / Save As New */}
+        <button
+          onClick={handleSavePreset}
+          disabled={isSavingPreset || !presetDraftName.trim()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold bg-primary hover:bg-primary/90 text-white shadow-sm transition active:scale-95 cursor-pointer disabled:opacity-40 shrink-0"
+        >
+          {isSavingPreset ? (
+            <Loader2 className="w-3 h-3 animate-spin" />
+          ) : (
+            <Check className="w-3 h-3" />
+          )}
+          {isPredefined ? "Save As New" : "Save"}
+        </button>
+
+        {/* Delete (only for custom presets) */}
+        {!isPredefined && activePresetName && (
+          <button
+            onClick={handleDeleteActivePreset}
+            className="p-1.5 rounded-lg hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition active:scale-90 cursor-pointer shrink-0"
+            title="Delete this preset"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
       {/* Editor Switcher (Form vs YAML) */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shrink-0">
         <div className="flex gap-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-xl shadow-sm self-start">
@@ -448,14 +413,80 @@ export function ConfigPanel() {
         {editMode === "visual" ? (
           configData ? (
             <div className="h-full overflow-y-auto pr-2 space-y-4 pb-6 scrollbar-thin">
+              {/* ── Project Settings ── */}
+              <ConfigSection
+                title="Project Settings"
+                icon={<SettingsIcon size={18} />}
+                badge="General"
+                description="Basic project metadata and environment configuration"
+                defaultOpen
+                accentColor="sky-500"
+              >
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold flex items-center gap-1">
+                    Pipeline Project Name
+                    <InfoTooltip text="Unique name identifying this RAG pipeline in logs and metrics." />
+                  </label>
+                  <input
+                    type="text"
+                    value={configData.project?.name || ""}
+                    onChange={(e) =>
+                      handleUpdateConfigValue(
+                        ["project", "name"],
+                        e.target.value,
+                      )
+                    }
+                    className={inputCls}
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold flex items-center gap-1">
+                    Environment Tier
+                    <InfoTooltip text="System runtime environment tier (determines tracing levels)." />
+                  </label>
+                  <select
+                    value={configData.project?.environment || "development"}
+                    onChange={(e) =>
+                      handleUpdateConfigValue(
+                        ["project", "environment"],
+                        e.target.value,
+                      )
+                    }
+                    className={inputCls}
+                  >
+                    <option value="development">Development</option>
+                    <option value="staging">Staging</option>
+                    <option value="production">Production</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold flex items-center gap-1">
+                    Project Version
+                    <InfoTooltip text="Project version identifier." />
+                  </label>
+                  <input
+                    type="text"
+                    value={configData.project?.version || ""}
+                    onChange={(e) =>
+                      handleUpdateConfigValue(
+                        ["project", "version"],
+                        e.target.value,
+                      )
+                    }
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-primary text-slate-900 dark:text-slate-100 transition-colors"
+                  />
+                </div>
+              </ConfigSection>
+
               {/* ───────────────── 1. INGESTION ───────────────── */}
               <ConfigSection
                 icon={<FileText size={18} />}
                 title="Ingestion Pipeline"
                 badge="Ingest"
                 description="Document parsing, chunking strategy, embeddings, and vector storage"
-                defaultOpen={true}
-                accentColor="sky-500"
+                accentColor="yellow-500"
               >
                 {/* ── Parser ── */}
                 <Subsection
@@ -2221,63 +2252,6 @@ export function ConfigPanel() {
           </div>
         )}
       </div>
-
-      {/* Save Preset Dialog Modal */}
-      {showSaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl w-96 p-6 shadow-xl space-y-4 text-left">
-            <div className="flex items-center gap-2 text-slate-850 dark:text-slate-100">
-              <BookmarkPlus className="w-5 h-5 text-primary" />
-              <h3 className="text-sm font-bold font-display">
-                Save Custom Settings Configuration
-              </h3>
-            </div>
-
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Name your configuration preset. It will copy the current visual
-              grid or raw YAML parameters to a reusable custom preset file.
-            </p>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Preset Name
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. production_gpu_v1"
-                value={newPresetName}
-                onChange={(e) => setNewPresetName(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-950 dark:text-slate-50 focus:outline-none focus:border-primary"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2.5 pt-2">
-              <button
-                onClick={() => {
-                  setShowSaveModal(false);
-                  setNewPresetName("");
-                }}
-                className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-900 transition active:scale-95 cursor-pointer text-slate-700 dark:text-slate-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreatePreset}
-                disabled={isSavingPreset}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-primary hover:bg-primary/95 text-white shadow-md shadow-primary/20 transition active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {isSavingPreset ? (
-                  <>
-                    <Loader2 className="w-3 h-3 animate-spin" /> Saving...
-                  </>
-                ) : (
-                  "Save Configuration"
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

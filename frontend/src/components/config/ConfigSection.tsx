@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
 const accentClasses: Record<string, string> = {
+  "yellow-500": "bg-yellow-500/10 border-yellow-500/20 text-yellow-500",
   "sky-500": "bg-sky-500/10 border-sky-500/20 text-sky-500",
   "violet-500": "bg-violet-500/10 border-violet-500/20 text-violet-500",
   "emerald-500": "bg-emerald-500/10 border-emerald-500/20 text-emerald-500",
@@ -76,7 +77,9 @@ export function ConfigSection({
       </button>
       <div
         className={`transition-all duration-300 ease-in-out ${
-          isOpen ? "max-h-[5000px] opacity-100" : "max-h-0 opacity-0"
+          isOpen
+            ? "max-h-[5000px] opacity-100 border-t border-slate-200 dark:border-slate-700 pt-4"
+            : "max-h-0 opacity-0"
         } overflow-hidden`}
       >
         <div className="px-5 pb-5 pt-1">
@@ -155,7 +158,7 @@ export function AdvancedToggle({
       <div
         className={`transition-all duration-300 ease-in-out ${
           isExpanded ? "max-h-[3000px] opacity-100" : "max-h-0 opacity-0"
-        } overflow-hidden`}
+        } pb-4`}
       >
         <div className="space-y-3 mt-3 pt-3 border-t border-dashed border-slate-100 dark:border-slate-800/50">
           {children}
