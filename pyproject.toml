@@ -45,6 +45,10 @@ pgvector = ["asyncpg>=0.29", "pgvector>=0.3"]
 # ── Ingestion ────────────────────────────────────────────────────────
 unstructured = ["unstructured[all-docs]>=0.14"]
 llamaparse = ["llama-parse>=0.4"]
+pymupdf = ["pymupdf>=1.24"]
+docling = ["docling>=2.0"]
+gcp-documentai = ["google-cloud-documentai>=2.30"]
+unstructured-api = ["unstructured-client>=0.45"]
 
 # ── Guardrails ───────────────────────────────────────────────────────
 guardrails-nemo = ["nemoguardrails>=0.9"]

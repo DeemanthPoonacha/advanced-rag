@@ -91,7 +91,20 @@ class ComponentFactory:
     def create_parser(self) -> BaseParser:
         """Build the document parser specified in ``ingestion.parser``."""
         cfg = self._config.ingestion.parser
-        return self._build("parser", cfg.provider, cfg.config)
+        
+        # Route sub-configs dynamically based on provider type
+        if cfg.provider == "pymupdf":
+            parser_config = self._config.ingestion.pymupdf.model_dump()
+        elif cfg.provider == "docling":
+            parser_config = self._config.ingestion.docling.model_dump()
+        elif cfg.provider == "gcp_documentai":
+            parser_config = self._config.ingestion.gcp_documentai.model_dump()
+        elif cfg.provider == "unstructured_api":
+            parser_config = self._config.ingestion.unstructured_api.model_dump()
+        else:
+            parser_config = cfg.config
+            
+        return self._build("parser", cfg.provider, parser_config)
 
     def create_chunker(self) -> BaseChunker:
         """Build the chunker specified in ``ingestion.chunker``."""

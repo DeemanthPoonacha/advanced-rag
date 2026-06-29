@@ -50,7 +50,11 @@ COMPONENT_TYPES: dict[str, type] = {
 _IMPLEMENTATION_MODULES: list[str] = [
     # Parsers
     "rag.ingestion.parsers.unstructured_parser",
+    "rag.ingestion.parsers.unstructured_api_parser",
     "rag.ingestion.parsers.llamaparse_parser",
+    "rag.ingestion.parsers.pymupdf_parser",
+    "rag.ingestion.parsers.docling_parser",
+    "rag.ingestion.parsers.gcp_documentai_parser",
     "rag.ingestion.parsers.multimodal_unstructured",
     # Chunkers
     "rag.ingestion.chunkers.semantic_chunker",

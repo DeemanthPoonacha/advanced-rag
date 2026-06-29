@@ -496,7 +496,7 @@ export function ConfigPanel() {
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold flex items-center gap-1">
                       Parser Provider
-                      <InfoTooltip text="Raw file parser algorithm (unstructured handles local; llamaparse is cloud-based; multimodal_unstructured extracts layout elements/tables/images)." />
+                      <InfoTooltip text="Raw file parser algorithm (pymupdf is fast & lightweight; docling and unstructured parse layouts locally; llamaparse, unstructured_api, and gcp_documentai are premium cloud services)." />
                     </label>
                     <select
                       value={
@@ -510,13 +510,15 @@ export function ConfigPanel() {
                       }
                       className={inputCls}
                     >
-                      <option value="unstructured">
-                        Unstructured.io Parser
-                      </option>
-                      <option value="llamaparse">LlamaParse Cloud API</option>
+                      <option value="pymupdf">PyMuPDF (Fast Local Text)</option>
+                      <option value="docling">Docling (Local Layout)</option>
+                      <option value="unstructured">Unstructured (Local Full)</option>
                       <option value="multimodal_unstructured">
-                        Multimodal Unstructured Parser
+                        Multimodal Unstructured (Local PDF)
                       </option>
+                      <option value="unstructured_api">Unstructured API (Cloud)</option>
+                      <option value="llamaparse">LlamaParse (Cloud Markdown)</option>
+                      <option value="gcp_documentai">Google Cloud Document AI (Cloud)</option>
                     </select>
                   </div>
 
@@ -526,11 +528,172 @@ export function ConfigPanel() {
                     expandedSections={expandedSections}
                     toggleSection={toggleSection}
                   >
-                    {/* Unstructured / Multimodal parser config */}
-                    {(configData.ingestion?.parser?.provider ===
-                      "unstructured" ||
-                      configData.ingestion?.parser?.provider ===
-                        "multimodal_unstructured") && (
+                    {/* PyMuPDF config */}
+                    {configData.ingestion?.parser?.provider === "pymupdf" && (
+                      <Toggle
+                        label="Extract Images"
+                        description="Attempt to extract inline images (experimental)"
+                        checked={configData.ingestion?.pymupdf?.extract_images ?? false}
+                        onChange={(v) =>
+                          handleUpdateConfigValue(
+                            ["ingestion", "pymupdf", "extract_images"],
+                            v,
+                          )
+                        }
+                      />
+                    )}
+
+                    {/* Docling config */}
+                    {configData.ingestion?.parser?.provider === "docling" && (
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-semibold flex items-center gap-1">
+                          Export Format
+                          <InfoTooltip text="Docling document export format target." />
+                        </label>
+                        <select
+                          value={configData.ingestion?.docling?.export_format || "markdown"}
+                          onChange={(e) =>
+                            handleUpdateConfigValue(
+                              ["ingestion", "docling", "export_format"],
+                              e.target.value,
+                            )
+                          }
+                          className={inputSmCls}
+                        >
+                          <option value="markdown">Clean Markdown</option>
+                          <option value="json">Raw JSON Dict</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {/* GCP Document AI config */}
+                    {configData.ingestion?.parser?.provider === "gcp_documentai" && (
+                      <>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-semibold flex items-center gap-1">
+                            GCP Project ID
+                            <InfoTooltip text="Google Cloud project ID where Document AI is enabled." />
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="my-gcp-project-123"
+                            value={configData.ingestion?.gcp_documentai?.project_id || ""}
+                            onChange={(e) =>
+                              handleUpdateConfigValue(
+                                ["ingestion", "gcp_documentai", "project_id"],
+                                e.target.value,
+                              )
+                            }
+                            className={inputSmCls}
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-semibold flex items-center gap-1">
+                            Location Region
+                            <InfoTooltip text="Location region for processor endpoint (e.g. us, eu)." />
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="us"
+                            value={configData.ingestion?.gcp_documentai?.location || "us"}
+                            onChange={(e) =>
+                              handleUpdateConfigValue(
+                                ["ingestion", "gcp_documentai", "location"],
+                                e.target.value,
+                              )
+                            }
+                            className={inputSmCls}
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-semibold flex items-center gap-1">
+                            Processor ID
+                            <InfoTooltip text="UUID/ID of the created Document AI processor." />
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="a12b34c5678d90ef"
+                            value={configData.ingestion?.gcp_documentai?.processor_id || ""}
+                            onChange={(e) =>
+                              handleUpdateConfigValue(
+                                ["ingestion", "gcp_documentai", "processor_id"],
+                                e.target.value,
+                              )
+                            }
+                            className={inputSmCls}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Unstructured API config */}
+                    {configData.ingestion?.parser?.provider === "unstructured_api" && (
+                      <>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-semibold flex items-center gap-1">
+                            Server API URL
+                            <InfoTooltip text="Base API endpoint URL for Unstructured general partition." />
+                          </label>
+                          <input
+                            type="text"
+                            value={configData.ingestion?.unstructured_api?.api_url || ""}
+                            onChange={(e) =>
+                              handleUpdateConfigValue(
+                                ["ingestion", "unstructured_api", "api_url"],
+                                e.target.value,
+                              )
+                            }
+                            className={inputSmCls}
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-semibold flex items-center gap-1">
+                            Unstructured API Key
+                            <InfoTooltip text="User SaaS API key token." />
+                          </label>
+                          <input
+                            type="password"
+                            placeholder="••••••••••••••••"
+                            value={configData.ingestion?.unstructured_api?.api_key || ""}
+                            onChange={(e) =>
+                              handleUpdateConfigValue(
+                                ["ingestion", "unstructured_api", "api_key"],
+                                e.target.value,
+                              )
+                            }
+                            className={inputSmCls}
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[11px] font-semibold flex items-center gap-1">
+                            Strategy Mode
+                            <InfoTooltip text="hi_res partitions layout; fast extracts plain text; ocr_only scans files." />
+                          </label>
+                          <select
+                            value={configData.ingestion?.unstructured_api?.strategy || "hi_res"}
+                            onChange={(e) =>
+                              handleUpdateConfigValue(
+                                ["ingestion", "unstructured_api", "strategy"],
+                                e.target.value,
+                              )
+                            }
+                            className={inputSmCls}
+                          >
+                            <option value="hi_res">Hi-Res Layout Extract</option>
+                            <option value="fast">Fast Raw Text</option>
+                            <option value="ocr_only">OCR Only (Scans)</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Local Unstructured / Multimodal config */}
+                    {(configData.ingestion?.parser?.provider === "unstructured" ||
+                      configData.ingestion?.parser?.provider === "multimodal_unstructured") && (
                       <>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-semibold flex items-center gap-1">
@@ -562,8 +725,7 @@ export function ConfigPanel() {
                           label="Extract Images"
                           description="Attempt to partition and extract inline images"
                           checked={
-                            configData.ingestion?.parser?.config
-                              ?.extract_images ??
+                            configData.ingestion?.parser?.config?.extract_images ??
                             configData.ingestion?.parser?.provider ===
                               "multimodal_unstructured"
                           }
@@ -588,8 +750,7 @@ export function ConfigPanel() {
                           <input
                             type="text"
                             value={(
-                              configData.ingestion?.parser?.config
-                                ?.languages || ["en"]
+                              configData.ingestion?.parser?.config?.languages || ["en"]
                             ).join(", ")}
                             onChange={(e) => {
                               const list = e.target.value
@@ -608,8 +769,7 @@ export function ConfigPanel() {
                     )}
 
                     {/* LlamaParse config */}
-                    {configData.ingestion?.parser?.provider ===
-                      "llamaparse" && (
+                    {configData.ingestion?.parser?.provider === "llamaparse" && (
                       <>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-semibold flex items-center gap-1">
@@ -637,8 +797,7 @@ export function ConfigPanel() {
                           label="Premium Mode"
                           description="Run premium parsing algorithms for highest quality"
                           checked={
-                            configData.ingestion?.parser?.config
-                              ?.premium_mode ?? false
+                            configData.ingestion?.parser?.config?.premium_mode ?? false
                           }
                           onChange={(v) =>
                             handleUpdateConfigValue(
@@ -656,8 +815,7 @@ export function ConfigPanel() {
                           <textarea
                             rows={2}
                             value={
-                              configData.ingestion?.parser?.config
-                                ?.parsing_instruction || ""
+                              configData.ingestion?.parser?.config?.parsing_instruction || ""
                             }
                             onChange={(e) =>
                               handleUpdateConfigValue(

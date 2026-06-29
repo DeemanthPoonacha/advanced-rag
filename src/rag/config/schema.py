@@ -86,7 +86,14 @@ class ProviderConfig(BaseModel):
 class ParserConfig(ProviderConfig):
     """Document parser provider selection."""
 
-    provider: Literal["unstructured", "llamaparse", "multimodal_unstructured"] = "unstructured"
+    provider: Literal[
+        "unstructured",
+        "unstructured_api",
+        "llamaparse",
+        "pymupdf",
+        "docling",
+        "gcp_documentai",
+    ] = "unstructured"
 
 
 class ChunkerConfig(ProviderConfig):
@@ -107,6 +114,30 @@ class IngestionConfig(BaseModel):
         api_key: str | None = None
         base_url: str | None = None
 
+    class PyMuPDFConfig(BaseModel):
+        """Configuration for PyMuPDF parser."""
+        model_config = {"extra": "allow"}
+        extract_images: bool = False
+
+    class DoclingConfig(BaseModel):
+        """Configuration for Docling parser."""
+        model_config = {"extra": "allow"}
+        export_format: Literal["markdown", "json"] = "markdown"
+
+    class GCPDocumentAIConfig(BaseModel):
+        """Configuration for GCP Document AI parser."""
+        model_config = {"extra": "allow"}
+        project_id: str | None = None
+        location: str = "us"
+        processor_id: str | None = None
+
+    class UnstructuredAPIConfig(BaseModel):
+        """Configuration for Unstructured API parser."""
+        model_config = {"extra": "allow"}
+        api_url: str = "https://api.unstructured.io/general/v0/general"
+        api_key: str | None = None
+        strategy: str = "hi_res"
+
     parser: ParserConfig = Field(
         default_factory=lambda: ParserConfig(provider="unstructured")
     )
@@ -116,6 +147,10 @@ class IngestionConfig(BaseModel):
     multimodal_summarizer: MultimodalSummarizerConfig = Field(
         default_factory=MultimodalSummarizerConfig
     )
+    pymupdf: PyMuPDFConfig = Field(default_factory=PyMuPDFConfig)
+    docling: DoclingConfig = Field(default_factory=DoclingConfig)
+    gcp_documentai: GCPDocumentAIConfig = Field(default_factory=GCPDocumentAIConfig)
+    unstructured_api: UnstructuredAPIConfig = Field(default_factory=UnstructuredAPIConfig)
     batch_size: int = Field(default=50, ge=1, le=1000)
 
 
