@@ -168,3 +168,40 @@ async def test_multimodal_summarizer_chunker():
     chunks_mm = await chunker.chunk(doc_mm)
     assert len(chunks_mm) == 1
     assert chunks_mm[0].content == "AI Enhanced Search Description."
+
+
+@pytest.mark.asyncio
+async def test_multimodal_summarizer_chunker_grouping():
+    # Construct a list of separate layout element documents
+    docs = [
+        Document(content="Section Title 1", metadata={"custom": {"element_type": "title"}, "source": "test.pdf", "page_number": 1}),
+        Document(content="Paragraph of text under title 1.", metadata={"custom": {"element_type": "text"}, "source": "test.pdf", "page_number": 1}),
+        Document(content="<table>Table data</table>", metadata={"custom": {"element_type": "table"}, "source": "test.pdf", "page_number": 1}),
+        Document(content="Section Title 2", metadata={"custom": {"element_type": "title"}, "source": "test.pdf", "page_number": 2}),
+        Document(content="Text block 2.", metadata={"custom": {"element_type": "text"}, "source": "test.pdf", "page_number": 2}),
+    ]
+
+    chunker = MultimodalSummarizerChunker()
+    
+    # Mock the LLM to return a summary for section 1 (which has a table)
+    from unittest.mock import AsyncMock, MagicMock
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock()]
+    mock_response.choices[0].message.content = "Summary of Section 1"
+    chunker._llm._client = MagicMock()
+    chunker._llm._client.chat.completions.create = AsyncMock(return_value=mock_response)
+
+    # Invoke chunk_batch
+    chunks = await chunker.chunk_batch(docs)
+    
+    # We expect 2 chunks corresponding to the 2 sections
+    assert len(chunks) == 2
+    
+    # Chunk 1 should be the AI summary of Section 1 (since it contains a table)
+    assert chunks[0].content == "Summary of Section 1"
+    assert chunks[0].metadata.custom["section_title"] == "Section Title 1"
+    assert chunks[0].metadata.custom["tables_html"] == ["<table>Table data</table>"]
+
+    # Chunk 2 should bypass LLM (since Section 2 contains no tables/images) and be the raw text
+    assert "Text block 2." in chunks[1].content
+    assert chunks[1].metadata.custom["section_title"] == "Section Title 2"

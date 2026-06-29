@@ -123,9 +123,109 @@ SEARCHABLE DESCRIPTION:"""
             )
         ]
 
+    def _group_layout_documents(self, documents: list[Document]) -> list[Document]:
+        """Group granular layout elements into logical pages/sections.
+        
+        If documents do not contain layout metadata, they are returned as-is.
+        """
+        has_granular_layout = any(
+            doc.metadata and doc.metadata.custom and "element_type" in doc.metadata.custom
+            for doc in documents
+        )
+        if not has_granular_layout:
+            return documents
+
+        from collections import defaultdict
+        source_groups = defaultdict(list)
+        for doc in documents:
+            source = doc.metadata.source or "unknown"
+            source_groups[source].append(doc)
+
+        grouped_docs: list[Document] = []
+
+        for source, docs in source_groups.items():
+            # Sort by page number first, then order. Section titles trigger first on same page.
+            docs_sorted = sorted(
+                docs,
+                key=lambda d: (
+                    d.metadata.page_number or 1,
+                    0 if (d.metadata.custom or {}).get("element_type") == "title" else 1
+                )
+            )
+
+            current_section_text: list[str] = []
+            current_tables: list[str] = []
+            current_images: list[str] = []
+            current_title = ""
+            ref_doc = None
+
+            def flush_section():
+                nonlocal current_section_text, current_tables, current_images, current_title, ref_doc
+                combined_text = "\n\n".join(current_section_text).strip()
+                if not combined_text and not current_tables and not current_images:
+                    return
+
+                if ref_doc is None:
+                    ref_doc = docs_sorted[0]
+
+                doc_meta = ref_doc.metadata.model_copy()
+                if not doc_meta.custom:
+                    doc_meta.custom = {}
+                
+                doc_meta.custom.update({
+                    "raw_text": combined_text,
+                    "tables_html": current_tables,
+                    "images_base64": current_images,
+                    "section_title": current_title,
+                })
+
+                grouped_docs.append(
+                    Document(
+                        id=ref_doc.id,
+                        content=combined_text,
+                        metadata=doc_meta
+                    )
+                )
+
+                current_section_text = []
+                current_tables = []
+                current_images = []
+                ref_doc = None
+
+            for doc in docs_sorted:
+                custom = doc.metadata.custom or {}
+                el_type = custom.get("element_type", "text")
+
+                acc_size = sum(len(t) for t in current_section_text)
+                if el_type == "title" or acc_size > 3000:
+                    flush_section()
+                    if el_type == "title":
+                        current_title = doc.content.strip()
+
+                if ref_doc is None:
+                    ref_doc = doc
+
+                if el_type == "table":
+                    current_tables.append(doc.content)
+                elif el_type == "image":
+                    img_b64 = custom.get("image_base64")
+                    if img_b64:
+                        current_images.append(img_b64)
+                    if doc.content:
+                        current_section_text.append(doc.content)
+                else:
+                    current_section_text.append(doc.content)
+
+            flush_section()
+
+        return grouped_docs
+
     @trace_operation(LifecycleStage.CHUNK, "multimodal_summarizer_chunk_batch")
     async def chunk_batch(self, documents: list[Document]) -> list[Chunk]:
-        tasks = [self.chunk(doc) for doc in documents]
+        # Group layout elements first
+        grouped_documents = self._group_layout_documents(documents)
+
+        tasks = [self.chunk(doc) for doc in grouped_documents]
         results = await asyncio.gather(*tasks)
 
         flat_chunks: list[Chunk] = []
@@ -134,3 +234,4 @@ SEARCHABLE DESCRIPTION:"""
                 chunk.chunk_index = chunk_idx
                 flat_chunks.append(chunk)
         return flat_chunks
+

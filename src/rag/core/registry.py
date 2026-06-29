@@ -55,7 +55,6 @@ _IMPLEMENTATION_MODULES: list[str] = [
     "rag.ingestion.parsers.pymupdf_parser",
     "rag.ingestion.parsers.docling_parser",
     "rag.ingestion.parsers.gcp_documentai_parser",
-    "rag.ingestion.parsers.multimodal_unstructured",
     # Chunkers
     "rag.ingestion.chunkers.semantic_chunker",
     "rag.ingestion.chunkers.recursive_chunker",

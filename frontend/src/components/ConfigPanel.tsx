@@ -513,9 +513,6 @@ export function ConfigPanel() {
                       <option value="pymupdf">PyMuPDF (Fast Local Text)</option>
                       <option value="docling">Docling (Local Layout)</option>
                       <option value="unstructured">Unstructured (Local Full)</option>
-                      <option value="multimodal_unstructured">
-                        Multimodal Unstructured (Local PDF)
-                      </option>
                       <option value="unstructured_api">Unstructured API (Cloud)</option>
                       <option value="llamaparse">LlamaParse (Cloud Markdown)</option>
                       <option value="gcp_documentai">Google Cloud Document AI (Cloud)</option>
@@ -691,9 +688,8 @@ export function ConfigPanel() {
                       </>
                     )}
 
-                    {/* Local Unstructured / Multimodal config */}
-                    {(configData.ingestion?.parser?.provider === "unstructured" ||
-                      configData.ingestion?.parser?.provider === "multimodal_unstructured") && (
+                    {/* Local Unstructured config */}
+                    {configData.ingestion?.parser?.provider === "unstructured" && (
                       <>
                         <div className="flex flex-col gap-1.5">
                           <label className="text-[11px] font-semibold flex items-center gap-1">
@@ -725,9 +721,7 @@ export function ConfigPanel() {
                           label="Extract Images"
                           description="Attempt to partition and extract inline images"
                           checked={
-                            configData.ingestion?.parser?.config?.extract_images ??
-                            configData.ingestion?.parser?.provider ===
-                              "multimodal_unstructured"
+                            configData.ingestion?.parser?.config?.extract_images ?? false
                           }
                           onChange={(v) =>
                             handleUpdateConfigValue(

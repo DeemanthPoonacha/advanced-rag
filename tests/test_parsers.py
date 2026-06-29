@@ -5,7 +5,6 @@ from tests.conftest import mock_unstructured_partition, mock_llama_parse
 import pytest
 from rag.ingestion.parsers.unstructured_parser import UnstructuredParser
 from rag.ingestion.parsers.llamaparse_parser import LlamaParseParser
-from rag.ingestion.parsers.multimodal_unstructured import MultimodalUnstructuredParser
 from rag.core.types import Document
 
 
@@ -86,34 +85,3 @@ async def test_llamaparse_parser(tmp_path: Path):
     assert mock_client.aload_data.call_count == 2
 
 
-@pytest.mark.asyncio
-async def test_multimodal_unstructured_parser(tmp_path: Path):
-    # Mock elements returned by partition_pdf
-    mock_el = MagicMock()
-    mock_el.text = "Hello Table"
-    mock_el.category = "Table"
-    
-    # Mock unstructured elements grouping
-    mock_chunk = MagicMock()
-    mock_chunk.text = "Title Chunk Text"
-    
-    mock_orig_el = MagicMock()
-    type(mock_orig_el).__name__ = "Table"
-    mock_orig_el.metadata = MagicMock(text_as_html="<table>Mock Table</table>")
-    mock_orig_el.text = "Hello Table"
-    
-    mock_chunk.metadata = MagicMock(orig_elements=[mock_orig_el])
-
-    with patch("unstructured.partition.pdf.partition_pdf", return_value=[mock_el]), \
-         patch("unstructured.chunking.title.chunk_by_title", return_value=[mock_chunk]):
-        
-        test_file = tmp_path / "multimodal.pdf"
-        test_file.touch()
-        
-        parser = MultimodalUnstructuredParser(strategy="hi_res", extract_images=True)
-        docs = await parser.parse(str(test_file))
-        
-        assert len(docs) == 1
-        assert docs[0].content == "Title Chunk Text"
-        assert docs[0].metadata.custom["tables_html"] == ["<table>Mock Table</table>"]
-        assert docs[0].metadata.custom["images_base64"] == []

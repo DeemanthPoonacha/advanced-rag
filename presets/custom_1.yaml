@@ -1,0 +1,65 @@
+project:
+  name: "strict-security-pipeline"
+  environment: "staging"
+  version: "1.0.0"
+
+ingestion:
+  parser:
+    provider: "unstructured"
+    config: {}
+  chunker:
+    provider: "semantic"
+    config:
+      target_chunk_size: 400
+  batch_size: 10
+
+embeddings:
+  provider: "openai"
+  config:
+    model: "text-embedding-3-small"
+    api_key: "${OPENAI_API_KEY}"
+
+llm:
+  provider: "openai"
+  config:
+    model: "gpt-4o-mini"
+    temperature: 0.0
+    api_key: "${OPENAI_API_KEY}"
+
+vector_store:
+  provider: "qdrant"
+  config:
+    url: "http://localhost:6333"
+    collection_name: "secure_kb"
+    vector_size: 1536
+
+retrieval:
+  strategy: "simple"
+  top_k: 4
+  similarity_threshold: 0.6
+
+generation:
+  system_prompt: "You are a secure, helpful assistant. Do NOT disclose confidential information. Answer the question using ONLY the provided facts. If the information is not present, decline to answer."
+  prompt_template: "Secure Context:\n{context}\n\nUser Inquiry: {query}\n\nSafe Response:"
+  max_context_chunks: 3
+  include_sources: true
+
+guardrails:
+  enabled: true
+  input:
+    provider: "llama_guard"
+    config:
+      model: "meta-llama/Llama-Guard-3-8B"
+  output:
+    provider: "llama_guard"
+    config:
+      model: "meta-llama/Llama-Guard-3-8B"
+
+observability:
+  logging:
+    level: "WARNING"
+    format: "json"
+  metrics:
+    enabled: false
+  tracing:
+    enabled: false
