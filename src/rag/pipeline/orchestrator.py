@@ -463,6 +463,7 @@ class RAGPipelineOrchestrator:
         ground_truth: str | None = None,
         metadata: dict[str, Any] | None = None,
         attachments: list[dict[str, Any]] | None = None,
+        chat_history: list[dict] | None = None,
     ) -> GenerationResult:
         """Run the end-to-end query, retrieval, generation, and validation pipeline.
 
@@ -483,7 +484,7 @@ class RAGPipelineOrchestrator:
 
         # Cache lookup — return cached result for identical queries within TTL
         if not ground_truth and not attachments:
-            cache_input = user_query + str(metadata or {})
+            cache_input = user_query + str(metadata or {}) + str(chat_history or [])
             cache_key = hashlib.sha256(cache_input.encode()).hexdigest()
             cached = self._query_cache.get(cache_key)
             if cached:
@@ -523,10 +524,13 @@ class RAGPipelineOrchestrator:
                     },
                 )
 
+        # 1.5 Condense Query if chat history is present
+        search_query = await self._condense_query(user_query, chat_history)
+
         # 2. Retrieval
         logger.info("pipeline_retrieve_start")
         q_ctx = QueryContext(
-            original_query=user_query,
+            original_query=search_query,
             filters=metadata.get("filters", {}) if metadata else {},
             top_k=self.config.retrieval.top_k,
             similarity_threshold=self.config.retrieval.similarity_threshold,
@@ -541,7 +545,7 @@ class RAGPipelineOrchestrator:
         if self.reranker and retrieved_results:
             logger.info("pipeline_rerank_start")
             reranked_results = await self.reranker.rerank(
-                query=user_query,
+                query=search_query,
                 results=retrieved_results,
                 top_n=self.config.generation.max_context_chunks,
             )
@@ -592,9 +596,18 @@ class RAGPipelineOrchestrator:
             attachment_context = "\n\n=== User Attached Files ===\n" + "\n\n".join(attachment_text_parts)
             context_str = (context_str + attachment_context) if context_str else attachment_context
 
+        query_with_history = user_query
+        if chat_history:
+            recent_history = chat_history[-10:]
+            history_str = "\n".join([
+                f"{'User' if m.get('sender') == 'user' or m.get('role') == 'user' else 'Assistant'}: {m.get('text') or m.get('content')}"
+                for m in recent_history
+            ])
+            query_with_history = f"Chat History:\n{history_str}\n\nLatest Query: {user_query}"
+
         prompt = self.config.generation.prompt_template.format(
             context=context_str,
-            query=user_query,
+            query=query_with_history,
         )
 
         answer = await self.llm.generate(
@@ -677,6 +690,7 @@ class RAGPipelineOrchestrator:
         user_query: str,
         metadata: dict[str, Any] | None = None,
         attachments: list[dict[str, Any]] | None = None,
+        chat_history: list[dict] | None = None,
     ) -> AsyncIterator[str]:
         """Stream generated response tokens.
 
@@ -692,9 +706,12 @@ class RAGPipelineOrchestrator:
                 yield "This query violates safety policies and cannot be processed."
                 return
 
+        # Condense Query if chat history is present
+        search_query = await self._condense_query(user_query, chat_history)
+
         # Retrieve & Rerank
         q_ctx = QueryContext(
-            original_query=user_query,
+            original_query=search_query,
             filters=metadata.get("filters", {}) if metadata else {},
             top_k=self.config.retrieval.top_k,
             similarity_threshold=self.config.retrieval.similarity_threshold,
@@ -705,7 +722,7 @@ class RAGPipelineOrchestrator:
         
         if self.reranker and retrieved_results:
             reranked_results = await self.reranker.rerank(
-                query=user_query,
+                query=search_query,
                 results=retrieved_results,
                 top_n=self.config.generation.max_context_chunks,
             )
@@ -753,9 +770,18 @@ class RAGPipelineOrchestrator:
             attachment_context = "\n\n=== User Attached Files ===\n" + "\n\n".join(attachment_text_parts)
             context_str = (context_str + attachment_context) if context_str else attachment_context
 
+        query_with_history = user_query
+        if chat_history:
+            recent_history = chat_history[-10:]
+            history_str = "\n".join([
+                f"{'User' if m.get('sender') == 'user' or m.get('role') == 'user' else 'Assistant'}: {m.get('text') or m.get('content')}"
+                for m in recent_history
+            ])
+            query_with_history = f"Chat History:\n{history_str}\n\nLatest Query: {user_query}"
+
         prompt = self.config.generation.prompt_template.format(
             context=context_str,
-            query=user_query,
+            query=query_with_history,
         )
 
         async for token in self.llm.generate_stream(
@@ -878,6 +904,40 @@ SEARCHABLE DESCRIPTION:"""
 
         remaining = len(target_chunks) - updated_count
         return updated_count, remaining
+
+    async def _condense_query(self, user_query: str, chat_history: list[dict] | None) -> str:
+        """Reformulate follow-up user query into standalone search query using chat history."""
+        if not chat_history:
+            return user_query
+
+        recent_history = chat_history[-10:]
+        history_str = "\n".join([
+            f"{'User' if m.get('sender') == 'user' or m.get('role') == 'user' else 'Assistant'}: {m.get('text') or m.get('content')}"
+            for m in recent_history
+        ])
+
+        prompt = (
+            "Given the following chat history and follow-up query, rewrite the query to be a standalone, "
+            "self-contained question that can be used for search/retrieval. Do not include any "
+            "conversational greetings, preamble, or comments. Just return the standalone question.\n\n"
+            f"Chat History:\n{history_str}\n\n"
+            f"Follow-up Query: {user_query}\n\n"
+            "Standalone Query:"
+        )
+        
+        try:
+            standalone = await self.llm.generate(
+                prompt,
+                system_prompt="You are a query condensation assistant. Always return only the single standalone query string.",
+            )
+            cleaned = standalone.strip()
+            if cleaned.startswith('"') and cleaned.endswith('"'):
+                cleaned = cleaned[1:-1]
+            logger.info("query_condensation_complete", original=user_query, condensed=cleaned)
+            return cleaned if cleaned else user_query
+        except Exception as exc:
+            logger.warning("query_condensation_failed", error=str(exc), fallback="using original query")
+            return user_query
 
     async def close(self) -> None:
         """Gracefully release open HTTP/gRPC channels and database connection pools."""

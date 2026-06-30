@@ -336,3 +336,47 @@ async def test_orchestrator_update_missing_summaries(orchestrator_config):
     assert updated_chunk.embedding == [0.9, 0.9, 0.9]
     orchestrator.embedding_model.embed.assert_called_once_with(["LLM generated response"])
 
+
+@pytest.mark.asyncio
+async def test_history_aware_query_condensation(orchestrator_config):
+    orchestrator = RAGPipelineOrchestrator(orchestrator_config)
+    await orchestrator.initialize()
+
+    prompt_received = []
+    async def mock_generate(prompt, **kwargs):
+        prompt_received.append(prompt)
+        if "standalone" in prompt.lower() or "rewrite" in prompt.lower():
+            return "standalone condensed query"
+        return "final synthesized answer"
+
+    orchestrator.llm.generate = mock_generate
+    orchestrator.retriever.retrieve = AsyncMock(return_value=[])
+
+    chat_history = [
+        {"sender": "user", "text": "What is advanced RAG?"},
+        {"sender": "assistant", "text": "It is an advanced framework."}
+    ]
+
+    res = await orchestrator.query(
+        user_query="Can you list its parsers?",
+        chat_history=chat_history
+    )
+
+    # 1. Verify query condensation prompt was sent to LLM
+    assert len(prompt_received) >= 2
+    condensation_prompt = prompt_received[0]
+    assert "what is advanced rag?" in condensation_prompt.lower()
+    assert "can you list its parsers?" in condensation_prompt.lower()
+
+    # 2. Verify retriever was called with the condensed query
+    orchestrator.retriever.retrieve.assert_called_once()
+    called_q_ctx = orchestrator.retriever.retrieve.call_args[0][0]
+    assert called_q_ctx.original_query == "standalone condensed query"
+
+    # 3. Verify final generation prompt has formatted chat history
+    final_prompt = prompt_received[1]
+    assert "chat history:" in final_prompt.lower()
+    assert "what is advanced rag?" in final_prompt.lower()
+    assert "can you list its parsers?" in final_prompt.lower()
+
+

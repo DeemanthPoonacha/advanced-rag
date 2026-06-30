@@ -384,6 +384,12 @@ export const useStore = create<State & Actions>((set, get) => ({
     const queryText = state.input.trim();
     set({ input: "", isGenerating: true });
 
+    const activeConversation = state.conversations.find((c) => c.id === state.activeConversationId) || state.conversations[0];
+    const chatHistory = activeConversation ? activeConversation.messages.map((m) => ({
+      sender: m.sender,
+      text: m.text,
+    })) : [];
+
     const attachmentsToSend = state.pendingAttachments.filter((a) => a.status === "ready");
     set({ pendingAttachments: [] });
 
@@ -425,6 +431,7 @@ export const useStore = create<State & Actions>((set, get) => ({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             query: queryText || `[Query with attachments]`,
+            chat_history: chatHistory,
             attachments: backendAttachments.length > 0 ? backendAttachments : undefined,
             metadata: bodyMetadata,
           }),
@@ -494,6 +501,7 @@ export const useStore = create<State & Actions>((set, get) => ({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             query: queryText || `[Query with attachments]`,
+            chat_history: chatHistory,
             attachments: backendAttachments.length > 0 ? backendAttachments : undefined,
             metadata: bodyMetadata,
           }),

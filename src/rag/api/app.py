@@ -3,7 +3,7 @@ import shutil
 import uuid
 import asyncio
 from pathlib import Path
-from typing import Any, Optional, Dict, List
+from typing import Any, Optional, Dict, List, Literal
 import yaml
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status
@@ -117,8 +117,13 @@ app.add_middleware(
 
 # ── API Models ────────────────────────────────────────────────────────
 
+class ChatMessage(BaseModel):
+    sender: Literal["user", "assistant"]
+    text: str
+
 class QueryRequest(BaseModel):
     query: str
+    chat_history: Optional[List[ChatMessage]] = None
     ground_truth: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     attachments: Optional[List[Dict[str, Any]]] = None
@@ -557,11 +562,13 @@ async def query_pipeline(req: QueryRequest):
         )
         
     try:
+        history_dicts = [m.model_dump() for m in req.chat_history] if req.chat_history else None
         result = await orchestrator.query(
             user_query=req.query,
             ground_truth=req.ground_truth,
             metadata=req.metadata,
-            attachments=req.attachments
+            attachments=req.attachments,
+            chat_history=history_dicts
         )
         
         # Format sources list
@@ -640,9 +647,12 @@ async def query_stream_pipeline(req: QueryRequest):
             detail=f"Orchestrator not initialized. Error: {init_error}"
         )
         
+    history_dicts = [m.model_dump() for m in req.chat_history] if req.chat_history else None
     async def token_generator():
         try:
-            async for token in orchestrator.query_stream(req.query, req.metadata, req.attachments):
+            async for token in orchestrator.query_stream(
+                req.query, req.metadata, req.attachments, chat_history=history_dicts
+            ):
                 yield {"data": token}
         except asyncio.CancelledError:
             print("Streaming request cancelled by client.")
