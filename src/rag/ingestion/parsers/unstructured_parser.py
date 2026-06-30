@@ -235,77 +235,93 @@ class UnstructuredParser(BaseParser):
                 def __str__(self) -> str:
                     return self.text
 
-            # Parse files locally
+            import io
+
+            # Parse files locally (with support for both file path and bytes)
+            suffix = ""
             if isinstance(source, str):
-                file_path = Path(source)
-                if file_path.exists():
-                    suffix = file_path.suffix.lower()
-                    if suffix in [".txt", ".md", ".py", ".json", ".yaml", ".yml", ".ini", ".conf"]:
-                        try:
-                            content = file_path.read_text(encoding="utf-8", errors="ignore")
-                            return [FallbackElement(content, page_number=1)]
-                        except Exception:
-                            pass
-                    elif suffix == ".csv":
-                        try:
-                            content = file_path.read_text(encoding="utf-8", errors="ignore")
-                            lines = [line.strip().split(",") for line in content.split("\n") if line.strip()]
-                            html_lines = ["<table>"]
-                            for r_idx, row in enumerate(lines):
-                                html_lines.append("  <tr>")
-                                for cell in row:
-                                    tag = "th" if r_idx == 0 else "td"
-                                    html_lines.append(f"    <{tag}>{cell}</{tag}>")
-                                html_lines.append("  </tr>")
-                            html_lines.append("</table>")
-                            html_table = "\n".join(html_lines)
-                            return [FallbackElement(html_table, page_number=1, category="Table")]
-                        except Exception:
-                            pass
-                    elif suffix == ".pdf":
-                        try:
-                            import pypdf
-                            reader = pypdf.PdfReader(source)
-                            pages = []
-                            for idx, page in enumerate(reader.pages):
-                                text = page.extract_text()
-                                if text and text.strip():
-                                    pages.append(FallbackElement(text, page_number=idx + 1))
-                            if pages:
-                                return pages
-                        except Exception as pdf_err:
-                            logger.error("fallback_pdf_parsing_failed", error=str(pdf_err))
-                    elif suffix == ".docx":
-                        try:
-                            import zipfile
-                            import xml.etree.ElementTree as ET
-                            with zipfile.ZipFile(source) as docx:
-                                tree = ET.fromstring(docx.read('word/document.xml'))
-                                namespaces = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
-                                text_nodes = tree.findall('.//w:t', namespaces)
-                                docx_text = "\n\n".join([node.text for node in text_nodes if node.text])
-                                if docx_text.strip():
-                                    return [FallbackElement(docx_text, page_number=1)]
-                        except Exception as docx_err:
-                            logger.error("fallback_docx_parsing_failed", error=str(docx_err))
-                    elif suffix == ".pptx":
-                        try:
-                            import zipfile
-                            import xml.etree.ElementTree as ET
-                            slide_texts = []
-                            with zipfile.ZipFile(source) as pptx:
-                                slide_files = sorted([f for f in pptx.namelist() if f.startswith("ppt/slides/slide") and f.endswith(".xml")])
-                                for slide_file in slide_files:
-                                    tree = ET.fromstring(pptx.read(slide_file))
-                                    namespaces = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}
-                                    text_nodes = tree.findall('.//a:t', namespaces)
-                                    slide_text = " ".join([node.text for node in text_nodes if node.text])
-                                    if slide_text.strip():
-                                        slide_texts.append(slide_text)
-                            if slide_texts:
-                                return [FallbackElement(txt, page_number=idx + 1) for idx, txt in enumerate(slide_texts)]
-                        except Exception as pptx_err:
-                            logger.error("fallback_pptx_parsing_failed", error=str(pptx_err))
+                suffix = Path(source).suffix.lower()
+            else:
+                file_type = extra_meta.get("file_type", "") or extra_meta.get("file_name", "").split(".")[-1]
+                if file_type:
+                    suffix = f".{file_type.lower()}"
+
+            if suffix:
+                if suffix in [".txt", ".md", ".py", ".json", ".yaml", ".yml", ".ini", ".conf"]:
+                    try:
+                        if isinstance(source, str):
+                            content = Path(source).read_text(encoding="utf-8", errors="ignore")
+                        else:
+                            content = source.decode("utf-8", errors="ignore")
+                        return [FallbackElement(content, page_number=1)]
+                    except Exception:
+                        pass
+                elif suffix == ".csv":
+                    try:
+                        if isinstance(source, str):
+                            content = Path(source).read_text(encoding="utf-8", errors="ignore")
+                        else:
+                            content = source.decode("utf-8", errors="ignore")
+                        lines = [line.strip().split(",") for line in content.split("\n") if line.strip()]
+                        html_lines = ["<table>"]
+                        for r_idx, row in enumerate(lines):
+                            html_lines.append("  <tr>")
+                            for cell in row:
+                                tag = "th" if r_idx == 0 else "td"
+                                html_lines.append(f"    <{tag}>{cell}</{tag}>")
+                            html_lines.append("  </tr>")
+                        html_lines.append("</table>")
+                        html_table = "\n".join(html_lines)
+                        return [FallbackElement(html_table, page_number=1, category="Table")]
+                    except Exception:
+                        pass
+                elif suffix == ".pdf":
+                    try:
+                        import pypdf
+                        stream = source if isinstance(source, str) else io.BytesIO(source)
+                        reader = pypdf.PdfReader(stream)
+                        pages = []
+                        for idx, page in enumerate(reader.pages):
+                            text = page.extract_text()
+                            if text and text.strip():
+                                pages.append(FallbackElement(text, page_number=idx + 1))
+                        if pages:
+                            return pages
+                    except Exception as pdf_err:
+                        logger.error("fallback_pdf_parsing_failed", error=str(pdf_err))
+                elif suffix == ".docx":
+                    try:
+                        import zipfile
+                        import xml.etree.ElementTree as ET
+                        stream = source if isinstance(source, str) else io.BytesIO(source)
+                        with zipfile.ZipFile(stream) as docx:
+                            tree = ET.fromstring(docx.read('word/document.xml'))
+                            namespaces = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+                            text_nodes = tree.findall('.//w:t', namespaces)
+                            docx_text = "\n\n".join([node.text for node in text_nodes if node.text])
+                            if docx_text.strip():
+                                return [FallbackElement(docx_text, page_number=1)]
+                    except Exception as docx_err:
+                        logger.error("fallback_docx_parsing_failed", error=str(docx_err))
+                elif suffix == ".pptx":
+                    try:
+                        import zipfile
+                        import xml.etree.ElementTree as ET
+                        stream = source if isinstance(source, str) else io.BytesIO(source)
+                        slide_texts = []
+                        with zipfile.ZipFile(stream) as pptx:
+                            slide_files = sorted([f for f in pptx.namelist() if f.startswith("ppt/slides/slide") and f.endswith(".xml")])
+                            for slide_file in slide_files:
+                                tree = ET.fromstring(pptx.read(slide_file))
+                                namespaces = {'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}
+                                text_nodes = tree.findall('.//a:t', namespaces)
+                                slide_text = " ".join([node.text for node in text_nodes if node.text])
+                                if slide_text.strip():
+                                    slide_texts.append(slide_text)
+                        if slide_texts:
+                            return [FallbackElement(txt, page_number=idx + 1) for idx, txt in enumerate(slide_texts)]
+                    except Exception as pptx_err:
+                        logger.error("fallback_pptx_parsing_failed", error=str(pptx_err))
 
             # Decode raw bytes as fallback
             content = ""

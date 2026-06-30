@@ -144,11 +144,21 @@ class UnstructuredAPIParser(BaseParser):
             elif isinstance(el, dict):
                 parsed_elements.append(el)
             else:
-                # Fallback to getattr
+                # Fallback to getattr with safe metadata dictionary conversion
+                el_meta = getattr(el, "metadata", {})
+                if hasattr(el_meta, "model_dump"):
+                    meta_dict = el_meta.model_dump()
+                elif hasattr(el_meta, "to_dict"):
+                    meta_dict = el_meta.to_dict()
+                elif hasattr(el_meta, "__dict__"):
+                    meta_dict = el_meta.__dict__
+                else:
+                    meta_dict = el_meta if isinstance(el_meta, dict) else {}
+
                 parsed_elements.append({
                     "type": getattr(el, "type", "Text"),
                     "text": getattr(el, "text", ""),
-                    "metadata": getattr(el, "metadata", {}),
+                    "metadata": meta_dict,
                 })
 
         # Group elements by page

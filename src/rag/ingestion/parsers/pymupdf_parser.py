@@ -99,7 +99,12 @@ class PyMuPDFParser(BaseParser):
                 page = doc[page_idx]
                 text = page.get_text()
                 if not text.strip():
-                    continue
+                    logger.info(
+                        "pymupdf_empty_page_detected",
+                        page_number=page_idx + 1,
+                        file_name=file_name,
+                    )
+                    text = "[Empty Page]"
 
                 meta = DocumentMetadata(
                     source=str(source) if isinstance(source, str) else "<bytes>",

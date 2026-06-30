@@ -6,6 +6,7 @@ Layout-aware local document parser using IBM's Docling.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -93,16 +94,18 @@ class DoclingParser(BaseParser):
             result = converter.convert(file_path)
             
             if self._export_format == "json":
-                content = str(result.document.export_to_dict())
+                content = json.dumps(result.document.export_to_dict())
             else:
                 content = result.document.export_to_markdown()
+
+            total_pages = len(result.pages) if hasattr(result, "pages") and result.pages else 1
 
             meta = DocumentMetadata(
                 source=str(source) if isinstance(source, str) else "<bytes>",
                 file_name=file_name,
                 file_type=file_type,
                 page_number=1,
-                total_pages=1,  # Docling processes full doc hierarchy
+                total_pages=total_pages,
                 language="en",
                 custom={
                     **extra_meta,

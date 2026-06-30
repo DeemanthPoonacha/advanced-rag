@@ -120,7 +120,7 @@ class LlamaParseParser(BaseParser):
         Returns:
             Flat list of all parsed Documents.
         """
-        meta_list = metadata or [{}] * len(sources)
+        meta_list = metadata if metadata is not None else [{}] * len(sources)
         if len(meta_list) != len(sources):
             raise ValueError(
                 f"metadata length ({len(meta_list)}) must match "
@@ -226,16 +226,23 @@ class LlamaParseParser(BaseParser):
         file_type = extra_meta.get("file_type", "pdf")
         file_name = extra_meta.get("file_name", f"document.{file_type}")
 
-        with tempfile.NamedTemporaryFile(
-            suffix=f".{file_type}", delete=True
-        ) as tmp:
-            tmp.write(data)
-            tmp.flush()
+        import os
+
+        # Use delete=False for cross-platform compatibility (e.g. Windows file locking)
+        temp_file = tempfile.NamedTemporaryFile(suffix=f".{file_type}", delete=False)
+        try:
+            temp_file.write(data)
+            temp_file.close()
 
             llama_docs = await asyncio.wait_for(
-                parser.aload_data(tmp.name),
+                parser.aload_data(temp_file.name),
                 timeout=self._max_timeout,
             )
+        finally:
+            try:
+                os.unlink(temp_file.name)
+            except Exception:
+                pass
 
         documents: list[Document] = []
         for i, ldoc in enumerate(llama_docs):
