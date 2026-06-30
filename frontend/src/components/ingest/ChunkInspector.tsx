@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Eye, X, Info, Loader2 } from "lucide-react";
 import { useStore } from "../../store/useStore";
 import "./ChunkInspector.css";
+import Markdown from "react-markdown";
 
 interface ChunkInspectorProps {
   selectedChunk: {
@@ -262,8 +263,10 @@ export function ChunkInspector({
                 </div>
               )
             ) : (
-              <div className="bg-slate-50 dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-800/80 rounded-xl leading-relaxed text-slate-700 dark:text-slate-300 font-mono text-[11px] whitespace-pre-wrap select-text shadow-inner">
+              <div className="bg-slate-50 dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-800/80 rounded-xl leading-relaxed text-slate-700 dark:text-slate-300 font-mono whitespace-pre-wrap select-text shadow-inner">
+               <Markdown>
                 {selectedChunk.summaryText}
+               </Markdown>
               </div>
             )}
           </div>

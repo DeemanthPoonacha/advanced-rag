@@ -110,9 +110,10 @@ retrieval:
   reranker:
     config: {}
     provider: cross_encoder
+  reranker_top_n: 3
   similarity_threshold: 0
   strategy: simple
-  top_k: 3
+  top_k: 10
 vector_store:
   config:
     collection_name: documents
