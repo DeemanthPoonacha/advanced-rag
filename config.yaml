@@ -41,18 +41,32 @@ ingestion:
   multimodal_enricher:
     api_key: null
     base_url: null
-    image_prompt: 'You are a visual assistant analyzing documents.\nDescribe this
-      image in detail. Generate a comprehensive, searchable description that covers:\n1.
-      Main topics, charts, diagrams, or patterns.\n2. Key labels, text values, numbers,
-      and data points shown in the image.\n3. Logical conclusions or answers this
-      image could provide.\nMake it detailed and searchable - prioritize findability
-      over brevity.\n\nIMAGE DESCRIPTION:'
+    image_prompt: 'You are a visual assistant analyzing documents.
+
+      Describe this image in detail. Generate a comprehensive, searchable description
+      that covers:
+
+      1. Main topics, charts, diagrams, or patterns.
+
+      2. Key labels, text values, numbers, and data points shown in the image.
+
+      3. Logical conclusions or answers this image could provide.
+
+      Make it detailed and searchable - prioritize findability over brevity.
+
+
+      IMAGE DESCRIPTION:'
     model_name: gpt-4o
     provider: primary
-    table_prompt: 'You are a structured data assistant.\nAnalyze this HTML table.
-      Translate it into a clean, searchable Markdown table.\nEnsure all data points,
-      headers, values, and relations are preserved accurately.\nDo not write conversational
-      preamble.\n\nTABLE CONTENT:'
+    table_prompt: 'You are a structured data assistant.
+
+      Analyze this HTML table. Translate it into a clean, searchable Markdown table.
+
+      Ensure all data points, headers, values, and relations are preserved accurately.
+
+      Do not write conversational preamble.
+
+      TABLE CONTENT:'
     temperature: 0
   parser:
     config:
