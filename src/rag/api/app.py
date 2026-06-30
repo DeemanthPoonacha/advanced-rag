@@ -51,17 +51,20 @@ async def run_background_summarizer():
                 if num_updated > 0:
                     print(f"Background Summarizer: Successfully updated {num_updated} chunk summaries.")
                 
-                if remaining > 0:
-                    # Some are still missing (probably LLM is offline). Sleep and retry.
+                if remaining > 0 and num_updated > 0:
+                    # We made progress but some are still missing. Sleep and retry.
                     await asyncio.sleep(15)
                     trigger_startup = True
+                else:
+                    # No progress made (LLM probably offline) or all complete. Go to sleep.
+                    trigger_startup = False
                     
         except asyncio.CancelledError:
             break
         except Exception as e:
             print(f"Error in background summarizer task: {e}")
             await asyncio.sleep(15)
-            trigger_startup = True
+            trigger_startup = False
 
 def init_orchestrator():
     global orchestrator, init_error
