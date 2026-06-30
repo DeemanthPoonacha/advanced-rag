@@ -318,21 +318,21 @@ async def test_recursive_chunker_layout_indivisible():
 
 @pytest.mark.asyncio
 async def test_by_title_chunker_layout_indivisible():
-    chunker = ByTitleChunker(max_chunk_size=200, chunk_overlap=0, prepend_title=True)
+    chunker = ByTitleChunker(max_chunk_size=300, chunk_overlap=0, prepend_title=True)
     
     docs = [
         Document(content="Section Title", metadata={"source": "doc1", "page_number": 1, "custom": {"element_type": "title"}}),
-        Document(content="Some regular text in section.", metadata={"source": "doc1", "page_number": 1}),
+        Document(content="Some regular text in section. " + "A" * 130, metadata={"source": "doc1", "page_number": 1}),
         Document(content="<table><tr><td>table cell</td></tr></table>", metadata={"source": "doc1", "page_number": 1, "custom": {"element_type": "table"}}),
-        Document(content="Another text block.", metadata={"source": "doc1", "page_number": 1}),
+        Document(content="Another text block. " + "B" * 140, metadata={"source": "doc1", "page_number": 1}),
     ]
     
     chunks = await chunker.chunk_batch(docs)
     
     # We expect:
-    # 1. Text chunk: "Section: Section Title\n\nSection Title\n\nSome regular text in section."
-    # 2. Table chunk: "Section: Section Title\n\n<table><tr><td>table cell</td></tr></table>" (Intact!)
-    # 3. Next text chunk: "Section: Section Title\n\nAnother text block."
+    # 1. Text chunk: "Section: Section Title\n\nSection Title\n\nSome regular text..." (fits in 300, not merged because text is > 150 chars)
+    # 2. Table chunk: "Section: Section Title\n\n<table><tr><td>table cell</td></tr></table>"
+    # 3. Next text chunk: "Section: Section Title\n\nAnother text block..."
     assert len(chunks) == 3
     assert "Some regular text" in chunks[0].content
     assert chunks[1].content == "Section: Section Title\n\n<table><tr><td>table cell</td></tr></table>"
@@ -358,6 +358,59 @@ async def test_hierarchical_chunker_layout_indivisible():
     assert chunks[1].metadata.custom["hierarchy_level"] == "child"
     assert chunks[1].content == "<table><tr><td>very long parent and child table</td></tr></table>"
     assert chunks[1].parent_id == chunks[0].id
+
+
+@pytest.mark.asyncio
+async def test_by_title_chunker_smart_section_merging():
+    # If everything in the section fits (including title, image, and caption),
+    # it should be outputted as a single, unified chunk!
+    chunker = ByTitleChunker(max_chunk_size=1024, chunk_overlap=0, prepend_title=True)
+    
+    docs = [
+        Document(content="Diagram Title", metadata={"source": "doc2", "page_number": 1, "custom": {"element_type": "title"}}),
+        Document(content="Image Description: RAG architecture overview.", metadata={"source": "doc2", "page_number": 1, "custom": {"element_type": "image"}}),
+        Document(content="Figure 1: Schematic flow diagram.", metadata={"source": "doc2", "page_number": 1}),
+    ]
+    
+    chunks = await chunker.chunk_batch(docs)
+    
+    # Combined length is well under 1024, so it should merge everything into a single chunk!
+    assert len(chunks) == 1
+    assert "Section: Diagram Title" in chunks[0].content
+    assert "Diagram Title" in chunks[0].content
+    assert "Image Description: RAG architecture overview." in chunks[0].content
+    assert "Figure 1: Schematic flow diagram." in chunks[0].content
+
+
+@pytest.mark.asyncio
+async def test_by_title_chunker_adjacent_merging():
+    # If the section is too large, but has adjacent short elements (like title and caption),
+    # they should be merged directly with the image chunk.
+    chunker = ByTitleChunker(max_chunk_size=200, chunk_overlap=0, prepend_title=True)
+    
+    docs = [
+        Document(content="Diagram Title", metadata={"source": "doc3", "page_number": 1, "custom": {"element_type": "title"}}),
+        # Long body paragraph (300 chars) that forces Case 2 splitting
+        Document(content="A" * 300, metadata={"source": "doc3", "page_number": 1}),
+        Document(content="Image Description: Schematic RAG flow overview.", metadata={"source": "doc3", "page_number": 1, "custom": {"element_type": "image"}}),
+        Document(content="Figure 1: Schematic flow diagram.", metadata={"source": "doc3", "page_number": 1}),
+    ]
+    
+    chunks = await chunker.chunk_batch(docs)
+    
+    # We expect:
+    # 1. Text chunk: "Section: Diagram Title\n\nDiagram Title\n\nAAAA..." (split because it exceeds max_chunk_size)
+    # 2. Merged image chunk: "Section: Diagram Title\n\nImage Description: ...\n\nFigure 1: ..."
+    # So the image description and figure caption are merged together!
+    assert len(chunks) >= 2
+    
+    # Find the image chunk
+    image_chunks = [c for c in chunks if "Image Description" in c.content]
+    assert len(image_chunks) == 1
+    
+    # Verify adjacent merging: caption (Figure 1) is merged inside the image chunk!
+    assert "Figure 1: Schematic flow diagram." in image_chunks[0].content
+
 
 
 

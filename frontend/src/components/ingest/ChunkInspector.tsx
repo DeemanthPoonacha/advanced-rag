@@ -57,9 +57,9 @@ export function ChunkInspector({
 
   const getImages = () => {
     const imgs: string[] = [];
-    // if (selectedChunk.metadata?.custom?.image_base64) {
-    //   imgs.push(selectedChunk.metadata.custom.image_base64);
-    // }
+    if (selectedChunk.metadata?.custom?.image_base64) {
+      imgs.push(selectedChunk.metadata.custom.image_base64);
+    }
     if (Array.isArray(selectedChunk.metadata?.custom?.images_base64)) {
       imgs.push(...selectedChunk.metadata.custom.images_base64);
     }
