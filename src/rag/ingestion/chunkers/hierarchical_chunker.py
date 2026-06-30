@@ -85,6 +85,43 @@ class HierarchicalChunker(BaseChunker):
         Returns:
             Flat list of all Chunks (parents first, then children).
         """
+        custom = document.metadata.custom or {}
+        el_type = custom.get("element_type")
+        if el_type in ("table", "image"):
+            # Create indivisible parent chunk
+            parent_chunk = Chunk(
+                content=document.content,
+                document_id=document.id,
+                metadata=document.metadata.model_copy(),
+                chunk_index=0,
+                token_count=len(document.content.split()),
+            )
+            parent_chunk.metadata.custom = parent_chunk.metadata.custom.copy() if parent_chunk.metadata.custom else {}
+            parent_chunk.metadata.custom["hierarchy_level"] = "parent"
+
+            # Create indivisible child chunk linked to the parent
+            child_chunk = Chunk(
+                content=document.content,
+                document_id=document.id,
+                metadata=document.metadata.model_copy(),
+                parent_id=parent_chunk.id,
+                chunk_index=1,
+                token_count=len(document.content.split()),
+            )
+            child_chunk.metadata.custom = child_chunk.metadata.custom.copy() if child_chunk.metadata.custom else {}
+            child_chunk.metadata.custom["hierarchy_level"] = "child"
+            child_chunk.metadata.custom["child_index"] = 0
+
+            parent_chunk.children_ids = [child_chunk.id]
+
+            logger.info(
+                "hierarchical_chunk_complete",
+                document_id=document.id,
+                parents=1,
+                total_chunks=2,
+            )
+            return [parent_chunk, child_chunk]
+
         # 1. Create parent chunks using the parent splitter
         parent_chunks = await self._parent_splitter.chunk(document)
 
@@ -93,8 +130,7 @@ class HierarchicalChunker(BaseChunker):
 
         for parent_chunk in parent_chunks:
             parent_chunk.chunk_index = chunk_idx
-            if not parent_chunk.metadata.custom:
-                parent_chunk.metadata.custom = {}
+            parent_chunk.metadata.custom = parent_chunk.metadata.custom.copy() if parent_chunk.metadata.custom else {}
             parent_chunk.metadata.custom["hierarchy_level"] = "parent"
             chunk_idx += 1
 
@@ -105,8 +141,7 @@ class HierarchicalChunker(BaseChunker):
             for c_idx, child_chunk in enumerate(child_chunks):
                 child_chunk.parent_id = parent_chunk.id
                 child_chunk.chunk_index = chunk_idx
-                if not child_chunk.metadata.custom:
-                    child_chunk.metadata.custom = {}
+                child_chunk.metadata.custom = child_chunk.metadata.custom.copy() if child_chunk.metadata.custom else {}
                 child_chunk.metadata.custom["hierarchy_level"] = "child"
                 child_chunk.metadata.custom["child_index"] = c_idx
                 chunk_idx += 1

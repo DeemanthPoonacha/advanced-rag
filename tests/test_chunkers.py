@@ -6,6 +6,7 @@ from rag.ingestion.chunkers.recursive_chunker import RecursiveChunker
 from rag.ingestion.chunkers.semantic_chunker import SemanticChunker, _cosine_similarity, _split_sentences
 from rag.ingestion.chunkers.hierarchical_chunker import HierarchicalChunker
 from rag.ingestion.chunkers.markdown_header_chunker import MarkdownHeaderChunker
+from rag.ingestion.chunkers.by_title_chunker import ByTitleChunker
 
 
 class MockEmbeddingModel(BaseEmbeddingModel):
@@ -265,5 +266,98 @@ async def test_semantic_chunker_buffer_size_and_limits():
     assert len(chunks_2) == 2
     assert chunks_2[0].content.startswith("A")
     assert chunks_2[1].content.startswith("B")
+
+
+@pytest.mark.asyncio
+async def test_multimodal_enricher_layout_preservation():
+    from rag.ingestion.enricher import MultimodalEnricher
+    from unittest.mock import AsyncMock
+    
+    mock_llm = AsyncMock()
+    mock_llm.generate.return_value = "Summary of visual content"
+    
+    enricher = MultimodalEnricher(llm=mock_llm)
+    
+    # 1. Test table preservation
+    table_doc = Document(
+        content="<table><tr><td>cell</td></tr></table>",
+        metadata={"custom": {"element_type": "table"}}
+    )
+    enriched_table = await enricher.enrich_document(table_doc)
+    assert "Table Summary: Summary of visual content" in enriched_table.content
+    assert "Table Data:\n<table><tr><td>cell</td></tr></table>" in enriched_table.content
+    assert enriched_table.metadata.custom["summary_text"] == "Summary of visual content"
+    
+    # 2. Test image formatting
+    image_doc = Document(
+        content="Image Raw Content",
+        metadata={"custom": {"element_type": "image", "image_base64": "b64data"}}
+    )
+    enriched_image = await enricher.enrich_document(image_doc)
+    assert enriched_image.content == "Image Description: Summary of visual content"
+    assert enriched_image.metadata.custom["summary_text"] == "Summary of visual content"
+
+
+@pytest.mark.asyncio
+async def test_recursive_chunker_layout_indivisible():
+    # Set max_chunk_size very small (e.g., 20 chars), but table HTML is 50 chars
+    chunker = RecursiveChunker(max_chunk_size=20, chunk_overlap=0)
+    
+    table_doc = Document(
+        content="<table><tr><td>very long table cells</td></tr></table>",
+        metadata={"custom": {"element_type": "table"}}
+    )
+    
+    chunks = await chunker.chunk(table_doc)
+    
+    # Should bypass splitting and return a single chunk with full table data intact
+    assert len(chunks) == 1
+    assert chunks[0].content == "<table><tr><td>very long table cells</td></tr></table>"
+    assert chunks[0].chunk_index == 0
+
+
+@pytest.mark.asyncio
+async def test_by_title_chunker_layout_indivisible():
+    chunker = ByTitleChunker(max_chunk_size=200, chunk_overlap=0, prepend_title=True)
+    
+    docs = [
+        Document(content="Section Title", metadata={"source": "doc1", "page_number": 1, "custom": {"element_type": "title"}}),
+        Document(content="Some regular text in section.", metadata={"source": "doc1", "page_number": 1}),
+        Document(content="<table><tr><td>table cell</td></tr></table>", metadata={"source": "doc1", "page_number": 1, "custom": {"element_type": "table"}}),
+        Document(content="Another text block.", metadata={"source": "doc1", "page_number": 1}),
+    ]
+    
+    chunks = await chunker.chunk_batch(docs)
+    
+    # We expect:
+    # 1. Text chunk: "Section: Section Title\n\nSection Title\n\nSome regular text in section."
+    # 2. Table chunk: "Section: Section Title\n\n<table><tr><td>table cell</td></tr></table>" (Intact!)
+    # 3. Next text chunk: "Section: Section Title\n\nAnother text block."
+    assert len(chunks) == 3
+    assert "Some regular text" in chunks[0].content
+    assert chunks[1].content == "Section: Section Title\n\n<table><tr><td>table cell</td></tr></table>"
+    assert "Another text block" in chunks[2].content
+
+
+@pytest.mark.asyncio
+async def test_hierarchical_chunker_layout_indivisible():
+    chunker = HierarchicalChunker(parent_chunk_size=100, child_chunk_size=20)
+    
+    table_doc = Document(
+        content="<table><tr><td>very long parent and child table</td></tr></table>",
+        metadata={"custom": {"element_type": "table"}}
+    )
+    
+    chunks = await chunker.chunk(table_doc)
+    
+    # Should return exactly 2 chunks (1 parent, 1 child) without splitting the table in either of them
+    assert len(chunks) == 2
+    assert chunks[0].metadata.custom["hierarchy_level"] == "parent"
+    assert chunks[0].content == "<table><tr><td>very long parent and child table</td></tr></table>"
+    
+    assert chunks[1].metadata.custom["hierarchy_level"] == "child"
+    assert chunks[1].content == "<table><tr><td>very long parent and child table</td></tr></table>"
+    assert chunks[1].parent_id == chunks[0].id
+
 
 

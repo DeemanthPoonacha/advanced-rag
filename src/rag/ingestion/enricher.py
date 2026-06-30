@@ -66,10 +66,14 @@ class MultimodalEnricher:
                 raise_on_error=True
             )
             if summary:
-                document.content = summary
                 if not document.metadata.custom:
                     document.metadata.custom = {}
                 document.metadata.custom["summary_text"] = summary
+
+                if el_type == "table":
+                    document.content = f"Table Summary: {summary}\n\nTable Data:\n{document.content}"
+                else:  # image
+                    document.content = f"Image Description: {summary}"
         except Exception as e:
             logger.error("multimodal_enrichment_failed", error=str(e), doc_id=document.id)
 

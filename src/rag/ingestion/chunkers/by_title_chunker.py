@@ -131,6 +131,23 @@ class ByTitleChunker(BaseChunker):
                     process_current_section()
                     current_title = doc.content.strip()
                     current_section_docs.append(doc)
+                elif el_type in ("table", "image"):
+                    # Table/image triggers section flush, then chunked as indivisible block
+                    process_current_section()
+                    
+                    title_header = f"Section: {current_title}\n\n" if (self._prepend_title and current_title) else ""
+                    final_content = f"{title_header}{doc.content}"
+                    
+                    all_chunks.append(
+                        Chunk(
+                            content=final_content,
+                            document_id=doc.id,
+                            metadata=doc.metadata.model_copy(),
+                            chunk_index=chunk_idx,
+                            token_count=len(final_content.split()),
+                        )
+                    )
+                    chunk_idx += 1
                 else:
                     current_section_docs.append(doc)
 

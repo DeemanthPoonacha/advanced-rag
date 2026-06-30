@@ -88,6 +88,25 @@ class SemanticChunker(BaseChunker):
         Returns:
             Ordered list of Chunks.
         """
+        custom = document.metadata.custom or {}
+        el_type = custom.get("element_type")
+        if el_type in ("table", "image"):
+            chunks = [
+                Chunk(
+                    content=document.content,
+                    document_id=document.id,
+                    metadata=document.metadata.model_copy(),
+                    chunk_index=0,
+                    token_count=len(document.content.split()),
+                )
+            ]
+            logger.info(
+                "semantic_chunk_complete",
+                document_id=document.id,
+                sentences=1,
+                chunks=len(chunks),
+            )
+            return chunks
         if self._embedding_model is None:
             raise RuntimeError(
                 "SemanticChunker requires an embedding model. "

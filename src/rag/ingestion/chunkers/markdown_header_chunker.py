@@ -43,6 +43,18 @@ class MarkdownHeaderChunker(BaseChunker):
     @trace_operation(LifecycleStage.CHUNK, "markdown_header_chunk")
     async def chunk(self, document: Document) -> list[Chunk]:
         """Split a Markdown document by header levels."""
+        custom = document.metadata.custom or {}
+        el_type = custom.get("element_type")
+        if el_type in ("table", "image"):
+            return [
+                Chunk(
+                    content=document.content,
+                    document_id=document.id,
+                    metadata=document.metadata.model_copy(),
+                    chunk_index=0,
+                    token_count=len(document.content.split()),
+                )
+            ]
         content = document.content
         if not content:
             return []

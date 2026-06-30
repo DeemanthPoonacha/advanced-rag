@@ -17,7 +17,8 @@ async def test_multimodal_enricher_table():
     enricher = MultimodalEnricher(llm=mock_llm, table_prompt="CUSTOM TABLE PROMPT:")
     enriched_doc = await enricher.enrich_document(doc)
     
-    assert enriched_doc.content == "| Cell 1 |\n|---|"
+    assert "Table Summary: | Cell 1 |\n|---|" in enriched_doc.content
+    assert "Table Data:\n<table><tr><td>Cell 1</td></tr></table>" in enriched_doc.content
     assert enriched_doc.metadata.custom["summary_text"] == "| Cell 1 |\n|---|"
     mock_llm.generate.assert_called_once()
     assert "CUSTOM TABLE PROMPT:" in mock_llm.generate.call_args[0][0]
@@ -36,7 +37,7 @@ async def test_multimodal_enricher_image():
     enricher = MultimodalEnricher(llm=mock_llm, image_prompt="CUSTOM IMAGE PROMPT:")
     enriched_doc = await enricher.enrich_document(doc)
     
-    assert enriched_doc.content == "Detailed image description."
+    assert enriched_doc.content == "Image Description: Detailed image description."
     assert enriched_doc.metadata.custom["summary_text"] == "Detailed image description."
     mock_llm.generate.assert_called_once()
     assert mock_llm.generate.call_args[0][0] == "CUSTOM IMAGE PROMPT:"

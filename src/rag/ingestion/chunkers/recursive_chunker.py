@@ -62,6 +62,26 @@ class RecursiveChunker(BaseChunker):
         Returns:
             Ordered list of Chunks.
         """
+        custom = document.metadata.custom or {}
+        el_type = custom.get("element_type")
+        if el_type in ("table", "image"):
+            chunks = [
+                Chunk(
+                    content=document.content,
+                    document_id=document.id,
+                    metadata=document.metadata.model_copy(),
+                    chunk_index=0,
+                    token_count=len(document.content.split()),
+                )
+            ]
+            logger.info(
+                "recursive_chunk_complete",
+                document_id=document.id,
+                chunks=len(chunks),
+                avg_size=len(document.content),
+            )
+            return chunks
+
         raw_texts = self._split_text(document.content, self._separators)
         merged = raw_texts
 
