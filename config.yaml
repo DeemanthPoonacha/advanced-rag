@@ -107,7 +107,9 @@ project:
   version: 1.0.0
 retrieval:
   config: {}
-  reranker: null
+  reranker:
+    config: {}
+    provider: cross_encoder
   similarity_threshold: 0
   strategy: simple
   top_k: 3

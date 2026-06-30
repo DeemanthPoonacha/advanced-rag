@@ -78,12 +78,43 @@ export interface MultimodalEnricherConfig {
   [key: string]: any;
 }
 
+export interface PyMuPDFConfig {
+  extract_images?: boolean;
+}
+
+export interface DoclingConfig {
+  export_format?: "markdown" | "json";
+}
+
+export interface GCPDocumentAIConfig {
+  project_id?: string | null;
+  location?: string;
+  processor_id?: string | null;
+}
+
+export interface UnstructuredAPIConfig {
+  api_url?: string;
+  api_key?: string | null;
+  strategy?: string;
+}
+
+export interface MarkdownHeaderConfig {
+  max_chunk_size?: number;
+  chunk_overlap?: number;
+  prepend_headers?: boolean;
+}
+
 export interface IngestionSettings {
   batch_size?: number;
   chunker?: ChunkerSettings;
   parser?: ParserSettings;
   enable_multimodal_enrichment?: boolean;
   multimodal_enricher?: MultimodalEnricherConfig;
+  pymupdf?: PyMuPDFConfig;
+  docling?: DoclingConfig;
+  gcp_documentai?: GCPDocumentAIConfig;
+  unstructured_api?: UnstructuredAPIConfig;
+  markdown_header?: MarkdownHeaderConfig;
 }
 
 export interface ProjectSettings {
@@ -92,11 +123,18 @@ export interface ProjectSettings {
   version?: string;
 }
 
+export interface RerankerSettings {
+  provider: string;
+  config?: Record<string, any>;
+}
+
 export interface RetrievalSettings {
   strategy: string;
   top_k: number;
   similarity_threshold: number;
   config?: Record<string, any>;
+  reranker?: RerankerSettings | null;
+  reranker_top_n?: number;
 }
 
 export interface LLMConfig {

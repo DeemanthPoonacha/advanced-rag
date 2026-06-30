@@ -235,6 +235,7 @@ class RetrievalConfig(BaseModel):
     reranker: RerankerConfig | None = None
     top_k: int = Field(default=10, ge=1, le=1000)
     similarity_threshold: float = Field(default=0.0, ge=0.0, le=1.0)
+    reranker_top_n: int = Field(default=5, ge=1, le=100)
 
 
 # ─── Guardrails ──────────────────────────────────────────────────────────

@@ -610,7 +610,11 @@ async def retrieve_pipeline(req: QueryRequest):
         retrieved_results = await orchestrator.retriever.retrieve(q_ctx)
         
         if hasattr(orchestrator, "reranker") and orchestrator.reranker and retrieved_results:
-            retrieved_results = await orchestrator.reranker.rerank(q_ctx, retrieved_results)
+            retrieved_results = await orchestrator.reranker.rerank(
+                query=q_ctx.original_query,
+                results=retrieved_results,
+                top_n=orchestrator.config.retrieval.reranker_top_n
+            )
             
         chunks_list = []
         for r in retrieved_results:

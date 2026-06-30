@@ -319,6 +319,8 @@ export function ConfigPanel() {
   const topK = configData?.retrieval?.top_k || 5;
   const similarityThreshold =
     configData?.retrieval?.similarity_threshold || 0.0;
+  const reranker = configData?.retrieval?.reranker || null;
+  const rerankerTopN = configData?.retrieval?.reranker_top_n || 5;
   const embeddingsProvider = configData?.embeddings?.provider || "openai";
   const vectorProvider = configData?.vector_store?.provider || "qdrant";
 
@@ -2013,8 +2015,8 @@ export function ConfigPanel() {
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold flex items-center justify-between">
                       <span className="flex items-center gap-1">
-                        Top K Chunks
-                        <InfoTooltip text="Maximum number of matched document vectors retrieved to inject into prompt context." />
+                        Retrieve Top K (Stage 1)
+                        <InfoTooltip text="Number of matched document vectors retrieved from the vector database in the first stage." />
                       </span>
                       <RangeValue value={topK} />
                     </label>
@@ -2063,6 +2065,139 @@ export function ConfigPanel() {
                       />
                     </div>
                   </AdvancedToggle>
+                </Subsection>
+
+                <Subsection title="Reranking" icon={<Sliders size={10} />}>
+                  <Toggle
+                    label="Enable Reranking"
+                    description="Re-score and re-order search results using an LLM or local cross-encoder model."
+                    checked={reranker !== null}
+                    onChange={(checked) =>
+                      handleUpdateConfigValue(
+                        ["retrieval", "reranker"],
+                        checked ? { provider: "cohere", config: {} } : null,
+                      )
+                    }
+                  />
+
+                  {reranker !== null && (
+                    <div className="">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-semibold flex items-center gap-1">
+                          Reranker Provider
+                          <InfoTooltip text="Provider used to re-rank results." />
+                        </label>
+                        <select
+                          value={reranker.provider}
+                          onChange={(e) =>
+                            handleUpdateConfigValue(
+                              ["retrieval", "reranker", "provider"],
+                              e.target.value,
+                            )
+                          }
+                          className={inputCls}
+                        >
+                          <option value="cohere">Cohere API Rerank</option>
+                          <option value="cross_encoder">Local Cross-Encoder</option>
+                        </select>
+                      </div>
+
+                      {reranker.provider === "cohere" && (
+                        <>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-semibold">Model Name</label>
+                            <input
+                              type="text"
+                              value={reranker.config?.model || "rerank-v3.5"}
+                              onChange={(e) =>
+                                handleUpdateConfigValue(
+                                  ["retrieval", "reranker", "config", "model"],
+                                  e.target.value,
+                                )
+                              }
+                              className={inputCls}
+                              placeholder="rerank-v3.5"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-semibold">API Key</label>
+                            <input
+                              type="password"
+                              value={reranker.config?.api_key || ""}
+                              onChange={(e) =>
+                                handleUpdateConfigValue(
+                                  ["retrieval", "reranker", "config", "api_key"],
+                                  e.target.value || null,
+                                )
+                              }
+                              className={inputCls}
+                              placeholder="CO_API_KEY (leave empty to use env)"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {reranker.provider === "cross_encoder" && (
+                        <>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-semibold">Model Name</label>
+                            <input
+                              type="text"
+                              value={reranker.config?.model_name || "BAAI/bge-reranker-v2-m3"}
+                              onChange={(e) =>
+                                handleUpdateConfigValue(
+                                  ["retrieval", "reranker", "config", "model_name"],
+                                  e.target.value,
+                                )
+                              }
+                              className={inputCls}
+                              placeholder="BAAI/bge-reranker-v2-m3"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-semibold">Device</label>
+                            <select
+                              value={reranker.config?.device || "cpu"}
+                              onChange={(e) =>
+                                handleUpdateConfigValue(
+                                  ["retrieval", "reranker", "config", "device"],
+                                  e.target.value,
+                                )
+                              }
+                              className={inputCls}
+                            >
+                              <option value="cpu">CPU</option>
+                              <option value="cuda">CUDA (GPU)</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
+
+                      <div className="flex flex-col gap-1.5 border-t border-slate-200/50 dark:border-slate-800/50 pt-3">
+                        <label className="text-[10px] font-semibold flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            Rerank Top N (Stage 2)
+                            <InfoTooltip text="Number of final, top relevant chunks to keep and return after re-scoring." />
+                          </span>
+                          <RangeValue value={rerankerTopN} />
+                        </label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="20"
+                          step="1"
+                          value={rerankerTopN}
+                          onChange={(e) =>
+                            handleUpdateConfigValue(
+                              ["retrieval", "reranker_top_n"],
+                              parseInt(e.target.value),
+                            )
+                          }
+                          className={rangeThinCls}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </Subsection>
 
                 {/* <div className="border-t border-slate-100 dark:border-slate-800/50" /> */}
