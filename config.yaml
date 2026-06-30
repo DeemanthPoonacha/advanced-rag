@@ -25,7 +25,8 @@ ingestion:
   batch_size: 10
   chunker:
     config:
-      target_chunk_size: 500
+      max_chunk_size: 2000
+      chunk_overlap: 300
     provider: by_title
   docling:
     export_format: markdown
@@ -41,32 +42,10 @@ ingestion:
   multimodal_enricher:
     api_key: null
     base_url: null
-    image_prompt: 'You are a visual assistant analyzing documents.
-
-      Describe this image in detail. Generate a comprehensive, searchable description
-      that covers:
-
-      1. Main topics, charts, diagrams, or patterns.
-
-      2. Key labels, text values, numbers, and data points shown in the image.
-
-      3. Logical conclusions or answers this image could provide.
-
-      Make it detailed and searchable - prioritize findability over brevity.
-
-
-      IMAGE DESCRIPTION:'
+    image_prompt: "Generate a comprehensive, searchable description of the images, diagrams, and surrounding text. Cover:\n1. Visual content analysis (charts, diagrams, drawings, or patterns in images).\n2. Key labels, text values, numbers, and data points shown in the image.\n3. Main topics and concepts discussed in the text and illustrated by the images.\n4. Questions this content could answer.\n5. Alternative search terms users might use.\nMake it detailed and searchable - prioritize findability over brevity."
     model_name: gpt-4o
     provider: primary
-    table_prompt: 'You are a structured data assistant.
-
-      Analyze this HTML table. Translate it into a clean, searchable Markdown table.
-
-      Ensure all data points, headers, values, and relations are preserved accurately.
-
-      Do not write conversational preamble.
-
-      TABLE CONTENT:'
+    table_prompt: "Generate a comprehensive, searchable description of the tables and surrounding text. Cover:\n1. Key facts, numbers, and data points from the text and tables.\n2. Main topics, concepts, and relationships discussed.\n3. Questions this content could answer.\n4. Alternative search terms users might use.\nMake it detailed and searchable - prioritize findability over brevity."
     temperature: 0
   parser:
     config:

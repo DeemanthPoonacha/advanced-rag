@@ -375,15 +375,17 @@ class RAGPipelineOrchestrator:
             raise file_error
 
     async def _chunk_documents(self, documents: list[Document]) -> list[Chunk]:
-        """Chunk a list of documents, optionally running visual LLM enrichment first."""
+        """Chunk a list of documents, optionally running visual LLM enrichment after chunking."""
+        chunks = await self.chunker.chunk_batch(documents)
+
         if self.config.ingestion.enable_multimodal_enrichment:
             try:
                 enricher = self.factory.create_multimodal_enricher()
-                documents = await enricher.enrich_batch(documents)
+                chunks = await enricher.enrich_chunks(chunks)
             except Exception as enrich_err:
-                logger.error("multimodal_enrichment_initialization_failed", error=str(enrich_err))
+                logger.error("multimodal_enrichment_failed", error=str(enrich_err))
 
-        return await self.chunker.chunk_batch(documents)
+        return chunks
 
     @trace_operation(LifecycleStage.INGEST, "pipeline_ingest_batch")
     async def ingest_batch(

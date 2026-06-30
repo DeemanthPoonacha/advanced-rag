@@ -109,23 +109,24 @@ class ChunkerConfig(ProviderConfig):
     ] = "semantic"
 
 
-TABLE_SUMMARIZER_PROMPT =(
-                "You are a structured data assistant.\n"
-                "Analyze this HTML table. Translate it into a clean, searchable Markdown table.\n"
-                "Ensure all data points, headers, values, and relations are preserved accurately.\n"
-                "Do not write conversational preamble.\n\n"
-                "TABLE CONTENT:"
-            )
+TABLE_SUMMARIZER_PROMPT = (
+    "Generate a comprehensive, searchable description of the tables and surrounding text. Cover:\n"
+    "1. Key facts, numbers, and data points from the text and tables.\n"
+    "2. Main topics, concepts, and relationships discussed.\n"
+    "3. Questions this content could answer.\n"
+    "4. Alternative search terms users might use.\n"
+    "Make it detailed and searchable - prioritize findability over brevity."
+)
 
-IMAGE_SUMMARIZER_PROMPT=(
-                "You are a visual assistant analyzing documents.\n"
-                "Describe this image in detail. Generate a comprehensive, searchable description that covers:\n"
-                "1. Main topics, charts, diagrams, or patterns.\n"
-                "2. Key labels, text values, numbers, and data points shown in the image.\n"
-                "3. Logical conclusions or answers this image could provide.\n"
-                "Make it detailed and searchable - prioritize findability over brevity.\n\n"
-                "IMAGE DESCRIPTION:"
-            )
+IMAGE_SUMMARIZER_PROMPT = (
+    "Generate a comprehensive, searchable description of the images, diagrams, and surrounding text. Cover:\n"
+    "1. Visual content analysis (charts, diagrams, drawings, or patterns in images).\n"
+    "2. Key labels, text values, numbers, and data points shown in the image.\n"
+    "3. Main topics and concepts discussed in the text and illustrated by the images.\n"
+    "4. Questions this content could answer.\n"
+    "5. Alternative search terms users might use.\n"
+    "Make it detailed and searchable - prioritize findability over brevity."
+)
 class IngestionConfig(BaseModel):
     """Full ingestion pipeline configuration."""
 
