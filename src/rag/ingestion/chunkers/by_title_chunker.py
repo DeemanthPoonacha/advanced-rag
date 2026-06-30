@@ -101,6 +101,22 @@ class ByTitleChunker(BaseChunker):
 
                 if combined_len <= self._max_chunk_size or not has_layout_blocks:
                     # Case 1: The section fits, or has no layout blocks. Standard split.
+                    # Gather tables and images from all docs in this section to avoid losing them
+                    section_tables = []
+                    section_images = []
+                    for d in current_section_docs:
+                        d_custom = d.metadata.custom or {}
+                        d_el_type = d_custom.get("element_type")
+                        if d_el_type == "table":
+                            section_tables.append(d.content)
+                        elif isinstance(d_custom.get("tables_html"), list):
+                            section_tables.extend(d_custom["tables_html"])
+                            
+                        if d_el_type == "image" and d_custom.get("image_base64"):
+                            section_images.append(d_custom["image_base64"])
+                        elif isinstance(d_custom.get("images_base64"), list):
+                            section_images.extend(d_custom["images_base64"])
+
                     sub_max = max(100, self._max_chunk_size - len(title_header))
                     sub_splitter = RecursiveChunker(
                         max_chunk_size=sub_max,
@@ -114,12 +130,18 @@ class ByTitleChunker(BaseChunker):
                     for text in merged_splits:
                         ref_doc = current_section_docs[0]
                         final_content = f"{title_header}{text}"
+                        
+                        chunk_meta = ref_doc.metadata.model_copy()
+                        if section_tables:
+                            chunk_meta.custom["tables_html"] = section_tables
+                        if section_images:
+                            chunk_meta.custom["images_base64"] = section_images
 
                         all_chunks.append(
                             Chunk(
                                 content=final_content,
                                 document_id=ref_doc.id,
-                                metadata=ref_doc.metadata.model_copy(),
+                                metadata=chunk_meta,
                                 chunk_index=chunk_idx,
                                 token_count=len(final_content.split()),
                             )

@@ -571,7 +571,12 @@ class RAGPipelineOrchestrator:
             context_parts.append(part_str)
             
             images_base64 = custom.get("images_base64", [])
-            images.extend(images_base64)
+            if isinstance(images_base64, list):
+                images.extend(images_base64)
+            
+            img_b64 = custom.get("image_base64")
+            if img_b64 and img_b64 not in images:
+                images.append(img_b64)
             
         context_str = "\n\n".join(context_parts)
 
@@ -745,7 +750,12 @@ class RAGPipelineOrchestrator:
             context_parts.append(part_str)
             
             images_base64 = custom.get("images_base64", [])
-            images.extend(images_base64)
+            if isinstance(images_base64, list):
+                images.extend(images_base64)
+            
+            img_b64 = custom.get("image_base64")
+            if img_b64 and img_b64 not in images:
+                images.append(img_b64)
             
         context_str = "\n\n".join(context_parts)
 
