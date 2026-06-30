@@ -54,12 +54,18 @@ class MarkdownHeaderChunker(BaseChunker):
         sections: list[dict[str, Any]] = []
         current_headers: dict[int, str] = {}
         current_text: list[str] = []
+        has_text_in_current_header = False
 
         for line in lines:
             match = header_regex.match(line)
             if match:
                 # Flush existing section
-                if current_text:
+                if not has_text_in_current_header and any(k >= len(match.group(1)) for k in current_headers.keys()):
+                    sections.append({
+                        "headers": current_headers.copy(),
+                        "text": ""
+                    })
+                elif current_text or has_text_in_current_header:
                     sections.append({
                         "headers": current_headers.copy(),
                         "text": "\n".join(current_text).strip()
@@ -73,14 +79,22 @@ class MarkdownHeaderChunker(BaseChunker):
                 # Clean up deeper headers in hierarchy
                 current_headers = {k: v for k, v in current_headers.items() if k < level}
                 current_headers[level] = title
+                has_text_in_current_header = False
             else:
                 current_text.append(line)
+                if line.strip():
+                    has_text_in_current_header = True
 
         # Flush final section
-        if current_text or not sections:
+        if current_text or has_text_in_current_header or not sections:
             sections.append({
                 "headers": current_headers.copy(),
                 "text": "\n".join(current_text).strip()
+            })
+        elif not has_text_in_current_header and current_headers:
+            sections.append({
+                "headers": current_headers.copy(),
+                "text": ""
             })
 
         chunks: list[Chunk] = []
@@ -88,29 +102,55 @@ class MarkdownHeaderChunker(BaseChunker):
 
         for section in sections:
             sec_text = section["text"]
-            if not sec_text:
+            headers = section["headers"]
+            if not sec_text and not headers:
                 continue
 
             # Build header prefix context
             header_parts = []
-            for level in sorted(section["headers"].keys()):
-                header_parts.append(f"{'#' * level} {section['headers'][level]}")
+            for level in sorted(headers.keys()):
+                header_parts.append(f"{'#' * level} {headers[level]}")
             header_prefix = "\n".join(header_parts) + "\n\n" if (self._prepend_headers and header_parts) else ""
+
+            if not sec_text:
+                if header_prefix:
+                    meta = document.metadata.model_copy()
+                    if not meta.custom:
+                        meta.custom = {}
+                    meta.custom["markdown_headers"] = headers.copy()
+                    final_content = header_prefix.strip()
+                    chunks.append(
+                        Chunk(
+                            content=final_content,
+                            document_id=document.id,
+                            metadata=meta,
+                            chunk_index=chunk_idx,
+                            token_count=len(final_content.split()),
+                        )
+                    )
+                    chunk_idx += 1
+                continue
 
             # Split section text to fit within bounds
             sub_max = max(100, self._max_chunk_size - len(header_prefix))
             
-            # Use temporary document for sub-splitting
+            # Use temporary local RecursiveChunker to avoid race conditions
+            sub_splitter = RecursiveChunker(
+                max_chunk_size=sub_max,
+                chunk_overlap=self._chunk_overlap,
+                separators=self._sub_splitter._separators,
+                keep_separator=self._sub_splitter._keep_separator,
+                strip_whitespace=self._sub_splitter._strip_whitespace,
+            )
             temp_doc = Document(content=sec_text, metadata=document.metadata)
-            self._sub_splitter._max_chunk_size = sub_max
-            sub_chunks = await self._sub_splitter.chunk(temp_doc)
+            sub_chunks = await sub_splitter.chunk(temp_doc)
 
             for sub_c in sub_chunks:
                 final_content = f"{header_prefix}{sub_c.content}"
                 meta = document.metadata.model_copy()
                 if not meta.custom:
                     meta.custom = {}
-                meta.custom["markdown_headers"] = section["headers"]
+                meta.custom["markdown_headers"] = headers.copy()
 
                 chunks.append(
                     Chunk(

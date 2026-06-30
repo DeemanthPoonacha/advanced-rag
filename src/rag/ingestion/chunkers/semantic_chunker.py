@@ -98,7 +98,7 @@ class SemanticChunker(BaseChunker):
         if not sentences:
             return []
 
-        if len(sentences) == 1:
+        if len(sentences) == 1 and len(sentences[0]) <= self._max_chunk_size:
             return [
                 Chunk(
                     content=sentences[0],
@@ -109,15 +109,18 @@ class SemanticChunker(BaseChunker):
                 )
             ]
 
-        # Embed all sentences in batches
-        embeddings = await self._embedding_model.embed(sentences)
-        emb_array = np.array(embeddings)
+        # Embed all sentences in batches (only if we have multiple sentences)
+        if len(sentences) > 1:
+            embeddings = await self._embedding_model.embed(sentences)
+            emb_array = np.array(embeddings)
 
-        # Find breakpoints
-        breakpoints = self._find_breakpoints(emb_array)
+            # Find breakpoints
+            breakpoints = self._find_breakpoints(emb_array)
 
-        # Group sentences into chunks at breakpoints
-        raw_chunks = self._group_sentences(sentences, breakpoints)
+            # Group sentences into chunks at breakpoints
+            raw_chunks = self._group_sentences(sentences, breakpoints)
+        else:
+            raw_chunks = sentences
 
         # Post-process: merge small, split large
         processed = self._post_process(raw_chunks)
@@ -173,12 +176,23 @@ class SemanticChunker(BaseChunker):
     def _find_breakpoints(self, embeddings: np.ndarray) -> list[int]:
         """Find sentence indices where a semantic break should occur.
 
-        Compares consecutive sentence embeddings and marks positions where
-        the cosine similarity drops below the threshold.
+        Compares sliding windows of sentence embeddings using buffer_size and marks
+        positions where the cosine similarity drops below the threshold.
         """
         breakpoints: list[int] = []
         for i in range(1, len(embeddings)):
-            sim = _cosine_similarity(embeddings[i - 1], embeddings[i])
+            # Define sliding windows around the breakpoint index i
+            left_start = max(0, i - self._buffer_size)
+            left_window = embeddings[left_start:i]
+            
+            right_end = min(len(embeddings), i + self._buffer_size)
+            right_window = embeddings[i:right_end]
+            
+            # Compute window-averaged embeddings
+            left_emb = np.mean(left_window, axis=0)
+            right_emb = np.mean(right_window, axis=0)
+            
+            sim = _cosine_similarity(left_emb, right_emb)
             if sim < self._breakpoint_threshold:
                 breakpoints.append(i)
         return breakpoints
@@ -202,38 +216,42 @@ class SemanticChunker(BaseChunker):
 
     def _post_process(self, chunks: list[str]) -> list[str]:
         """Merge chunks that are too small; split chunks that are too large."""
-        # First pass: merge small chunks
+        # First pass: merge small chunks safely
         merged: list[str] = []
-        buffer = ""
-        for chunk in chunks:
-            if buffer:
-                combined = buffer + " " + chunk
-                if len(combined) <= self._max_chunk_size:
-                    buffer = combined
-                    continue
-                else:
-                    merged.append(buffer)
-                    buffer = chunk
-            elif len(chunk) < self._min_chunk_size:
-                buffer = chunk
-            else:
-                buffer = chunk
+        buffer: list[str] = []
 
-            if len(buffer) >= self._min_chunk_size:
-                merged.append(buffer)
-                buffer = ""
+        for chunk in chunks:
+            if len(chunk) >= self._min_chunk_size and not buffer:
+                merged.append(chunk)
+            else:
+                # Calculate what the length would be if we merge
+                combined_len = sum(len(x) for x in buffer) + len(buffer) + len(chunk)
+                if combined_len > self._max_chunk_size and buffer:
+                    # Flush existing buffer
+                    merged.append(" ".join(buffer))
+                    buffer = [chunk]
+                else:
+                    buffer.append(chunk)
+
+                # If buffer is now large enough, flush it
+                buffer_len = sum(len(x) for x in buffer) + max(0, len(buffer) - 1)
+                if buffer_len >= self._min_chunk_size:
+                    merged.append(" ".join(buffer))
+                    buffer = []
 
         if buffer:
+            leftover = " ".join(buffer)
             if merged:
+                # Try to append to the last chunk if it fits
                 last = merged[-1]
-                if len(last) + len(buffer) + 1 <= self._max_chunk_size:
-                    merged[-1] = last + " " + buffer
+                if len(last) + len(leftover) + 1 <= self._max_chunk_size:
+                    merged[-1] = last + " " + leftover
                 else:
-                    merged.append(buffer)
+                    merged.append(leftover)
             else:
-                merged.append(buffer)
+                merged.append(leftover)
 
-        # Second pass: split oversized chunks
+        # Second pass: split oversized chunks with character-level fallback
         final: list[str] = []
         for chunk in merged:
             if len(chunk) <= self._max_chunk_size:
@@ -242,7 +260,17 @@ class SemanticChunker(BaseChunker):
                 sub_sentences = _split_sentences(chunk)
                 sub_buffer = ""
                 for sent in sub_sentences:
-                    if sub_buffer and len(sub_buffer) + len(sent) + 1 > self._max_chunk_size:
+                    if len(sent) > self._max_chunk_size:
+                        # Flush current sub_buffer first
+                        if sub_buffer:
+                            final.append(sub_buffer)
+                            sub_buffer = ""
+                        # Fallback to hard character-splitting for the long sentence
+                        for start in range(0, len(sent), self._max_chunk_size):
+                            sub = sent[start: start + self._max_chunk_size].strip()
+                            if sub:
+                                final.append(sub)
+                    elif sub_buffer and len(sub_buffer) + len(sent) + 1 > self._max_chunk_size:
                         final.append(sub_buffer)
                         sub_buffer = sent
                     else:

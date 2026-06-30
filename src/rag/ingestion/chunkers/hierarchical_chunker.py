@@ -17,6 +17,7 @@ from ...core.interfaces import BaseChunker
 from ...core.registry import ComponentRegistry
 from ...core.types import Chunk, Document, LifecycleStage
 from ...observability.tracing import trace_operation
+from .recursive_chunker import RecursiveChunker
 
 logger = structlog.get_logger(__name__)
 
@@ -56,6 +57,20 @@ class HierarchicalChunker(BaseChunker):
         self._parent_overlap = parent_overlap
         self._child_overlap = child_overlap
         self._separators = separators or ["\n\n", "\n", ". ", " ", ""]
+        
+        # Instantiate recursive splitters for parents and children
+        self._parent_splitter = RecursiveChunker(
+            max_chunk_size=parent_chunk_size,
+            chunk_overlap=parent_overlap,
+            separators=self._separators,
+            **kwargs
+        )
+        self._child_splitter = RecursiveChunker(
+            max_chunk_size=child_chunk_size,
+            chunk_overlap=child_overlap,
+            separators=self._separators,
+            **kwargs
+        )
 
     @trace_operation(LifecycleStage.CHUNK, "hierarchical_chunk")
     async def chunk(self, document: Document) -> list[Chunk]:
@@ -70,49 +85,31 @@ class HierarchicalChunker(BaseChunker):
         Returns:
             Flat list of all Chunks (parents first, then children).
         """
-        # 1. Create parent chunks
-        parent_texts = self._split_text(
-            document.content,
-            self._parent_chunk_size,
-            self._parent_overlap,
-        )
+        # 1. Create parent chunks using the parent splitter
+        parent_chunks = await self._parent_splitter.chunk(document)
 
         all_chunks: list[Chunk] = []
-        parent_index = 0
+        chunk_idx = 0
 
-        for p_idx, parent_text in enumerate(parent_texts):
-            # Create parent chunk
-            parent_chunk = Chunk(
-                content=parent_text,
-                document_id=document.id,
-                metadata=document.metadata.model_copy(deep=True),
-                chunk_index=parent_index,
-                token_count=len(parent_text.split()),
-            )
+        for parent_chunk in parent_chunks:
+            parent_chunk.chunk_index = chunk_idx
+            if not parent_chunk.metadata.custom:
+                parent_chunk.metadata.custom = {}
             parent_chunk.metadata.custom["hierarchy_level"] = "parent"
-            parent_index += 1
+            chunk_idx += 1
 
             # 2. Create child chunks from this parent
-            child_texts = self._split_text(
-                parent_text,
-                self._child_chunk_size,
-                self._child_overlap,
-            )
+            temp_doc = Document(content=parent_chunk.content, metadata=document.metadata)
+            child_chunks = await self._child_splitter.chunk(temp_doc)
 
-            child_chunks: list[Chunk] = []
-            for c_idx, child_text in enumerate(child_texts):
-                child_chunk = Chunk(
-                    content=child_text,
-                    document_id=document.id,
-                    metadata=document.metadata.model_copy(deep=True),
-                    parent_id=parent_chunk.id,
-                    chunk_index=parent_index,
-                    token_count=len(child_text.split()),
-                )
+            for c_idx, child_chunk in enumerate(child_chunks):
+                child_chunk.parent_id = parent_chunk.id
+                child_chunk.chunk_index = chunk_idx
+                if not child_chunk.metadata.custom:
+                    child_chunk.metadata.custom = {}
                 child_chunk.metadata.custom["hierarchy_level"] = "child"
                 child_chunk.metadata.custom["child_index"] = c_idx
-                parent_index += 1
-                child_chunks.append(child_chunk)
+                chunk_idx += 1
 
             # 3. Link parent to children
             parent_chunk.children_ids = [c.id for c in child_chunks]
@@ -123,7 +120,7 @@ class HierarchicalChunker(BaseChunker):
         logger.info(
             "hierarchical_chunk_complete",
             document_id=document.id,
-            parents=len(parent_texts),
+            parents=len(parent_chunks),
             total_chunks=len(all_chunks),
         )
         return all_chunks
@@ -153,83 +150,3 @@ class HierarchicalChunker(BaseChunker):
             all_chunks.extend(result)
 
         return all_chunks
-
-    # ── Internal ─────────────────────────────────────────────────────
-
-    def _split_text(
-        self,
-        text: str,
-        max_size: int,
-        overlap: int,
-    ) -> list[str]:
-        """Split text into chunks using the separator hierarchy with overlap.
-
-        Tries separators in order; for each separator that appears in the text,
-        splits on it and merges the resulting pieces to fit within ``max_size``.
-        """
-        # Find the best separator
-        separator = ""
-        for sep in self._separators:
-            if sep == "" or sep in text:
-                separator = sep
-                break
-
-        if separator:
-            raw_splits = text.split(separator)
-        else:
-            raw_splits = list(text)
-
-        # Clean splits
-        splits = [s.strip() for s in raw_splits if s.strip()]
-
-        if not splits:
-            return [text] if text.strip() else []
-
-        # Merge splits into chunks with overlap
-        chunks: list[str] = []
-        current_parts: list[str] = []
-        current_len = 0
-
-        for split in splits:
-            split_len = len(split)
-            separator_len = len(separator) if current_parts else 0
-
-            if current_len + separator_len + split_len > max_size and current_parts:
-                chunk_text = separator.join(current_parts).strip()
-                if chunk_text:
-                    chunks.append(chunk_text)
-
-                # Build overlap from the end of current_parts
-                overlap_parts: list[str] = []
-                overlap_len = 0
-                for part in reversed(current_parts):
-                    if overlap_len + len(part) > overlap:
-                        break
-                    overlap_parts.insert(0, part)
-                    overlap_len += len(part)
-
-                current_parts = overlap_parts
-                current_len = sum(len(p) for p in current_parts) + len(separator) * max(
-                    len(current_parts) - 1, 0
-                )
-
-            current_parts.append(split)
-            current_len += (separator_len if len(current_parts) > 1 else 0) + split_len
-
-        if current_parts:
-            chunk_text = separator.join(current_parts).strip()
-            if chunk_text:
-                chunks.append(chunk_text)
-
-        # Final pass: hard-split any chunks that still exceed max_size
-        final: list[str] = []
-        for chunk in chunks:
-            if len(chunk) <= max_size:
-                final.append(chunk)
-            else:
-                for start in range(0, len(chunk), max_size - overlap):
-                    sub = chunk[start: start + max_size].strip()
-                    if sub:
-                        final.append(sub)
-
-        return final

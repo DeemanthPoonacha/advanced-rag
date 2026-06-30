@@ -163,3 +163,107 @@ async def test_markdown_header_chunker():
     assert "Complete details." in chunks[2].content
     assert chunks[2].metadata.custom["markdown_headers"] == {1: "Details"}
 
+
+@pytest.mark.asyncio
+async def test_recursive_chunker_order_and_fallback():
+    # Test order preservation with an oversized split in the middle
+    chunker = RecursiveChunker(max_chunk_size=20, chunk_overlap=0)
+    doc = Document(content="AAAA B_VERY_LONG_PART_EXCEEDING_MAX CCCC")
+    chunks = await chunker.chunk(doc)
+    
+    # Order must be strictly preserved: AAAA -> B part 1 -> B part 2 -> CCCC
+    contents = [c.content for c in chunks]
+    assert contents[0] == "AAAA"
+    assert contents[-1] == "CCCC"
+    # Fallback to character split should not insert spaces between characters
+    assert any("B_VERY" in c for c in contents)
+    assert not any("B _ V E R Y" in c for c in contents)
+
+
+@pytest.mark.asyncio
+async def test_by_title_chunker_sorting():
+    from rag.ingestion.chunkers.by_title_chunker import ByTitleChunker
+    from rag.core.types import DocumentMetadata
+    
+    chunker = ByTitleChunker(max_chunk_size=100, chunk_overlap=0, prepend_title=True)
+    docs = [
+        Document(content="Intro Title", metadata=DocumentMetadata(source="doc.txt", page_number=1, custom={"element_type": "title"})),
+        Document(content="Body text under intro.", metadata=DocumentMetadata(source="doc.txt", page_number=1, custom={"element_type": "text"})),
+        Document(content="Setup Title", metadata=DocumentMetadata(source="doc.txt", page_number=2, custom={"element_type": "title"})),
+        Document(content="Body text under setup.", metadata=DocumentMetadata(source="doc.txt", page_number=2, custom={"element_type": "text"})),
+    ]
+    chunks = await chunker.chunk_batch(docs)
+    
+    # We expect 2 chunks.
+    # Chunk 1: Body text under intro. (Intro Title was prepended to it)
+    # Chunk 2: Body text under setup. (Setup Title was prepended to it)
+    assert len(chunks) == 2
+    assert chunks[0].content == "Section: Intro Title\n\nIntro Title\n\nBody text under intro."
+    assert chunks[1].content == "Section: Setup Title\n\nSetup Title\n\nBody text under setup."
+
+
+@pytest.mark.asyncio
+async def test_markdown_header_chunker_empty_sections():
+    # Test that empty sections (like # Intro and ## Setup before # Details) are not silently dropped
+    doc = Document(content="# Intro\n## Setup\n# Details\nSome text.")
+    chunker = MarkdownHeaderChunker(max_chunk_size=100, chunk_overlap=10, prepend_headers=True)
+    chunks = await chunker.chunk(doc)
+    
+    # We expect two chunks:
+    # 1. Containing the empty headers '# Intro\n\n## Setup'
+    # 2. Containing '# Details\n\nSome text.'
+    assert len(chunks) == 2
+    assert chunks[0].content == "# Intro\n## Setup"
+    assert chunks[0].metadata.custom["markdown_headers"] == {1: "Intro", 2: "Setup"}
+    
+    assert "# Details" in chunks[1].content
+    assert "Some text." in chunks[1].content
+    assert chunks[1].metadata.custom["markdown_headers"] == {1: "Details"}
+
+
+@pytest.mark.asyncio
+async def test_semantic_chunker_buffer_size_and_limits():
+    # 1. Test size constraint violation fallback
+    embeddings = [[1.0, 0.0, 0.0]]
+    mock_embed = MockEmbeddingModel(sentence_embeddings=embeddings)
+    # max_chunk_size = 50, but sentence is 80 chars
+    long_text = "A" * 80 + "."
+    doc = Document(content=long_text)
+    chunker = SemanticChunker(embedding_model=mock_embed, max_chunk_size=50, min_chunk_size=10)
+    
+    chunks = await chunker.chunk(doc)
+    # The oversized sentence should have been character-split so no chunk exceeds max_chunk_size (50)
+    for c in chunks:
+        assert len(c.content) <= 50
+
+    # 2. Test safe merging (does not destructively merge unrelated normal chunks)
+    # C1 (200 chars), C2 (50 chars), C3 (200 chars). min = 100, max = 500.
+    # C1 and C3 should not be merged together; C2 should merge with C3.
+    embeddings_2 = [
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ]
+    mock_embed_2 = MockEmbeddingModel(sentence_embeddings=embeddings_2)
+    # We set breakpoint threshold very high to force splits at all three sentences
+    chunker_2 = SemanticChunker(embedding_model=mock_embed_2, breakpoint_threshold=1.5, max_chunk_size=500, min_chunk_size=100)
+    
+    # Construct content such that:
+    # Sentence 1 is 200 chars.
+    # Sentence 2 is 50 chars.
+    # Sentence 3 is 200 chars.
+    s1 = "A" * 199 + "."
+    s2 = "B" * 49 + "."
+    s3 = "C" * 199 + "."
+    doc_2 = Document(content=f"{s1} {s2} {s3}")
+    chunks_2 = await chunker_2.chunk(doc_2)
+    
+    # We expect 2 chunks:
+    # Chunk 0: Sentence 1 ("A...") - length ~200
+    # Chunk 1: Sentence 2 + Sentence 3 ("B... C...") - length ~250 (Sentence 2 was merged with 3 because it was < min_chunk_size)
+    # Sentence 1 should NOT be merged with them.
+    assert len(chunks_2) == 2
+    assert chunks_2[0].content.startswith("A")
+    assert chunks_2[1].content.startswith("B")
+
+

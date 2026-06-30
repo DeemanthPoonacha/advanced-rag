@@ -63,7 +63,7 @@ class RecursiveChunker(BaseChunker):
             Ordered list of Chunks.
         """
         raw_texts = self._split_text(document.content, self._separators)
-        merged = self._merge_splits(raw_texts)
+        merged = raw_texts
 
         chunks: list[Chunk] = []
         for idx, text in enumerate(merged):
@@ -114,11 +114,9 @@ class RecursiveChunker(BaseChunker):
     # ── Internal ─────────────────────────────────────────────────────
 
     def _split_text(self, text: str, separators: list[str]) -> list[str]:
-        """Recursively split text using the separator hierarchy."""
+        """Recursively split text using the separator hierarchy, preserving order."""
         if len(text) <= self._max_chunk_size:
             return [text]
-
-        final_chunks: list[str] = []
 
         # Find the appropriate separator
         separator = separators[-1]
@@ -138,69 +136,87 @@ class RecursiveChunker(BaseChunker):
         else:
             splits = list(text)
 
-        # Process splits
-        good_splits: list[str] = []
+        final_chunks: list[str] = []
+        current_splits: list[str] = []
+
         for s in splits:
-            piece = s
-            if self._keep_separator and separator:
-                piece = separator + s if s != splits[0] else s
-
             if self._strip_whitespace:
-                piece = piece.strip()
-
-            if not piece:
+                s = s.strip()
+            if not s:
                 continue
 
-            if len(piece) < self._max_chunk_size:
-                good_splits.append(piece)
-            elif new_separators:
-                # Recursively split with the next separator
-                sub_chunks = self._split_text(piece, new_separators)
-                final_chunks.extend(sub_chunks)
+            if len(s) <= self._max_chunk_size:
+                current_splits.append(s)
             else:
-                # At character level, hard-split
-                for start in range(0, len(piece), self._max_chunk_size):
-                    sub = piece[start: start + self._max_chunk_size]
-                    if sub.strip():
-                        final_chunks.append(sub)
+                # Flush existing accumulated splits first
+                if current_splits:
+                    merged = self._merge_splits(current_splits, separator)
+                    final_chunks.extend(merged)
+                    current_splits = []
 
-        # Merge good splits that fit within chunk size
-        if good_splits:
-            merged = self._merge_splits(good_splits)
+                # Recursively split the large split
+                if new_separators:
+                    sub_chunks = self._split_text(s, new_separators)
+                    final_chunks.extend(sub_chunks)
+                else:
+                    # At character level, hard-split
+                    for start in range(0, len(s), self._max_chunk_size):
+                        sub = s[start: start + self._max_chunk_size]
+                        if self._strip_whitespace:
+                            sub = sub.strip()
+                        if sub:
+                            final_chunks.append(sub)
+
+        # Flush any remaining accumulated splits
+        if current_splits:
+            merged = self._merge_splits(current_splits, separator)
             final_chunks.extend(merged)
 
         return final_chunks
 
-    def _merge_splits(self, splits: list[str]) -> list[str]:
+    def _merge_splits(self, splits: list[str], separator: str = "") -> list[str]:
         """Merge small splits into chunks respecting max_chunk_size and overlap."""
         chunks: list[str] = []
         current_parts: list[str] = []
         current_length = 0
 
+        # Determine joiner based on keep_separator
+        joiner = separator if self._keep_separator else ""
+
         for split in splits:
             split_len = len(split)
+            # The length of separator we would insert
+            separator_len = len(joiner) if current_parts else 0
 
-            if current_length + split_len + (1 if current_parts else 0) > self._max_chunk_size:
+            # Check if this split fits in the current chunk
+            if current_length + separator_len + split_len > self._max_chunk_size:
                 if current_parts:
-                    chunk_text = " ".join(current_parts)
+                    chunk_text = joiner.join(current_parts)
                     if self._strip_whitespace:
                         chunk_text = chunk_text.strip()
                     if chunk_text:
                         chunks.append(chunk_text)
 
-                    # Keep overlap
-                    while current_length > self._chunk_overlap and current_parts:
-                        removed = current_parts.pop(0)
-                        current_length -= len(removed) + (1 if current_parts else 0)
+                    # Keep overlap: remove parts from start until length is within overlap
+                    while current_parts:
+                        if len(current_parts) == 1:
+                            current_parts = []
+                            current_length = 0
+                            break
+
+                        current_parts.pop(0)
+                        current_length = sum(len(p) for p in current_parts) + len(joiner) * (len(current_parts) - 1)
+                        if current_length <= self._chunk_overlap:
+                            break
 
                 current_parts.append(split)
-                current_length = sum(len(p) for p in current_parts) + (len(current_parts) - 1 if current_parts else 0)
+                current_length = sum(len(p) for p in current_parts) + len(joiner) * (len(current_parts) - 1)
             else:
                 current_parts.append(split)
-                current_length += split_len + (1 if len(current_parts) > 1 else 0)
+                current_length += (separator_len if len(current_parts) > 1 else 0) + split_len
 
         if current_parts:
-            chunk_text = " ".join(current_parts)
+            chunk_text = joiner.join(current_parts)
             if self._strip_whitespace:
                 chunk_text = chunk_text.strip()
             if chunk_text:

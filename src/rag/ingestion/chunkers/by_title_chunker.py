@@ -69,13 +69,10 @@ class ByTitleChunker(BaseChunker):
         all_chunks: list[Chunk] = []
 
         for source, docs in source_groups.items():
-            # Sort elements by page number, ensuring titles trigger at start
+            # Sort elements by page number, keeping the original layout order of elements on the same page
             docs_sorted = sorted(
                 docs,
-                key=lambda d: (
-                    d.metadata.page_number or 0,
-                    1 if (d.metadata.custom or {}).get("element_type") == "title" else 0
-                )
+                key=lambda d: d.metadata.page_number or 0
             )
 
             current_title = ""
@@ -97,8 +94,16 @@ class ByTitleChunker(BaseChunker):
 
                 # Split section text to fit within max bounds (accounting for prepended header size)
                 sub_max = max(100, self._max_chunk_size - len(title_header))
-                splits = self._sub_splitter._split_text(section_text, self._sub_splitter._separators)
-                merged_splits = self._sub_splitter._merge_splits(splits)
+                
+                # Use a local splitter to avoid modifying shared instance state concurrently
+                sub_splitter = RecursiveChunker(
+                    max_chunk_size=sub_max,
+                    chunk_overlap=self._chunk_overlap,
+                    separators=self._sub_splitter._separators,
+                    keep_separator=self._sub_splitter._keep_separator,
+                    strip_whitespace=self._sub_splitter._strip_whitespace,
+                )
+                merged_splits = sub_splitter._split_text(section_text, sub_splitter._separators)
 
                 for text in merged_splits:
                     ref_doc = current_section_docs[0]
