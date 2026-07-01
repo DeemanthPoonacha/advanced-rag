@@ -316,6 +316,7 @@ export function ConfigPanel() {
     configData?.ingestion?.chunker?.provider || "semantic";
   const llmTemp = configData?.llm?.config?.temperature ?? 0.1;
   const retrievalStrategy = configData?.retrieval?.strategy || "simple";
+  const hybridAlpha = configData?.retrieval?.config?.alpha ?? 0.5;
   const topK = configData?.retrieval?.top_k || 5;
   const similarityThreshold =
     configData?.retrieval?.similarity_threshold || 0.0;
@@ -2002,6 +2003,7 @@ export function ConfigPanel() {
                       className={inputCls}
                     >
                       <option value="simple">Simple Dense Search</option>
+                      <option value="hybrid">Hybrid (Dense + Sparse)</option>
                       <option value="multi_query">Multi-Query Expansion</option>
                       <option value="contextual_compression">
                         Contextual Compression
@@ -2011,6 +2013,32 @@ export function ConfigPanel() {
                       </option>
                     </select>
                   </div>
+
+                  {retrievalStrategy === "hybrid" && (
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          Hybrid Alpha (Dense Weight)
+                          <InfoTooltip text="Weight given to dense vector search. 1.0 is pure dense, 0.0 is pure keyword/sparse." />
+                        </span>
+                        <RangeValue value={hybridAlpha.toFixed(2)} />
+                      </label>
+                      <input
+                        type="range"
+                        min="0.0"
+                        max="1.0"
+                        step="0.05"
+                        value={hybridAlpha}
+                        onChange={(e) =>
+                          handleUpdateConfigValue(
+                            ["retrieval", "config", "alpha"],
+                            parseFloat(e.target.value),
+                          )
+                        }
+                        className={rangeBaseCls}
+                      />
+                    </div>
+                  )}
 
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold flex items-center justify-between">
