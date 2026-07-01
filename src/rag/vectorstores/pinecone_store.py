@@ -214,6 +214,7 @@ class PineconeVectorStore(BaseVectorStore):
         top_k: int = 10,
         alpha: float = 0.5,
         filters: dict[str, Any] | None = None,
+        query_text: str | None = None,
     ) -> list[RetrievalResult]:
         """Hybrid dense + sparse search.
 

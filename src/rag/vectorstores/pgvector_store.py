@@ -234,47 +234,77 @@ class PgvectorStore(BaseVectorStore):
         top_k: int = 10,
         alpha: float = 0.5,
         filters: dict[str, Any] | None = None,
+        query_text: str | None = None,
     ) -> list[RetrievalResult]:
-        """Hybrid search combining vector similarity with full-text ranking.
+        """Hybrid search combining vector similarity with PostgreSQL full-text ranking.
 
-        Uses pg_tsvector for the sparse component (BM25-style ranking)
-        and pgvector for the dense component.
+        Uses a SQL-level Reciprocal Rank Fusion (RRF) to combine results from
+        the pgvector cosine index and pg_tsvector full-text index.
 
         Args:
             query_embedding: Dense query vector.
-            sparse_vector: Not directly used; full-text query is derived from context.
+            sparse_vector: Not directly used; full-text search query is derived from query_text.
             top_k: Maximum results.
-            alpha: Weight for dense score.
+            alpha: Weight for dense rank (1 - alpha applied to sparse rank).
             filters: JSONB metadata filters.
+            query_text: Raw query text used for full-text search.
 
         Returns:
             Fused scored results.
         """
-        # For pgvector, we use full-text search as the sparse signal
+        if not query_text or not query_text.strip():
+            logger.info("pgvector_hybrid_fallback_dense", reason="empty_query_text")
+            return await self.search(query_embedding, top_k, filters)
+
         pool = await self._get_pool()
         dist_op = self._distance_ops.get(self._distance, "<=>")
         embedding_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
 
         where_clause, params = self._build_where(filters, param_offset=4)
+        and_where_clause = where_clause.replace("WHERE", "AND", 1) if where_clause else ""
 
+        # Using SQL CTEs to perform dense and sparse retrievals,
+        # then FULL OUTER JOINing and scoring them using RRF formula.
         query = f"""
             WITH dense_results AS (
                 SELECT id, content, document_id, metadata, parent_id,
                        chunk_index, token_count,
-                       1 - (embedding {dist_op} $1::vector) as dense_score
+                       ROW_NUMBER() OVER (ORDER BY embedding {dist_op} $1::vector) as rank
                 FROM {self._table_name}
                 {where_clause}
                 ORDER BY embedding {dist_op} $1::vector
-                LIMIT $2
+                LIMIT $2 * 2
+            ),
+            sparse_results AS (
+                SELECT id, content, document_id, metadata, parent_id,
+                       chunk_index, token_count,
+                       ROW_NUMBER() OVER (ORDER BY ts_rank_cd(to_tsvector('english', content), websearch_to_tsquery('english', $3)) DESC) as rank
+                FROM {self._table_name}
+                WHERE to_tsvector('english', content) @@ websearch_to_tsquery('english', $3)
+                {and_where_clause}
+                ORDER BY ts_rank_cd(to_tsvector('english', content), websearch_to_tsquery('english', $3)) DESC
+                LIMIT $2 * 2
+            ),
+            fused AS (
+                SELECT 
+                    COALESCE(d.id, s.id) as id,
+                    COALESCE(d.content, s.content) as content,
+                    COALESCE(d.document_id, s.document_id) as document_id,
+                    COALESCE(d.metadata, s.metadata) as metadata,
+                    COALESCE(d.parent_id, s.parent_id) as parent_id,
+                    COALESCE(d.chunk_index, s.chunk_index) as chunk_index,
+                    COALESCE(d.token_count, s.token_count) as token_count,
+                    (COALESCE(1.0 / (60.0 + d.rank), 0.0) * $4) + (COALESCE(1.0 / (60.0 + s.rank), 0.0) * (1.0 - $4)) as combined_score
+                FROM dense_results d
+                FULL OUTER JOIN sparse_results s ON d.id = s.id
             )
-            SELECT *, dense_score * $3 as combined_score
-            FROM dense_results
+            SELECT * FROM fused
             ORDER BY combined_score DESC
             LIMIT $2
         """
 
         async with pool.acquire() as conn:
-            rows = await conn.fetch(query, embedding_str, top_k, alpha, alpha, *params)
+            rows = await conn.fetch(query, embedding_str, top_k, query_text, alpha, *params)
 
         return [self._row_to_result(row, "hybrid") for row in rows]
 

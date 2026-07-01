@@ -129,12 +129,43 @@ class BaseEmbeddingModel(ABC):
     async def embed_sparse(self, texts: list[str]) -> list[SparseVector]:
         """Produce sparse embeddings for hybrid search.
 
-        Default implementation raises ``NotImplementedError`` — override in
-        providers that support sparse representations (SPLADE, BOW, etc.).
+        Default implementation uses a deterministic token-hashing bag-of-words
+        representation, allowing hybrid search to work out-of-the-box for all models.
         """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} does not support sparse embeddings"
-        )
+        import hashlib
+        import re
+        from collections import Counter
+
+        results = []
+        word_pattern = re.compile(r'\b\w+\b')
+
+        for text in texts:
+            tokens = word_pattern.findall(text.lower())
+            if not tokens:
+                results.append(SparseVector(indices=[], values=[]))
+                continue
+
+            counts = Counter(tokens)
+
+            # Map tokens to deterministic integer indices using md5 hash
+            token_indices = []
+            token_values = []
+
+            for token, count in counts.items():
+                h = int(hashlib.md5(token.encode('utf-8')).hexdigest(), 16)
+                idx = h % 1048576  # 2^20 dimensionality
+                val = float(count)
+                token_indices.append(idx)
+                token_values.append(val)
+
+            # Sort by index for consistency
+            sorted_pairs = sorted(zip(token_indices, token_values))
+            indices = [p[0] for p in sorted_pairs]
+            values = [p[1] for p in sorted_pairs]
+
+            results.append(SparseVector(indices=indices, values=values))
+
+        return results
 
     async def close(self) -> None:
         """Release resources (HTTP clients, GPU memory)."""
@@ -246,6 +277,7 @@ class BaseVectorStore(ABC):
         top_k: int = 10,
         alpha: float = 0.5,
         filters: dict[str, Any] | None = None,
+        query_text: str | None = None,
     ) -> list[RetrievalResult]:
         """Combined dense + sparse search with alpha-weighted fusion.
 

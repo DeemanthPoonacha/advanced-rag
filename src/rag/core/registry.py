@@ -80,6 +80,7 @@ _IMPLEMENTATION_MODULES: list[str] = [
     "rag.retrieval.strategies.multi_query",
     "rag.retrieval.strategies.contextual_compression",
     "rag.retrieval.strategies.auto_merging",
+    "rag.retrieval.strategies.hybrid",
     # Rerankers
     "rag.retrieval.rerankers.cohere_reranker",
     "rag.retrieval.rerankers.cross_encoder_reranker",

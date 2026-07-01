@@ -8,6 +8,7 @@ from rag.retrieval.strategies.simple_retriever import SimpleRetriever
 from rag.retrieval.strategies.multi_query import MultiQueryRetriever, ExpandedQueries
 from rag.retrieval.strategies.contextual_compression import ContextualCompressionRetriever, CompressedContent
 from rag.retrieval.strategies.auto_merging import AutoMergingRetriever
+from rag.retrieval.strategies.hybrid import HybridRetriever
 from rag.retrieval.rerankers.cohere_reranker import CohereReranker
 from rag.retrieval.rerankers.cross_encoder_reranker import CrossEncoderReranker
 
@@ -45,6 +46,34 @@ async def test_simple_retriever(setup_retrieval_data):
     assert len(results) == 2
     assert results[0].score == 0.8
     mock_store.search.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_hybrid_retriever(setup_retrieval_data):
+    _, _, _, res1, _, _ = setup_retrieval_data
+    
+    mock_store = MagicMock()
+    mock_store.hybrid_search = AsyncMock(return_value=[res1])
+    
+    mock_embed = MagicMock()
+    mock_embed.embed_query = AsyncMock(return_value=[0.1, 0.2])
+    # The default/mock embed_sparse will be called
+    mock_embed.embed_sparse = AsyncMock(return_value=[SparseVector(indices=[1], values=[1.0])])
+    
+    retriever = HybridRetriever(vector_store=mock_store, embedding_model=mock_embed, alpha=0.6)
+    ctx = QueryContext(original_query="hello", top_k=1)
+    results = await retriever.retrieve(ctx)
+    
+    assert len(results) == 1
+    assert results[0].score == 0.8
+    mock_store.hybrid_search.assert_called_once_with(
+        query_embedding=[0.1, 0.2],
+        sparse_vector=SparseVector(indices=[1], values=[1.0]),
+        top_k=1,
+        alpha=0.6,
+        filters=None,
+        query_text="hello"
+    )
 
 
 @pytest.mark.asyncio

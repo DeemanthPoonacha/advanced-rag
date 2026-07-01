@@ -158,3 +158,30 @@ async def test_local_embedding_model():
         normalize_embeddings=True,
         show_progress_bar=False
     )
+
+
+from rag.core.interfaces import BaseEmbeddingModel
+
+class DummyEmbeddingModel(BaseEmbeddingModel):
+    async def embed(self, texts): return []
+    async def embed_query(self, query): return []
+    @property
+    def dimensions(self): return 128
+
+@pytest.mark.asyncio
+async def test_default_embed_sparse():
+    embedder = DummyEmbeddingModel()
+    results = await embedder.embed_sparse(["hello world hello"])
+    assert len(results) == 1
+    s_vec = results[0]
+    assert len(s_vec.indices) == 2
+    assert len(s_vec.values) == 2
+    # "hello" has count 2.0, "world" has count 1.0
+    assert 2.0 in s_vec.values
+    assert 1.0 in s_vec.values
+    
+    # Check that empty string returns empty sparse vector
+    empty_res = await embedder.embed_sparse([""])
+    assert len(empty_res) == 1
+    assert len(empty_res[0].indices) == 0
+    assert len(empty_res[0].values) == 0

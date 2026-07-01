@@ -13,3 +13,6 @@ htmlcov/
 
 # Local database and data uploads
 data/
+
+# Graphify generated artifacts
+graphify-out/
