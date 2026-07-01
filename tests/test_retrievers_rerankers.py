@@ -9,6 +9,7 @@ from rag.retrieval.strategies.multi_query import MultiQueryRetriever, ExpandedQu
 from rag.retrieval.strategies.contextual_compression import ContextualCompressionRetriever, CompressedContent
 from rag.retrieval.strategies.auto_merging import AutoMergingRetriever
 from rag.retrieval.strategies.hybrid import HybridRetriever
+from rag.retrieval.strategies.self_query import SelfQueryRetriever, SelfQueryOutput
 from rag.retrieval.rerankers.cohere_reranker import CohereReranker
 from rag.retrieval.rerankers.cross_encoder_reranker import CrossEncoderReranker
 
@@ -73,6 +74,77 @@ async def test_hybrid_retriever(setup_retrieval_data):
         alpha=0.6,
         filters=None,
         query_text="hello"
+    )
+
+
+@pytest.mark.asyncio
+async def test_self_query_retriever(setup_retrieval_data):
+    _, _, _, res1, _, _ = setup_retrieval_data
+    
+    mock_store = MagicMock()
+    mock_store.search = AsyncMock(return_value=[res1])
+    mock_store.hybrid_search = AsyncMock(return_value=[res1])
+    
+    mock_embed = MagicMock()
+    mock_embed.embed_query = AsyncMock(return_value=[0.1])
+    mock_embed.embed_sparse = AsyncMock(return_value=[SparseVector(indices=[1], values=[1.0])])
+    
+    mock_llm = MagicMock()
+    mock_llm.generate_structured = AsyncMock(
+        return_value=SelfQueryOutput(
+            query="sales",
+            filters={"file_name": "document.pdf", "page_number": 5, "invalid_key": "ignored"}
+        )
+    )
+    
+    # Test dense mode
+    retriever = SelfQueryRetriever(
+        vector_store=mock_store,
+        embedding_model=mock_embed,
+        llm=mock_llm,
+        allowed_keys=["file_name", "page_number"],
+        search_type="dense"
+    )
+    
+    ctx = QueryContext(original_query="Show sales from page 5 of document.pdf", filters={"manual_key": "val"})
+    results = await retriever.retrieve(ctx)
+    
+    assert len(results) == 1
+    assert results[0].retrieval_method == "self_query_dense"
+    mock_llm.generate_structured.assert_called_once()
+    
+    # Assert filters merged properly, and invalid_key was excluded
+    expected_filters = {
+        "manual_key": "val",
+        "file_name": "document.pdf",
+        "page_number": 5
+    }
+    mock_store.search.assert_called_once_with(
+        query_embedding=[0.1],
+        top_k=10,
+        filters=expected_filters
+    )
+    
+    # Test hybrid mode
+    mock_llm.generate_structured.reset_mock()
+    retriever_hybrid = SelfQueryRetriever(
+        vector_store=mock_store,
+        embedding_model=mock_embed,
+        llm=mock_llm,
+        allowed_keys=["file_name", "page_number"],
+        search_type="hybrid",
+        alpha=0.4
+    )
+    results_hybrid = await retriever_hybrid.retrieve(ctx)
+    assert len(results_hybrid) == 1
+    assert results_hybrid[0].retrieval_method == "self_query_hybrid"
+    mock_store.hybrid_search.assert_called_once_with(
+        query_embedding=[0.1],
+        sparse_vector=SparseVector(indices=[1], values=[1.0]),
+        top_k=10,
+        alpha=0.4,
+        filters=expected_filters,
+        query_text="sales"
     )
 
 

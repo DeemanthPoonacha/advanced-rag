@@ -329,6 +329,8 @@ export function ConfigPanel() {
   const multiQueryNumQueries = configData?.retrieval?.config?.num_queries ?? 3;
   const multiQueryRrfK = configData?.retrieval?.config?.rrf_k ?? 60;
   const compressionConcurrency = configData?.retrieval?.config?.compression_concurrency ?? 5;
+  const selfQuerySearchType = configData?.retrieval?.config?.search_type || "dense";
+  const selfQueryAllowedKeys = configData?.retrieval?.config?.allowed_keys || ["file_name", "file_type", "source", "page_number", "language"];
 
   return (
     <div className="flex-1 flex flex-col gap-4 max-w-7xl w-full mx-auto overflow-hidden">
@@ -2016,6 +2018,7 @@ export function ConfigPanel() {
                       <option value="auto_merging">
                         Auto-Merging Retrieval
                       </option>
+                      <option value="self_query">Self-Querying (Auto-Filter)</option>
                     </select>
                   </div>
 
@@ -2173,6 +2176,68 @@ export function ConfigPanel() {
                         className={rangeBaseCls}
                       />
                     </div>
+                  )}
+
+                  {retrievalStrategy === "self_query" && (
+                    <>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold flex items-center gap-1">
+                          Backing Search Type
+                          <InfoTooltip text="Method used to search the vector database after extracting filters." />
+                        </label>
+                        <select
+                          value={selfQuerySearchType}
+                          onChange={(e) =>
+                            handleUpdateConfigValue(
+                              ["retrieval", "config", "search_type"],
+                              e.target.value,
+                            )
+                          }
+                          className={inputCls}
+                        >
+                          <option value="dense">Dense Vector Search</option>
+                          <option value="hybrid">Hybrid (Dense + Sparse) Search</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold flex items-center gap-1">
+                          Allowed Pre-Filter Keys
+                          <InfoTooltip text="Metadata fields the LLM is permitted to extract and query on." />
+                        </label>
+                        <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
+                          {["file_name", "file_type", "source", "page_number", "language"].map((key) => {
+                            const isChecked = selfQueryAllowedKeys.includes(key);
+                            return (
+                              <label
+                                key={key}
+                                className={`text-[10px] px-2 py-1 rounded-md border cursor-pointer select-none transition-colors ${
+                                  isChecked
+                                    ? "bg-emerald-500 border-emerald-500 text-white"
+                                    : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    const updated = e.target.checked
+                                      ? [...selfQueryAllowedKeys, key]
+                                      : selfQueryAllowedKeys.filter((k: string) => k !== key);
+                                    handleUpdateConfigValue(
+                                      ["retrieval", "config", "allowed_keys"],
+                                      updated,
+                                    );
+                                  }}
+                                  className="hidden"
+                                />
+                                {key}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
                   )}
 
                   <div className="flex flex-col gap-1.5">

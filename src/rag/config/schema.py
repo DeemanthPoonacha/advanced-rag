@@ -230,7 +230,7 @@ class RetrievalConfig(BaseModel):
     """Retrieval strategy + reranker configuration."""
 
     strategy: Literal[
-        "simple", "multi_query", "contextual_compression", "auto_merging", "hybrid"
+        "simple", "multi_query", "contextual_compression", "auto_merging", "hybrid", "self_query"
     ] = "simple"
     config: dict[str, Any] = Field(default_factory=dict)
     reranker: RerankerConfig | None = None
