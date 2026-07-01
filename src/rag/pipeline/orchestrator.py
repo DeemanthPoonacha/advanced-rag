@@ -23,7 +23,7 @@ from ..core.types import (
     QueryContext,
     TokenUsage,
 )
-from ..observability.tracing import trace_operation
+from ..observability.tracing import setup_tracing, trace_operation
 
 logger = structlog.get_logger(__name__)
 
@@ -52,6 +52,10 @@ class RAGPipelineOrchestrator:
             config: Pipeline configuration model.
         """
         self.config = config
+        
+        # Initialize observability tracing
+        setup_tracing(config.observability.tracing)
+
         self.factory = ComponentFactory(config)
 
         # Ingestion components

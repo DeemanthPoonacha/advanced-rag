@@ -7,6 +7,10 @@ from unittest.mock import MagicMock, AsyncMock
 import inngest
 inngest.Inngest.send = AsyncMock(return_value=[])
 
+# Mock setup_tracing to avoid OTel connection warnings during tests
+import rag.observability.tracing as tracing
+tracing.setup_tracing = lambda *args, **kwargs: None
+
 # 1. Create and inject all shared mock modules into sys.modules
 mock_openai = MagicMock()
 mock_anthropic = MagicMock()

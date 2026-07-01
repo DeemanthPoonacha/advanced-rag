@@ -99,11 +99,11 @@ observability:
     provider: prometheus
   tracing:
     api_key: null
-    enabled: false
-    endpoint: http://localhost:4317
+    enabled: true
+    endpoint: https://api.smith.langchain.com/otel
     provider: opentelemetry
     sample_rate: 1
-    service_name: rag-pipeline
+    service_name: advanced-rag-pipeline
 project:
   environment: development
   name: local-multimodal-pipeline

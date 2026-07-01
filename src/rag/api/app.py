@@ -275,17 +275,6 @@ async def summarize_missing_documents(ctx: inngest.Context) -> dict:
     return {"num_updated": num_updated, "remaining": remaining}
 
 
-@inngest_client.create_function(
-    fn_id="scheduled_summarization_sweep",
-    trigger=inngest.TriggerCron(cron="*/5 * * * *"),
-)
-async def scheduled_summarization_sweep(ctx: inngest.Context) -> dict:
-    await ctx.step.send_event(
-        "trigger-summarizer",
-        inngest.Event(name="document/summarize", data={})
-    )
-    return {"triggered": True}
-
 def init_orchestrator():
     global orchestrator, init_error
     try:
@@ -307,11 +296,6 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app_inst: FastAPI):
     init_orchestrator()
-    # Trigger a startup sweep of missing summaries via Inngest client
-    try:
-        await inngest_client.send(inngest.Event(name="document/summarize", data={}))
-    except Exception as e:
-        print(f"Failed to send startup summarizer trigger: {e}")
     yield
     global orchestrator
     if orchestrator:
@@ -339,7 +323,7 @@ app.add_middleware(
 inngest.fast_api.serve(
     app,
     inngest_client,
-    [ingest_document_workflow, summarize_missing_documents, scheduled_summarization_sweep],
+    [ingest_document_workflow, summarize_missing_documents],
 )
 
 # ── API Models ────────────────────────────────────────────────────────

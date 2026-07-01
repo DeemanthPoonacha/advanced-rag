@@ -61,13 +61,10 @@ def setup_tracing(config: TracingConfig) -> None:
 
 
 def _setup_opentelemetry(config: TracingConfig) -> None:
-    """Wire up OpenTelemetry with OTLP/gRPC exporter."""
+    """Wire up OpenTelemetry with OTLP/gRPC or OTLP/HTTP exporter."""
     global _tracer, _tracing_enabled
     try:
         from opentelemetry import trace
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
-            OTLPSpanExporter,
-        )
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -77,7 +74,33 @@ def _setup_opentelemetry(config: TracingConfig) -> None:
         sampler = TraceIdRatioBased(config.sample_rate)
         provider = TracerProvider(resource=resource, sampler=sampler)
 
-        exporter = OTLPSpanExporter(endpoint=config.endpoint)
+        headers = {}
+        if config.api_key:
+            headers["x-api-key"] = config.api_key
+        if "api.smith.langchain.com" in config.endpoint:
+            headers["Langsmith-Project"] = config.service_name
+
+        # Choose exporter based on endpoint URL structure
+        if "4317" in config.endpoint or (not config.endpoint.startswith("http://") and not config.endpoint.startswith("https://")):
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+                OTLPSpanExporter,
+            )
+            exporter = OTLPSpanExporter(endpoint=config.endpoint, headers=headers)
+            exporter_type = "grpc"
+        else:
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+                OTLPSpanExporter,
+            )
+            endpoint_url = config.endpoint
+            # Auto-append /v1/traces if needed for OTLP HTTP
+            if not endpoint_url.endswith("/v1/traces"):
+                if endpoint_url.endswith("/otel"):
+                    endpoint_url = endpoint_url + "/v1/traces"
+                elif endpoint_url.endswith("/otel/"):
+                    endpoint_url = endpoint_url + "v1/traces"
+            exporter = OTLPSpanExporter(endpoint=endpoint_url, headers=headers)
+            exporter_type = "http"
+
         provider.add_span_processor(BatchSpanProcessor(exporter))
 
         trace.set_tracer_provider(provider)
@@ -86,6 +109,7 @@ def _setup_opentelemetry(config: TracingConfig) -> None:
         logger.info(
             "opentelemetry_tracing_initialized",
             endpoint=config.endpoint,
+            exporter_type=exporter_type,
             service=config.service_name,
             sample_rate=config.sample_rate,
         )
@@ -123,6 +147,49 @@ def _setup_langsmith(config: TracingConfig) -> None:
 # ─── Decorator ───────────────────────────────────────────────────────────
 
 
+def _serialize_value(val: Any) -> Any:
+    """Recursively convert custom objects (Pydantic, datetime, etc) to JSON-serializable types."""
+    import datetime
+    
+    # 1. Pydantic Models (prioritize model_dump_json as it serializes all custom types cleanly)
+    if hasattr(val, "model_dump_json"):
+        try:
+            import json
+            return _serialize_value(json.loads(val.model_dump_json()))
+        except Exception:
+            pass
+    if hasattr(val, "model_dump"):
+        try:
+            return _serialize_value(val.model_dump(mode="json"))
+        except Exception:
+            try:
+                return _serialize_value(val.model_dump())
+            except Exception:
+                pass
+    if hasattr(val, "dict"):
+        try:
+            return _serialize_value(val.dict())
+        except Exception:
+            pass
+
+    # 2. Primitives
+    if isinstance(val, (str, int, float, bool, type(None))):
+        return val
+    if isinstance(val, datetime.datetime):
+        return val.isoformat()
+    if isinstance(val, datetime.date):
+        return val.isoformat()
+
+    # 3. Containers
+    if isinstance(val, dict):
+        return {str(k): _serialize_value(v) for k, v in val.items()}
+    if isinstance(val, (list, tuple, set)):
+        return [_serialize_value(item) for item in val]
+
+    # 4. Fallback to str/repr
+    return str(val)
+
+
 def trace_operation(
     stage: LifecycleStage,
     operation: str | None = None,
@@ -158,12 +225,35 @@ def trace_operation(
                     with _tracer.start_as_current_span(span_name) as span:
                         span.set_attribute("rag.stage", stage.value)
                         span.set_attribute("rag.operation", op_name)
+
+                        # Record inputs
+                        cleaned_args = list(args)
+                        if len(cleaned_args) > 0 and not isinstance(cleaned_args[0], (str, int, float, bool, dict, list)):
+                            cleaned_args = cleaned_args[1:]
+                        inputs_val = cleaned_args[0] if len(cleaned_args) == 1 and not kwargs else {"args": cleaned_args, "kwargs": kwargs}
+                        import json
+                        try:
+                            inputs_json = json.dumps(_serialize_value(inputs_val))
+                            span.set_attribute("inputs", inputs_json)
+                            span.set_attribute("input.value", inputs_json)
+                        except Exception:
+                            span.set_attribute("inputs", str(inputs_val))
+                            span.set_attribute("input.value", str(inputs_val))
+
                         start = time.perf_counter()
+                        collected_items = []
                         try:
                             async for item in func(*args, **kwargs):
                                 yield item
+                                if isinstance(item, str):
+                                    collected_items.append(item)
                             elapsed = (time.perf_counter() - start) * 1000
                             span.set_attribute("rag.duration_ms", elapsed)
+                            if collected_items:
+                                output_str = "".join(collected_items)
+                                outputs_json = json.dumps({"output": output_str})
+                                span.set_attribute("outputs", outputs_json)
+                                span.set_attribute("output.value", outputs_json)
                         except Exception as exc:
                             span.set_attribute("rag.error", str(exc))
                             span.record_exception(exc)
@@ -190,11 +280,44 @@ def trace_operation(
                 with _tracer.start_as_current_span(span_name) as span:
                     span.set_attribute("rag.stage", stage.value)
                     span.set_attribute("rag.operation", op_name)
+
+                    # Record inputs
+                    cleaned_args = list(args)
+                    if len(cleaned_args) > 0 and not isinstance(cleaned_args[0], (str, int, float, bool, dict, list)):
+                        cleaned_args = cleaned_args[1:]
+                    inputs_val = cleaned_args[0] if len(cleaned_args) == 1 and not kwargs else {"args": cleaned_args, "kwargs": kwargs}
+                    import json
+                    try:
+                        inputs_json = json.dumps(_serialize_value(inputs_val))
+                        span.set_attribute("inputs", inputs_json)
+                        span.set_attribute("input.value", inputs_json)
+                    except Exception:
+                        span.set_attribute("inputs", str(inputs_val))
+                        span.set_attribute("input.value", str(inputs_val))
+
                     start = time.perf_counter()
                     try:
                         result = await func(*args, **kwargs)
                         elapsed = (time.perf_counter() - start) * 1000
                         span.set_attribute("rag.duration_ms", elapsed)
+
+                        # Record outputs
+                        try:
+                            serialized_result = _serialize_value(result)
+                            if not isinstance(serialized_result, dict):
+                                if isinstance(serialized_result, list):
+                                    outputs_dict = {"results": serialized_result}
+                                else:
+                                    outputs_dict = {"output": serialized_result}
+                            else:
+                                outputs_dict = serialized_result
+                            outputs_json = json.dumps(outputs_dict)
+                            span.set_attribute("outputs", outputs_json)
+                            span.set_attribute("output.value", outputs_json)
+                        except Exception:
+                            span.set_attribute("outputs", str(result))
+                            span.set_attribute("output.value", str(result))
+
                         return result
                     except Exception as exc:
                         span.set_attribute("rag.error", str(exc))

@@ -2591,6 +2591,48 @@ export function ConfigPanel() {
                       />
                     </div>
 
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-semibold flex items-center gap-1">
+                        Tracing Service Name
+                        <InfoTooltip text="OTLP service.name or LangSmith Project Name." />
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="rag-pipeline"
+                        value={
+                          configData.observability?.tracing?.service_name || ""
+                        }
+                        onChange={(e) =>
+                          handleUpdateConfigValue(
+                            ["observability", "tracing", "service_name"],
+                            e.target.value,
+                          )
+                        }
+                        className={inputSmCls}
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-semibold flex items-center gap-1">
+                        Tracing API Key
+                        <InfoTooltip text="Secure API key (e.g. x-api-key or LANGCHAIN_API_KEY value)." />
+                      </label>
+                      <input
+                        type="password"
+                        placeholder="Optional API Key"
+                        value={
+                          configData.observability?.tracing?.api_key || ""
+                        }
+                        onChange={(e) =>
+                          handleUpdateConfigValue(
+                            ["observability", "tracing", "api_key"],
+                            e.target.value,
+                          )
+                        }
+                        className={inputSmCls}
+                      />
+                    </div>
+
                     <Toggle
                       label="Prometheus Metrics"
                       description="Expose scraping endpoint for performance queries"
