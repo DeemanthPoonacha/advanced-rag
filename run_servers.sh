@@ -13,14 +13,21 @@ echo "============================================="
 
 # 1. Start FastAPI Backend in background
 echo "-> Starting FastAPI backend on http://localhost:8000..."
-.venv/bin/uvicorn src.rag.api.app:app --host 0.0.0.0 --port 8000 --loop uvloop --http httptools --timeout-keep-alive 30 &
+INNGEST_DEV=1 .venv/bin/uvicorn src.rag.api.app:app --host 0.0.0.0 --port 8000 --loop uvloop --http httptools --timeout-keep-alive 30 &
 BACKEND_PID=$!
 
-# Ensure backend stops when this script is interrupted
+# 1b. Start Inngest Dev Server in background
+echo "-> Starting Inngest Dev Server on http://localhost:8288..."
+npx inngest-cli@latest dev --port 8288 &
+INNGEST_PID=$!
+
+# Ensure backend and Inngest stop when this script is interrupted
 cleanup() {
     echo ""
     echo "-> Shutting down FastAPI backend (PID $BACKEND_PID)..."
     kill $BACKEND_PID 2>/dev/null || true
+    echo "-> Shutting down Inngest Dev Server (PID $INNGEST_PID)..."
+    kill $INNGEST_PID 2>/dev/null || true
     echo "-> Done. Goodbye!"
 }
 trap cleanup EXIT INT TERM

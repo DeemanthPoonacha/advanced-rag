@@ -23,48 +23,268 @@ from rag.core.interfaces import (
 # Global orchestrator and initialization status
 orchestrator: Optional[RAGPipelineOrchestrator] = None
 init_error: Optional[str] = None
-background_summarizer_task: Optional[asyncio.Task] = None
-summarizer_trigger_event = asyncio.Event()
 
-async def run_background_summarizer():
-    """Background task loop that processes missing summaries and goes to sleep when done.
-    
-    Uses the (updated_count, remaining_count) tuple returned by
-    update_missing_summaries() to avoid a redundant full-scan of the vector store.
-    """
-    await asyncio.sleep(5)  # Wait for startup and other initializations to stabilize
-    
-    # Run once on startup to resolve any historical missing summaries
-    trigger_startup = True
-    
-    while True:
+import inngest
+import inngest.fast_api
+import structlog
+
+# Initialize Inngest client
+inngest_client = inngest.Inngest(
+    app_id="advanced-rag-api",
+    logger=structlog.get_logger("inngest")
+)
+
+@inngest_client.create_function(
+    fn_id="ingest_document",
+    trigger=inngest.TriggerEvent(event="document/uploaded"),
+)
+async def ingest_document_workflow(ctx: inngest.Context) -> dict:
+    global orchestrator
+    if not orchestrator:
+        init_orchestrator()
+    if not orchestrator:
+        raise Exception("Orchestrator could not be initialized")
+
+    file_path = ctx.event.data["file_path"]
+    filename = ctx.event.data["filename"]
+    metadata = ctx.event.data.get("metadata") or {}
+
+    # Initialize status in-memory for progress compatibility
+    orchestrator.ingestion_status[filename] = {
+        "step": 2,
+        "status": "partitioning",
+        "details": "Analyzing layout to partition text, tables, and images...",
+        "text_count": 0,
+        "table_count": 0,
+        "image_count": 0,
+        "title_count": 0,
+        "total_elements": 0,
+        "chunks_count": 0,
+        "chunks": []
+    }
+
+    # Step 1: Parse the file
+    async def run_parse():
+        import json
+        docs = await orchestrator.parser.parse(file_path, metadata)
+        return [json.loads(doc.model_dump_json()) for doc in docs]
+
+    docs_json = await ctx.step.run("parse", run_parse)
+    if not docs_json:
+        orchestrator.ingestion_status[filename] = {
+            "step": 3,
+            "status": "completed",
+            "details": "No elements found to parse.",
+            "text_count": 0, "table_count": 0, "image_count": 0, "title_count": 0,
+            "total_elements": 0, "chunks_count": 0, "chunks": []
+        }
+        return {"chunk_ids": []}
+
+    from rag.core.types import Document, Chunk
+    documents = [Document.model_validate(d) for d in docs_json]
+
+    # Calculate and update elements statistics for UI
+    text_count = 0
+    table_count = 0
+    image_count = 0
+    title_count = 0
+    for doc in documents:
+        m_dict = doc.metadata.model_dump() if hasattr(doc.metadata, "model_dump") else doc.metadata
+        custom = m_dict.get("custom", {})
+        if not isinstance(custom, dict):
+            custom = {}
+        tables = custom.get("tables_html", [])
+        if not isinstance(tables, list):
+            tables = [tables] if tables else []
+        images = custom.get("images_base64", [])
+        if not isinstance(images, list):
+            images = [images] if images else []
+        if tables:
+            table_count += len(tables)
+        if images:
+            image_count += len(images)
+        el_type = custom.get("element_type", "text")
+        if el_type == "text":
+            text_count += 1
+        elif el_type == "table":
+            if not tables:
+                table_count += 1
+        elif el_type == "image":
+            if not images:
+                image_count += 1
+        elif el_type == "title":
+            title_count += 1
+            
+    total_elements = text_count + table_count + image_count + title_count
+
+    # Update status to step 3: chunking
+    orchestrator.ingestion_status[filename] = {
+        "step": 3,
+        "status": "chunking",
+        "details": "Segmenting document into semantic blocks and generating AI summaries...",
+        "text_count": text_count,
+        "table_count": table_count,
+        "image_count": image_count,
+        "title_count": title_count,
+        "total_elements": total_elements,
+        "chunks_count": 0,
+        "chunks": []
+    }
+
+    # Step 2: Chunking & AI Summarization
+    async def run_chunking():
+        import json
+        chunks = await orchestrator._chunk_documents(documents)
+        return [json.loads(chunk.model_dump_json()) for chunk in chunks]
+
+    chunks_json = await ctx.step.run("chunking", run_chunking)
+    if not chunks_json:
+        orchestrator.ingestion_status[filename] = {
+            "step": 3,
+            "status": "completed",
+            "details": "Layout partitioned, but 0 chunks created.",
+            "text_count": text_count, "table_count": table_count, "image_count": image_count, "title_count": title_count,
+            "total_elements": total_elements, "chunks_count": 0, "chunks": []
+        }
+        return {"chunk_ids": []}
+
+    chunks = [Chunk.model_validate(c) for c in chunks_json]
+
+    # Update status to indexing
+    orchestrator.ingestion_status[filename] = {
+        "step": 3,
+        "status": "indexing",
+        "details": "Embedding text blocks and upserting into vector DB...",
+        "text_count": text_count,
+        "table_count": table_count,
+        "image_count": image_count,
+        "title_count": title_count,
+        "total_elements": total_elements,
+        "chunks_count": len(chunks),
+        "chunks": []
+    }
+
+    # Step 3: Embeddings
+    async def run_embedding():
+        import json
+        texts = [chunk.content for chunk in chunks]
+        embeddings = await orchestrator.embedding_model.embed(texts)
+        
+        sparse_embeddings = None
         try:
-            if not trigger_startup:
-                # Wait until triggered by a new upload or other updates
-                await summarizer_trigger_event.wait()
-                summarizer_trigger_event.clear()
-            
-            trigger_startup = False
-            
-            if orchestrator:
-                num_updated, remaining = await orchestrator.update_missing_summaries()
-                if num_updated > 0:
-                    print(f"Background Summarizer: Successfully updated {num_updated} chunk summaries.")
-                
-                if remaining > 0 and num_updated > 0:
-                    # We made progress but some are still missing. Sleep and retry.
-                    await asyncio.sleep(15)
-                    trigger_startup = True
-                else:
-                    # No progress made (LLM probably offline) or all complete. Go to sleep.
-                    trigger_startup = False
-                    
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            print(f"Error in background summarizer task: {e}")
-            await asyncio.sleep(15)
-            trigger_startup = False
+            if hasattr(orchestrator.embedding_model, "embed_sparse"):
+                sparse_embeddings = await orchestrator.embedding_model.embed_sparse(texts)
+        except Exception:
+            pass
+
+        # Attach embeddings to chunks
+        for i, chunk in enumerate(chunks):
+            chunk.embedding = embeddings[i]
+            if sparse_embeddings:
+                s_vec = sparse_embeddings[i]
+                chunk.sparse_embedding = dict(zip(s_vec.indices, s_vec.values))
+        return [json.loads(c.model_dump_json()) for c in chunks]
+
+    chunks_with_embeddings_json = await ctx.step.run("embedding", run_embedding)
+    chunks_with_embeddings = [Chunk.model_validate(c) for c in chunks_with_embeddings_json]
+
+    # Step 4: Indexing in Vector Store
+    async def run_indexing():
+        chunk_ids = await orchestrator.vector_store.upsert(chunks_with_embeddings)
+        return chunk_ids
+
+    chunk_ids = await ctx.step.run("indexing", run_indexing)
+
+    # Format chunks for UI compatibility
+    formatted_chunks = []
+    for c in chunks_with_embeddings:
+        c_m = c.metadata.model_dump() if hasattr(c.metadata, "model_dump") else c.metadata
+        file_type = c_m.get("file_type", "")
+        custom = c_m.get("custom", {})
+        if not isinstance(custom, dict):
+            custom = {}
+        element_type = custom.get("element_type", "text")
+        
+        formatted_chunks.append({
+            "id": c.id,
+            "document_id": c.document_id,
+            "content": c.content,
+            "metadata": {
+                "source": c_m.get("source", ""),
+                "file_name": c_m.get("file_name", ""),
+                "file_type": file_type,
+                "custom": {
+                    "element_type": element_type,
+                    "tables_html": custom.get("tables_html", []),
+                    "images_base64": custom.get("images_base64", [])
+                }
+            }
+        })
+
+    # Update status to completed
+    orchestrator.ingestion_status[filename] = {
+        "step": 3,
+        "status": "completed",
+        "details": f"Successfully ingested {len(chunk_ids)} chunks into the vector store.",
+        "text_count": text_count,
+        "table_count": table_count,
+        "image_count": image_count,
+        "title_count": title_count,
+        "total_elements": total_elements,
+        "chunks_count": len(chunk_ids),
+        "chunks": formatted_chunks
+    }
+
+    # Trigger background summarizer event
+    await ctx.step.send_event(
+        "trigger-summarizer",
+        inngest.Event(name="document/summarize", data={})
+    )
+
+    return {"chunk_ids": chunk_ids}
+
+
+@inngest_client.create_function(
+    fn_id="summarize_missing_documents",
+    trigger=inngest.TriggerEvent(event="document/summarize"),
+)
+async def summarize_missing_documents(ctx: inngest.Context) -> dict:
+    global orchestrator
+    if not orchestrator:
+        init_orchestrator()
+    if not orchestrator:
+        return {"status": "skipped", "reason": "orchestrator not initialized"}
+
+    # Run update_missing_summaries step
+    async def run_summarization():
+        num_updated, remaining = await orchestrator.update_missing_summaries()
+        return {"num_updated": num_updated, "remaining": remaining}
+
+    res = await ctx.step.run("update_summaries", run_summarization)
+    num_updated = res["num_updated"]
+    remaining = res["remaining"]
+
+    if remaining > 0 and num_updated > 0:
+        # Sleep for 15 seconds and trigger again
+        await ctx.step.sleep("sleep-before-retry", 15.0)
+        await ctx.step.send_event(
+            "re-trigger-summarizer",
+            inngest.Event(name="document/summarize", data={})
+        )
+
+    return {"num_updated": num_updated, "remaining": remaining}
+
+
+@inngest_client.create_function(
+    fn_id="scheduled_summarization_sweep",
+    trigger=inngest.TriggerCron(cron="*/5 * * * *"),
+)
+async def scheduled_summarization_sweep(ctx: inngest.Context) -> dict:
+    await ctx.step.send_event(
+        "trigger-summarizer",
+        inngest.Event(name="document/summarize", data={})
+    )
+    return {"triggered": True}
 
 def init_orchestrator():
     global orchestrator, init_error
@@ -87,15 +307,12 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app_inst: FastAPI):
     init_orchestrator()
-    global background_summarizer_task
-    background_summarizer_task = asyncio.create_task(run_background_summarizer())
+    # Trigger a startup sweep of missing summaries via Inngest client
+    try:
+        await inngest_client.send(inngest.Event(name="document/summarize", data={}))
+    except Exception as e:
+        print(f"Failed to send startup summarizer trigger: {e}")
     yield
-    if background_summarizer_task:
-        background_summarizer_task.cancel()
-        try:
-            await background_summarizer_task
-        except asyncio.CancelledError:
-            pass
     global orchestrator
     if orchestrator:
         await orchestrator.close()
@@ -116,6 +333,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Serve Inngest endpoints
+inngest.fast_api.serve(
+    app,
+    inngest_client,
+    [ingest_document_workflow, summarize_missing_documents, scheduled_summarization_sweep],
 )
 
 # ── API Models ────────────────────────────────────────────────────────
@@ -208,7 +432,10 @@ async def update_config(req: ConfigUpdateRequest):
         init_error = None
         
         # Trigger background summarization check in case LLM configurations were updated
-        summarizer_trigger_event.set()
+        try:
+            await inngest_client.send(inngest.Event(name="document/summarize", data={}))
+        except Exception as e:
+            print(f"Failed to send config update summarizer trigger: {e}")
         
         return {
             "status": "success",
@@ -246,7 +473,10 @@ async def update_config_json(req: Dict[str, Any]):
         init_error = None
         
         # Trigger background summarization check in case LLM configurations were updated
-        summarizer_trigger_event.set()
+        try:
+            await inngest_client.send(inngest.Event(name="document/summarize", data={}))
+        except Exception as e:
+            print(f"Failed to send config update summarizer trigger: {e}")
         
         return {
             "status": "success",
@@ -698,17 +928,14 @@ async def ingest_files(
     uploads_dir = Path("data/uploads")
     uploads_dir.mkdir(parents=True, exist_ok=True)
     
-    total_chunk_ids = []
-    ingested_files_log = []
+    queued_files_log = []
     
-    async def ingest_single_file(file: UploadFile):
+    for file in files:
         current_filename = file.filename
-        uploads_file_path = None
         try:
             # Generate unique uploads filename to prevent conflict
             file_extension = Path(str(current_filename)).suffix
             uploads_file_name = f"{current_filename}{uuid.uuid4()}{file_extension}"
-            # uploads_file_name = f"{uuid.uuid4()}{file_extension}"
             uploads_file_path = uploads_dir / uploads_file_name
             
             # Save file to uploads path via run_in_executor to avoid blocking the event loop
@@ -721,70 +948,52 @@ async def ingest_files(
             # Run ingestion metadata
             file_metadata = {**metadata, "filename": current_filename, "file_name": current_filename}
             
-            # Call orchestrator ingest directly - status logic is now inside orchestrator!
-            chunk_ids = await orchestrator.ingest_source(
-                source=str(uploads_file_path),
-                metadata=file_metadata
-            )
-            return current_filename, chunk_ids, None
-        except Exception as file_err:
-            orchestrator.set_ingestion_failed(str(current_filename), str(file_err))
-            return current_filename, [], file_err
-        finally:
-            pass
-            # Clean up temporary file
-            # if uploads_file_path and uploads_file_path.exists():
-            #     try:
-            #         uploads_file_path.unlink()
-            #     except Exception:
-            #         pass
-
-    try:
-        tasks = [ingest_single_file(f) for f in files]
-        results = await asyncio.gather(*tasks)
-        
-        failures = []
-        for filename, chunk_ids, error in results:
-            if error:
-                failures.append({"filename": filename, "error": str(error)})
-            else:
-                total_chunk_ids.extend(chunk_ids)
-                ingested_files_log.append({
-                    "filename": filename,
-                    "chunks_count": len(chunk_ids)
-                })
-
-        if failures and len(failures) == len(files):
-            # All files failed, raise error
-            raise HTTPException(
-                status_code=500,
-                detail=f"All file ingestions failed: {failures}"
+            # Set status to uploading before dispatching the event
+            orchestrator.ingestion_status[current_filename] = {
+                "step": 1,
+                "status": "uploading",
+                "details": "Saving files locally and dispatching to background worker...",
+                "text_count": 0,
+                "table_count": 0,
+                "image_count": 0,
+                "title_count": 0,
+                "total_elements": 0,
+                "chunks_count": 0,
+                "chunks": []
+            }
+            
+            # Dispatch event to Inngest
+            await inngest_client.send(
+                inngest.Event(
+                    name="document/uploaded",
+                    data={
+                        "file_path": str(uploads_file_path),
+                        "filename": current_filename,
+                        "metadata": file_metadata
+                    }
+                )
             )
             
-        # Trigger background summarization check
-        summarizer_trigger_event.set()
-        
-        return {
-            "status": "success",
-            "message": f"Successfully ingested {len(ingested_files_log)} of {len(files)} files.",
-            "files": ingested_files_log,
-            "total_chunks_ingested": len(total_chunk_ids),
-            "chunk_ids": total_chunk_ids,
-            "failures": failures
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        pass
-        # # Cleanup any remaining files in temp uploads
-        # if uploads_dir.exists():
-        #     for f in uploads_dir.glob("*"):
-        #         try:
-        #             f.unlink()
-        #         except Exception:
-        #             pass
+            queued_files_log.append({
+                "filename": current_filename,
+                "status": "queued"
+            })
+        except Exception as file_err:
+            orchestrator.set_ingestion_failed(str(current_filename), str(file_err))
+            queued_files_log.append({
+                "filename": current_filename,
+                "status": "failed",
+                "error": str(file_err)
+            })
+
+    return {
+        "status": "success",
+        "message": f"Successfully queued {len(queued_files_log)} files for ingestion.",
+        "files": queued_files_log,
+        "total_chunks_ingested": 0,
+        "chunk_ids": [],
+        "failures": [f for f in queued_files_log if f.get("status") == "failed"]
+    }
 
 @app.delete("/api/documents/{filename}")
 async def delete_document(filename: str):

@@ -65,6 +65,7 @@ api = [
     "httptools>=0.6",
     "python-multipart>=0.0.9",
     "sse-starlette>=2.0.0",
+    "inngest",
 ]
 
 # ── Convenience bundles ──────────────────────────────────────────────

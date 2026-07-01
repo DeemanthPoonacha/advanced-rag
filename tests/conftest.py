@@ -1,5 +1,11 @@
 import sys
-from unittest.mock import MagicMock
+import os
+os.environ["INNGEST_DEV"] = "1"
+from unittest.mock import MagicMock, AsyncMock
+
+# Mock Inngest send method to avoid outbound network requests during test runs
+import inngest
+inngest.Inngest.send = AsyncMock(return_value=[])
 
 # 1. Create and inject all shared mock modules into sys.modules
 mock_openai = MagicMock()

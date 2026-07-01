@@ -3,6 +3,13 @@ from unittest.mock import MagicMock, AsyncMock
 from fastapi.testclient import TestClient
 from rag.api.app import app
 import rag.api.app as api_app
+import pytest
+
+@pytest.fixture(autouse=True)
+def restore_init_orchestrator():
+    original_init = api_app.init_orchestrator
+    yield
+    api_app.init_orchestrator = original_init
 
 def test_api_endpoints():
     print("--- Starting API Integration Tests ---")
@@ -94,7 +101,13 @@ def test_api_endpoints():
         print(f"Status Code: {res.status_code}")
         print(f"Response: {res.json()}")
         assert res.status_code == 200
-        assert res.json()["total_chunks_ingested"] > 0
+        assert res.json()["status"] == "success"
+
+        # Simulate background ingestion completion in the in-memory status
+        api_app.orchestrator.ingestion_status["test_doc.txt"] = {
+            "status": "completed",
+            "chunks_count": len(dummy_chunks)
+        }
 
         # 4. Test GET /api/status (Verify count changed)
         print("\nTesting GET /api/status (Verify Chunk Count):")

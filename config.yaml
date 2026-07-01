@@ -25,8 +25,8 @@ ingestion:
   batch_size: 10
   chunker:
     config:
-      max_chunk_size: 2000
       chunk_overlap: 300
+      max_chunk_size: 2000
     provider: by_title
   docling:
     export_format: markdown
@@ -42,10 +42,34 @@ ingestion:
   multimodal_enricher:
     api_key: null
     base_url: null
-    image_prompt: "Generate a comprehensive, searchable description of the images, diagrams, and surrounding text. Cover:\n1. Visual content analysis (charts, diagrams, drawings, or patterns in images).\n2. Key labels, text values, numbers, and data points shown in the image.\n3. Main topics and concepts discussed in the text and illustrated by the images.\n4. Questions this content could answer.\n5. Alternative search terms users might use.\nMake it detailed and searchable - prioritize findability over brevity."
+    image_prompt: 'Generate a comprehensive, searchable description of the images,
+      diagrams, and surrounding text. Cover:
+
+      1. Visual content analysis (charts, diagrams, drawings, or patterns in images).
+
+      2. Key labels, text values, numbers, and data points shown in the image.
+
+      3. Main topics and concepts discussed in the text and illustrated by the images.
+
+      4. Questions this content could answer.
+
+      5. Alternative search terms users might use.
+
+      Make it detailed and searchable - prioritize findability over brevity.'
     model_name: gpt-4o
     provider: primary
-    table_prompt: "Generate a comprehensive, searchable description of the tables and surrounding text. Cover:\n1. Key facts, numbers, and data points from the text and tables.\n2. Main topics, concepts, and relationships discussed.\n3. Questions this content could answer.\n4. Alternative search terms users might use.\nMake it detailed and searchable - prioritize findability over brevity."
+    table_prompt: 'Generate a comprehensive, searchable description of the tables
+      and surrounding text. Cover:
+
+      1. Key facts, numbers, and data points from the text and tables.
+
+      2. Main topics, concepts, and relationships discussed.
+
+      3. Questions this content could answer.
+
+      4. Alternative search terms users might use.
+
+      Make it detailed and searchable - prioritize findability over brevity.'
     temperature: 0
   parser:
     config:
@@ -91,7 +115,7 @@ retrieval:
     provider: cross_encoder
   reranker_top_n: 3
   similarity_threshold: 0
-  strategy: simple
+  strategy: hybrid
   top_k: 10
 vector_store:
   config:

@@ -212,7 +212,11 @@ class ComponentRegistry:
 
         for module_path in _IMPLEMENTATION_MODULES:
             try:
-                importlib.import_module(module_path)
+                import sys
+                if module_path in sys.modules:
+                    importlib.reload(sys.modules[module_path])
+                else:
+                    importlib.import_module(module_path)
                 logger.debug("Discovered module: %s", module_path)
             except ImportError as exc:
                 logger.debug(
