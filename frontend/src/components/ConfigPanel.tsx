@@ -324,6 +324,11 @@ export function ConfigPanel() {
   const rerankerTopN = configData?.retrieval?.reranker_top_n || 5;
   const embeddingsProvider = configData?.embeddings?.provider || "openai";
   const vectorProvider = configData?.vector_store?.provider || "qdrant";
+  const autoMergingMergeThreshold = configData?.retrieval?.config?.merge_threshold ?? 0.4;
+  const autoMergingFetchMultiplier = configData?.retrieval?.config?.fetch_multiplier ?? 3;
+  const multiQueryNumQueries = configData?.retrieval?.config?.num_queries ?? 3;
+  const multiQueryRrfK = configData?.retrieval?.config?.rrf_k ?? 60;
+  const compressionConcurrency = configData?.retrieval?.config?.compression_concurrency ?? 5;
 
   return (
     <div className="flex-1 flex flex-col gap-4 max-w-7xl w-full mx-auto overflow-hidden">
@@ -2033,6 +2038,136 @@ export function ConfigPanel() {
                           handleUpdateConfigValue(
                             ["retrieval", "config", "alpha"],
                             parseFloat(e.target.value),
+                          )
+                        }
+                        className={rangeBaseCls}
+                      />
+                    </div>
+                  )}
+
+                  {retrievalStrategy === "auto_merging" && (
+                    <>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            Merge Threshold
+                            <InfoTooltip text="Fraction of a parent's children that must be retrieved before merging up to the parent chunk." />
+                          </span>
+                          <RangeValue value={autoMergingMergeThreshold.toFixed(2)} />
+                        </label>
+                        <input
+                          type="range"
+                          min="0.0"
+                          max="1.0"
+                          step="0.05"
+                          value={autoMergingMergeThreshold}
+                          onChange={(e) =>
+                            handleUpdateConfigValue(
+                              ["retrieval", "config", "merge_threshold"],
+                              parseFloat(e.target.value),
+                            )
+                          }
+                          className={rangeBaseCls}
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            Fetch Multiplier
+                            <InfoTooltip text="Multiplier on top_k for the initial candidate fetch size before merging." />
+                          </span>
+                          <RangeValue value={autoMergingFetchMultiplier} />
+                        </label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="5"
+                          step="1"
+                          value={autoMergingFetchMultiplier}
+                          onChange={(e) =>
+                            handleUpdateConfigValue(
+                              ["retrieval", "config", "fetch_multiplier"],
+                              parseInt(e.target.value),
+                            )
+                          }
+                          className={rangeBaseCls}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {retrievalStrategy === "multi_query" && (
+                    <>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            Number of Queries
+                            <InfoTooltip text="Number of alternative query reformulations to generate using the LLM." />
+                          </span>
+                          <RangeValue value={multiQueryNumQueries} />
+                        </label>
+                        <input
+                          type="range"
+                          min="1"
+                          max="5"
+                          step="1"
+                          value={multiQueryNumQueries}
+                          onChange={(e) =>
+                            handleUpdateConfigValue(
+                              ["retrieval", "config", "num_queries"],
+                              parseInt(e.target.value),
+                            )
+                          }
+                          className={rangeBaseCls}
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            RRF K-Constant
+                            <InfoTooltip text="Reciprocal Rank Fusion constant (higher values smooth ranks and reduce the influence of outliers)." />
+                          </span>
+                          <RangeValue value={multiQueryRrfK} />
+                        </label>
+                        <input
+                          type="range"
+                          min="10"
+                          max="120"
+                          step="5"
+                          value={multiQueryRrfK}
+                          onChange={(e) =>
+                            handleUpdateConfigValue(
+                              ["retrieval", "config", "rrf_k"],
+                              parseInt(e.target.value),
+                            )
+                          }
+                          className={rangeBaseCls}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {retrievalStrategy === "contextual_compression" && (
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          Compression Concurrency
+                          <InfoTooltip text="Maximum number of parallel LLM calls allowed for context compression." />
+                        </span>
+                        <RangeValue value={compressionConcurrency} />
+                      </label>
+                      <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        step="1"
+                        value={compressionConcurrency}
+                        onChange={(e) =>
+                          handleUpdateConfigValue(
+                            ["retrieval", "config", "compression_concurrency"],
+                            parseInt(e.target.value),
                           )
                         }
                         className={rangeBaseCls}
