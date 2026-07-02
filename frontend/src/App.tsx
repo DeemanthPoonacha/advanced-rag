@@ -265,7 +265,7 @@ export default function App() {
       {/* Image Preview Modal */}
       {previewImageUrl && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md animate-fade-in cursor-zoom-out"
+          className="fixed inset-0 z-[150] flex items-center justify-center bg-black/50 backdrop-blur-md animate-fade-in cursor-zoom-out"
           onClick={() => setPreviewImageUrl(null)}
         >
           <button

@@ -10,10 +10,11 @@ import {
   AlertCircle,
   Filter,
 } from "lucide-react";
-import { Message, Source, Evaluation, Attachment } from "../types";
+import { Source, Evaluation } from "../types";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useDocuments } from "../api/queries";
+import { ChunkInspector } from "./ingest/ChunkInspector";
 
 interface MessageDetailsProps {
   sources?: Source[] | null;
@@ -25,6 +26,8 @@ function MessageDetails({ sources, evaluation, latency }: MessageDetailsProps) {
   const [openSection, setOpenSection] = useState<"citations" | "eval" | null>(
     null,
   );
+  const [activeInspectorChunk, setActiveInspectorChunk] = useState<any | null>(null);
+  const [inspectorTab, setInspectorTab] = useState<"original" | "summary" | "metadata">("original");
 
   const toggleSection = (section: "citations" | "eval") => {
     setOpenSection(openSection === section ? null : section);
@@ -51,7 +54,21 @@ function MessageDetails({ sources, evaluation, latency }: MessageDetailsProps) {
               {sources.map((src, i) => (
                 <div
                   key={i}
-                  className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/50 rounded-xl text-xs space-y-1"
+                  onClick={() => {
+                    const custom = src.metadata?.custom || {};
+                    const elType = custom.element_type || "text";
+                    setActiveInspectorChunk({
+                      id: src.metadata?.chunk_id || src.metadata?.id || `src-${i}`,
+                      page: src.metadata?.page_number || 1,
+                      type: elType,
+                      snippet: src.content,
+                      originalText: custom.raw_text || src.content,
+                      summaryText: custom.summary_text || src.content,
+                      isRaw: !custom.summary_text,
+                      metadata: src.metadata || {}
+                    });
+                  }}
+                  className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/50 rounded-xl text-xs space-y-1 hover:border-primary/50 dark:hover:border-primary-light/50 cursor-pointer transition-all duration-200 active:scale-[0.99] select-none"
                 >
                   <div className="flex justify-between font-bold text-[10px] text-slate-400">
                     <span className="truncate max-w-[200px]">
@@ -62,7 +79,7 @@ function MessageDetails({ sources, evaluation, latency }: MessageDetailsProps) {
                       Similarity: {(src.score * 100).toFixed(0)}%
                     </span>
                   </div>
-                  <div className="italic text-slate-600 dark:text-slate-300 leading-relaxed font-sans pr-1">
+                  <div className="italic text-slate-600 dark:text-slate-300 leading-relaxed font-sans pr-1 truncate">
                     {src.content}
                   </div>
                 </div>
@@ -129,6 +146,25 @@ function MessageDetails({ sources, evaluation, latency }: MessageDetailsProps) {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {activeInspectorChunk && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-fade-in"
+          onClick={() => setActiveInspectorChunk(null)}
+        >
+          <div 
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-3xl h-[85vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ChunkInspector
+              selectedChunk={activeInspectorChunk}
+              setSelectedChunk={(c) => setActiveInspectorChunk(c)}
+              inspectorTab={inspectorTab}
+              setInspectorTab={setInspectorTab}
+            />
+          </div>
         </div>
       )}
     </div>
