@@ -449,16 +449,21 @@ export const useStore = create<State & Actions>((set, get) => ({
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let collectedText = "";
+        let buffer = "";
 
         while (true) {
           const { value, done } = await reader.read();
           if (done) break;
 
           const textChunk = decoder.decode(value, { stream: true });
-          const lines = textChunk.split("\n");
+          buffer += textChunk;
+          const lines = buffer.split("\n");
+          // Save the last line (which may be incomplete) to process with the next chunk
+          buffer = lines.pop() || "";
+
           for (const line of lines) {
             if (line.startsWith("data: ")) {
-              const token = line.slice(6);
+              const token = line.slice(6).replace(/\r/g, "");
               collectedText += token;
               state.updateActiveMessages((prev) => {
                 const next = [...prev];
@@ -471,6 +476,12 @@ export const useStore = create<State & Actions>((set, get) => ({
               });
             }
           }
+        }
+
+        // Process any remaining text in the buffer after stream ends
+        if (buffer && buffer.startsWith("data: ")) {
+          const token = buffer.slice(6).replace(/\r/g, "");
+          collectedText += token;
         }
 
         state.updateActiveMessages((prev) => {

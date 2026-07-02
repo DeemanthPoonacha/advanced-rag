@@ -75,8 +75,9 @@ def _setup_opentelemetry(config: TracingConfig) -> None:
         provider = TracerProvider(resource=resource, sampler=sampler)
 
         headers = {}
-        if config.api_key:
-            headers["x-api-key"] = config.api_key
+        api_key = config.api_key or os.getenv("LANGCHAIN_API_KEY")
+        if api_key:
+            headers["x-api-key"] = api_key
         if "api.smith.langchain.com" in config.endpoint:
             headers["Langsmith-Project"] = config.service_name
 
@@ -127,8 +128,9 @@ def _setup_langsmith(config: TracingConfig) -> None:
     try:
         import langsmith  # noqa: F401
 
-        if config.api_key:
-            os.environ.setdefault("LANGCHAIN_API_KEY", config.api_key)
+        api_key = config.api_key or os.getenv("LANGCHAIN_API_KEY")
+        if api_key:
+            os.environ.setdefault("LANGCHAIN_API_KEY", api_key)
         os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
         os.environ.setdefault("LANGCHAIN_PROJECT", config.service_name)
 

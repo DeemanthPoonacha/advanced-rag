@@ -98,7 +98,7 @@ observability:
     port: 9090
     provider: prometheus
   tracing:
-    api_key: null
+    api_key: ${LANGCHAIN_API_KEY}
     enabled: true
     endpoint: https://api.smith.langchain.com/otel
     provider: opentelemetry
@@ -111,7 +111,8 @@ project:
 retrieval:
   config: {}
   reranker:
-    config: {}
+    config:
+      device: cuda
     provider: cross_encoder
   reranker_top_n: 3
   similarity_threshold: 0
