@@ -6,6 +6,7 @@ Runs evaluations on generation results using TruLens feedback functions.
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Any
 
 import structlog
@@ -51,7 +52,7 @@ class TruLensEvaluator(BaseEvaluator):
         """
         self._metrics_list = metrics or ["groundedness", "answer_relevance", "context_relevance"]
         self._llm_model = llm_model
-        self._api_key = api_key
+        self._api_key = api_key or os.getenv("TRULENS_API_KEY") or os.getenv("OPENAI_API_KEY")
         self._base_url = base_url
         self._kwargs = kwargs
         self._provider: Any = None

@@ -6,6 +6,7 @@ Supports Cohere's ``embed-v3`` family with automatic input-type handling
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import structlog
@@ -49,7 +50,7 @@ class CohereEmbeddingModel(BaseEmbeddingModel):
         **kwargs: Any,
     ) -> None:
         self._model = kwargs.pop("model_name", model)
-        self._api_key = api_key
+        self._api_key = api_key or os.getenv("COHERE_API_KEY") or os.getenv("CO_API_KEY")
         self._dimensions_val = dimensions
         self._batch_size = min(batch_size, 96)  # Cohere hard limit
         self._input_type = input_type

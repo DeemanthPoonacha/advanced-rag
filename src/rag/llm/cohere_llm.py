@@ -6,6 +6,7 @@ Supports Cohere's Command R+ family with streaming and structured output.
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, AsyncIterator
 
 import structlog
@@ -49,7 +50,7 @@ class CohereLLM(BaseLLM):
         **kwargs: Any,
     ) -> None:
         self._model = model
-        self._api_key = api_key
+        self._api_key = api_key or os.getenv("COHERE_API_KEY") or os.getenv("CO_API_KEY")
         self._temperature = temperature
         self._max_tokens = max_tokens
         self._top_p = top_p

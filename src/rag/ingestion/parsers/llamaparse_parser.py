@@ -7,6 +7,7 @@ complex documents (PDFs with tables, charts, and multi-column layouts).
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from typing import Any
 
@@ -53,7 +54,7 @@ class LlamaParseParser(BaseParser):
         premium_mode: bool = False,
         max_timeout: int = 300,
     ) -> None:
-        self._api_key = api_key
+        self._api_key = api_key or os.getenv("LLAMA_CLOUD_API_KEY")
         self._result_type = result_type
         self._num_workers = num_workers
         self._language = language

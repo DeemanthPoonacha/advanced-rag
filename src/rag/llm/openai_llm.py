@@ -7,6 +7,7 @@ streaming, structured output, and tenacity retries.
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, AsyncIterator
 
 import structlog
@@ -54,7 +55,7 @@ class OpenAILLM(BaseLLM):
         **kwargs: Any,
     ) -> None:
         self._model = model
-        self._api_key = api_key
+        self._api_key = api_key or os.getenv("OPENAI_API_KEY")
         self._temperature = temperature
         self._max_tokens = max_tokens
         self._top_p = top_p

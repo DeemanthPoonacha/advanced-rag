@@ -113,6 +113,7 @@ retrieval:
   reranker:
     config:
       device: cuda
+      model_name: BAAI/bge-reranker-base
     provider: cross_encoder
   reranker_top_n: 3
   similarity_threshold: 0

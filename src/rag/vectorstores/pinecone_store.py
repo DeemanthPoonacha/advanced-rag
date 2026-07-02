@@ -6,6 +6,7 @@ namespace isolation, and batched upserts with retries.
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import structlog
@@ -51,7 +52,7 @@ class PineconeVectorStore(BaseVectorStore):
         batch_size: int = 100,
         **kwargs: Any,
     ) -> None:
-        self._api_key = api_key
+        self._api_key = api_key or os.getenv("PINECONE_API_KEY")
         self._index_name = index_name
         self._namespace = namespace
         self._cloud = cloud

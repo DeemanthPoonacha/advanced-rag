@@ -6,6 +6,7 @@ with a cross-encoder trained for relevance ranking.
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import structlog
@@ -42,7 +43,7 @@ class CohereReranker(BaseReranker):
         **kwargs: Any,
     ) -> None:
         self._model = model
-        self._api_key = api_key
+        self._api_key = api_key or os.getenv("COHERE_API_KEY") or os.getenv("CO_API_KEY")
         self._max_chunks_per_doc = max_chunks_per_doc
         self._client: Any = None
 

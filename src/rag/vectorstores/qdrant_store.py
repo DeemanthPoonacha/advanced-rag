@@ -6,6 +6,7 @@ filtering, and automatic collection creation with configurable distance metrics.
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import structlog
@@ -55,7 +56,7 @@ class QdrantVectorStore(BaseVectorStore):
         **kwargs: Any,
     ) -> None:
         self._url = url
-        self._api_key = api_key
+        self._api_key = api_key or os.getenv("QDRANT_API_KEY")
         self._collection_name = collection_name
         self._vector_size = vector_size
         self._distance = distance

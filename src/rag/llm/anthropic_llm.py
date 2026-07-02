@@ -7,6 +7,7 @@ and tenacity retries.
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, AsyncIterator
 
 import structlog
@@ -52,7 +53,7 @@ class AnthropicLLM(BaseLLM):
         **kwargs: Any,
     ) -> None:
         self._model = model
-        self._api_key = api_key
+        self._api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         self._temperature = temperature
         self._max_tokens = max_tokens
         self._top_p = top_p

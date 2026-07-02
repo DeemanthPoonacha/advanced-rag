@@ -7,6 +7,7 @@ rate-limit retries, and optional dimensionality reduction.
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Any
 
 import structlog
@@ -53,7 +54,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         **kwargs: Any,
     ) -> None:
         self._model = kwargs.pop("model_name", model)
-        self._api_key = api_key
+        self._api_key = api_key or os.getenv("OPENAI_API_KEY")
         self._dimensions_override = dimensions
         self._batch_size = batch_size
         self._max_retries = max_retries

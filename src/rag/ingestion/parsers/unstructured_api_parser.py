@@ -6,6 +6,7 @@ Offloads document partitioning and layout extraction to Unstructured's hosted se
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +32,7 @@ class UnstructuredAPIParser(BaseParser):
         **kwargs: Any,
     ) -> None:
         self._api_url = api_url
-        self._api_key = api_key
+        self._api_key = api_key or os.getenv("UNSTRUCTURED_API_KEY")
         self._strategy = strategy
         self._client = None
 

@@ -7,6 +7,7 @@ automatic collection creation, and batched upserts.
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Any
 
 import structlog
@@ -49,7 +50,7 @@ class MilvusVectorStore(BaseVectorStore):
         **kwargs: Any,
     ) -> None:
         self._uri = uri
-        self._token = token
+        self._token = token or os.getenv("MILVUS_TOKEN")
         self._collection_name = collection_name
         self._dimension = dimension
         self._metric_type = metric_type
