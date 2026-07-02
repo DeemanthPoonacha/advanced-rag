@@ -95,6 +95,14 @@ const getInitialConversations = (): Conversation[] => {
   ];
 };
 
+const getInitialTheme = (): boolean => {
+  const saved = localStorage.getItem("rag_dark_theme");
+  if (saved !== null) {
+    return saved === "true";
+  }
+  return true;
+};
+
 const getInitialActiveConversationId = (): string => {
   const savedId = localStorage.getItem("rag_active_conversation_id");
   return savedId || "default";
@@ -103,7 +111,7 @@ const getInitialActiveConversationId = (): string => {
 export const useStore = create<State & Actions>((set, get) => ({
   // Navigation & Theme
   activePage: "chat",
-  isDarkMode: true,
+  isDarkMode: getInitialTheme(),
   
   // UI Notifications
   toast: null,
@@ -134,6 +142,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   toggleTheme: () => {
     const nextDark = !get().isDarkMode;
     set({ isDarkMode: nextDark });
+    localStorage.setItem("rag_dark_theme", String(nextDark));
     if (nextDark) {
       document.documentElement.classList.add("dark");
     } else {

@@ -26,8 +26,12 @@ function MessageDetails({ sources, evaluation, latency }: MessageDetailsProps) {
   const [openSection, setOpenSection] = useState<"citations" | "eval" | null>(
     null,
   );
-  const [activeInspectorChunk, setActiveInspectorChunk] = useState<any | null>(null);
-  const [inspectorTab, setInspectorTab] = useState<"original" | "summary" | "metadata">("original");
+  const [activeInspectorChunk, setActiveInspectorChunk] = useState<any | null>(
+    null,
+  );
+  const [inspectorTab, setInspectorTab] = useState<
+    "original" | "summary" | "metadata"
+  >("original");
 
   const toggleSection = (section: "citations" | "eval") => {
     setOpenSection(openSection === section ? null : section);
@@ -58,23 +62,49 @@ function MessageDetails({ sources, evaluation, latency }: MessageDetailsProps) {
                     const custom = src.metadata?.custom || {};
                     const elType = custom.element_type || "text";
                     setActiveInspectorChunk({
-                      id: src.metadata?.chunk_id || src.metadata?.id || `src-${i}`,
+                      id:
+                        src.metadata?.chunk_id ||
+                        src.metadata?.id ||
+                        `src-${i}`,
                       page: src.metadata?.page_number || 1,
                       type: elType,
                       snippet: src.content,
                       originalText: custom.raw_text || src.content,
                       summaryText: custom.summary_text || src.content,
                       isRaw: !custom.summary_text,
-                      metadata: src.metadata || {}
+                      metadata: src.metadata || {},
                     });
                   }}
                   className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/50 rounded-xl text-xs space-y-1 hover:border-primary/50 dark:hover:border-primary-light/50 cursor-pointer transition-all duration-200 active:scale-[0.99] select-none"
                 >
                   <div className="flex justify-between font-bold text-[10px] text-slate-400">
-                    <span className="truncate max-w-[200px]">
-                      Doc {i + 1}:{" "}
-                      {src.metadata?.file_name || src.metadata?.source || "Doc"}
-                    </span>
+                    <div className="flex gap-2 items-center">
+                      <span className="truncate max-w-[200px]">
+                        Doc {i + 1}:{" "}
+                        {src.metadata?.file_name ||
+                          src.metadata?.source ||
+                          "Doc"}
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[8px] font-extrabold text-slate-500 dark:text-slate-400 uppercase">
+                        Page {src.metadata?.page_number}
+                      </span>
+                      {!!src.metadata?.custom?.images_base64?.length && (
+                        <span
+                          className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800/60 text-[8px] font-bold text-slate-500 dark:text-slate-400 capitalize"
+                          title={`Contains ${src.metadata?.custom?.images_base64?.length} images`}
+                        >
+                          image
+                        </span>
+                      )}
+                      {!!src.metadata?.custom?.tables_html?.length && (
+                        <span
+                          className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800/60 text-[8px] font-bold text-slate-500 dark:text-slate-400 capitalize"
+                          title={`Contains ${src.metadata?.custom?.tables_html?.length} images`}
+                        >
+                          table
+                        </span>
+                      )}
+                    </div>
                     <span className="text-accent font-mono">
                       Similarity: {(src.score * 100).toFixed(0)}%
                     </span>
@@ -150,11 +180,11 @@ function MessageDetails({ sources, evaluation, latency }: MessageDetailsProps) {
       )}
 
       {activeInspectorChunk && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4 animate-fade-in"
           onClick={() => setActiveInspectorChunk(null)}
         >
-          <div 
+          <div
             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-3xl h-[85vh] rounded-2xl overflow-hidden shadow-2xl flex flex-col animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >

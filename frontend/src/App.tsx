@@ -253,10 +253,19 @@ export default function App() {
   usePipelineConfig();
   useIngestStatus();
 
+  const isDarkMode = useStore((s) => s.isDarkMode);
+
   useEffect(() => {
-    document.documentElement.classList.add("dark");
-    document.documentElement.setAttribute("data-theme", "dark");
-  }, []);
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+      document.documentElement.style.setProperty("color-scheme", "dark");
+      document.documentElement.setAttribute("data-theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.style.setProperty("color-scheme", "light");
+      document.documentElement.setAttribute("data-theme", "light");
+    }
+  }, [isDarkMode]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
